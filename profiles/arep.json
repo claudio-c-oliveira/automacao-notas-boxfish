@@ -1,0 +1,9 @@
+{
+  "projeto": "AREP (S01 antigo)",
+  "prefixo_assunto_pedido": "AREP | EMISSÃO DE NF",
+  "prefixo_assunto_entrega": "AREP | NOTAS À PAGAR",
+  "texto_ref": "SMTC",
+  "retranca": "S01",
+  "planilha_cost_report": "Mesmo arquivo do Reunion — linhas sem preenchimento de cor",
+  "planilha_contratos": "BR_AREP_S01_CONTROLE_DE_CONTRATOS.xlsb"
+}

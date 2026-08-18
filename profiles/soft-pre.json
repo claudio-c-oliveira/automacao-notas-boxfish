@@ -1,0 +1,9 @@
+{
+  "projeto": "Soft Pré (S02)",
+  "prefixo_assunto_pedido": "SMTC - S02 | SOFT PRE | EMISSÃO DE NF",
+  "prefixo_assunto_entrega": "SMTC - S02 | SOFT PRE | NOTAS À PAGAR",
+  "texto_ref": "SMTC - SOFT PRE",
+  "retranca": "SOFT PRE_S02",
+  "planilha_cost_report": "BR_SMTC_S02_SOFTPRE_PROVISÓRIO.xlsx (nome pode mudar, link permanece)",
+  "planilha_contratos": "BR_SMTC_S02_CONTROLE_DE_CONTRATOS.xlsb"
+}

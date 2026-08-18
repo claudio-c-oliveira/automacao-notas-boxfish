@@ -1,0 +1,9 @@
+{
+  "projeto": "Reunion (S01)",
+  "prefixo_assunto_pedido": "SMTC - S01 | REUNION | EMISSÃO DE NF",
+  "prefixo_assunto_entrega": "SMTC - S01 | REUNION | NOTAS À PAGAR",
+  "texto_ref": "SMTC - REUNION",
+  "retranca": "REUNION_S01",
+  "planilha_cost_report": "BR_SMTC_S01__COST REPORT_VS_EXECUÇÃO_1201.xlsx — linhas com preenchimento roxo/cinza",
+  "planilha_contratos": "BR_AREP_S01_REUNION_CONTROLE_DE_CONTRATOS.xlsb"
+}
