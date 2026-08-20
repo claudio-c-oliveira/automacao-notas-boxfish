@@ -26,10 +26,17 @@ As Fases 3 e 4 acontecem juntas, não uma depois da outra — confirmado por Cla
 - 2º Filtrar Status Box = "PROGRAMAR ATÉ [data]" (texto exato). Regra pelo Status do Contrato:
 - — "Pendente" (já checado na outra planilha) → não dispara.
 - — vazio/"N/A" (já checado na outra planilha) → não dispara.
-- — "OK - Assinado" → monta e programa o e-mail de pedido, informando prazo de envio até data+5 dias, e deixa em RASCUNHO no Gmail.
-- Se o colaborador não enviar a NF até o prazo, o sistema envia cobrança automaticamente no mesmo e-mail, respondendo a "Todos".
-- 3º Filtrar Status Box = "SOLICITAR" → monta e-mail para envio imediato, mas por enquanto também fica em RASCUNHO.
-- O Status Box é atualizado assim que o rascunho é criado — não é preciso esperar o envio manual.
+- — "OK - Assinado" → monta e programa o e-mail de pedido, informando prazo de envio até data+5 dias, e deixa em RASCUNHO no Gmail. Ao criar esse rascunho pela 1ª vez: Status Box = "SOLICITADA MI".
+- 3º Filtrar Status Box = "SOLICITAR" → monta e-mail para envio imediato, mas por enquanto também fica em RASCUNHO. Mesma regra: Status Box = "SOLICITADA MI" ao criar o rascunho.
+- Quando o colaborador enviar a NF (pela thread original ou por e-mail avulso identificado — seção 4): Status Box = "RECEBIDA MI" + preenchimento das demais colunas correspondentes.
+
+### 3.1.1 Monitoramento e cobrança (a partir do dia "PROGRAMAR ATÉ")
+- No próprio dia do prazo, monitorar e-mails o dia todo: a thread original E qualquer e-mail avulso com NF em anexo (ver seção 4 — identificação fora da thread).
+- Se identificar a nota correspondente: segue fluxo normal (Status Box = "RECEBIDA MI").
+- Se não identificar até o fim do dia: agendar e-mail de cobrança pela MESMA thread para o dia seguinte.
+- Repetir a cobrança a cada 5 dias, até aproximadamente 5 dias antes do vencimento da NF (tolerância de alguns dias para mais ou menos é aceitável — não precisa ser exato). Isso funciona porque o ciclo do mês seguinte já abre uma thread nova.
+- Exemplo: Status Box = "PROGRAMAR ATÉ 20/08" e vencimento da NF em 10/09 → monitorar/cobrar a cada 5 dias entre 20/08 e ~05/09.
+- Se chegar ao fim desse ciclo sem resposta: alertar a Michelle via Telegram e ENCERRAR o fluxo automático para aquela nota — nenhuma cobrança adicional é enviada. Ação manual fica a critério da Michelle (é comum o colaborador mandar a NF com valor duplicado no ciclo do mês seguinte).
 
 ### 3.2 Dados de origem e tipos de emissão
 Usar apenas as colunas: G (Vencimento), J (Descrição), K (Valor a pagar), L (Status Box), R (E-mail do colaborador).
@@ -62,9 +69,16 @@ Confirmado: o link no e-mail do Danilo também leva o mesmo grifo azul-claro usa
 
 ## 4. Fase 2 — Recebimento e validação da nota
 - Monitorar e-mails recebidos com nota fiscal (ou recibo) anexada.
-- Caso o remetente não seja obviamente o colaborador: abrir a nota fiscal em anexo, extrair dela o nome do colaborador, a razão social e o projeto (Ref.), e usar essas informações para localizar a linha correspondente na aba Notas.
+- Todo e-mail recebido com NF em anexo deve ser checado: pertence a uma thread já em andamento (resposta ao pedido original), ou é um caso avulso (assunto diferente, não é resposta)?
+- Caso seja avulso / o remetente não seja obviamente o colaborador: abrir a nota fiscal em anexo, extrair dela o nome do colaborador, a razão social e o projeto (Ref.), e usar essas informações para localizar a linha correspondente na aba Notas.
+- Essa busca de correspondência deve ser feita via IA (API da Claude) — não por comparação exata de string nem por algoritmo fonético tradicional (tipo Soundex, que não funciona bem com nomes em português). A IA compara o nome/razão social extraído contra a lista de nomes/razões sociais da planilha e aponta a linha correspondente (ou indica que não há correspondência confiável), já lidando naturalmente com acentuação, maiúsculas/minúsculas e pequenas variações de escrita.
+- Se a IA encontrar correspondência confiável: segue o fluxo normal (para as cobranças e atualiza a planilha).
+- Se a IA NÃO encontrar nenhuma correspondência confiável: enviar mensagem via Telegram para a Michelle, informando os dados de referência que constam na nota (nome, razão social, valor, competência) e perguntando qual linha/colaborador ela associa a essa nota.
+  - Se ela responder dentro de 8h: executar a ação que ela indicou.
+  - Se não responder em 8h: reenviar o lembrete pelo Telegram.
+  - Se não responder em mais 18h (26h no total, desde a 1ª pergunta): encerrar o ciclo para aquela nota, sem ação automática — fica pendente.
 - Atualizar a planilha do Box: coluna D = tipo de documento, coluna E = número da nota (6 dígitos), coluna F = data de emissão.
-- Atualizar Status Box → "RECEBIDA MI [Rn]".
+- Atualizar Status Box → "RECEBIDA MI".
 - Salvar a nota no Drive particular da Michelle (substitui o salvamento local), na pasta do projeto, com a retranca abaixo.
 
 ### 4.1 Regra de retranca (nome do arquivo da nota)
@@ -134,10 +148,10 @@ As pastas de vencimento (`VENC_MÊS_dd.mm`) já existem pré-criadas para boa pa
 ## 5. Fase 3 + 4 — Remessa para o Danilo e Arquivamento (em paralelo)
 Confirmado por Claudio: essas duas fases acontecem juntas, na mesma execução — não uma depois da outra.
 - Filtrar recebidas por Vencimento (coluna G).
-- Importante: dentro da mesma planilha/aba Notas do S01, AREP e Reunion convivem juntos, diferenciados pela cor de preenchimento da linha (Reunion = roxo/cinza-arroxeado; AREP = sem preenchimento). Depois de filtrar por vencimento, é preciso também "Filtrar por cor" para não misturar notas dos dois projetos que caem no mesmo vencimento.
+- Importante: dentro da mesma planilha/aba Notas do S01, AREP e Reunion convivem juntos, diferenciados pela cor de preenchimento da linha (Reunion = roxo/cinza-arroxeado; AREP = sem preenchimento). Depois de filtrar por vencimento, é preciso também "Filtrar por cor" para não misturar notas dos dois projetos que caem no mesmo vencimento. Decisão técnica: o node nativo de planilha do n8n só lê valor de célula, não estilo/cor — a leitura de cor exige um node de Code usando a lib `exceljs`, o que só funciona com `NODE_FUNCTION_ALLOW_EXTERNAL=exceljs` configurado na VM do n8n (variável de ambiente + reinício do serviço + pacote `exceljs` instalado no ambiente). Confirmado configurar isso na VM (não só para o caso AREP/Reunion, mas porque outra planilha do projeto também usa cor de preenchimento e vai precisar da mesma distinção).
 - Agrupar em remessas de até 30 notas (R1, R2, R3...); regra de agrupamento no e-mail: mesmo Fornecedor + mesmo Vencimento = agrupa no mesmo e-mail, sem limite de quantidade.
 - Nunca usar "Classificar" — sempre "Filtrar" (Classificar quebra a estrutura da planilha).
-- Fazer uma cópia da planilha antes de mexer (nunca editar a original), remover as colunas que não vão para o Danilo, formatar "Valor a Pagar" como número com 2 casas decimais mantendo a cor vermelha, mudar Status Box da cópia para "ENTREGUE".
+- Fazer uma cópia da planilha antes de mexer (nunca editar a original), remover as colunas que não vão para o Danilo, formatar "Valor a Pagar" como número com 2 casas decimais mantendo a cor vermelha, mudar Status Box da cópia para "ENTREGA MI".
 - Colar o recorte formatado no e-mail do Danilo (RASCUNHO); essa mesma imagem da planilha formatada também deve ser salva na pasta de arquivamento (seção 5.3), junto com a nota fiscal.
 - Solicitar aprovação via Drive (Danielle + Vanessa).
 
@@ -153,10 +167,10 @@ Colunas (nesta ordem, SOMENTE estas): Tipo Doc Fiscal, Nº Doc Fiscal, Emissão,
 NUNCA incluir Status Cost nem Status Contrato neste recorte, em nenhum projeto.
 | TIPO DOC FISCAL | Nº DOC FISCAL | VENC. | VALOR A PAGAR | STATUS BOX |
 |---|---|---|---|---|
-| NF | 000792 | 20-ago-26 | 20647,29 | ENTREGUE |
+| NF | 000792 | 20-ago-26 | 20647,29 | ENTREGA MI |
 |  |  | TOTAL | R$ 20.647,29 |  |
 
-Fonte Verdana em todo o e-mail. Cabeçalho: fundo preto/texto branco negrito. Valor a Pagar: número com 2 casas decimais (sem "R$"), vermelho, linha a linha — só a linha de total (fundo preto) leva "R$". Status Box: destaque verde, texto exatamente "ENTREGUE" (só nesta cópia — ver variações na planilha interna, seção 5.3).
+Fonte Verdana em todo o e-mail. Cabeçalho: fundo preto/texto branco negrito. Valor a Pagar: número com 2 casas decimais (sem "R$"), vermelho, linha a linha — só a linha de total (fundo preto) leva "R$". Status Box: destaque verde, texto exatamente "ENTREGA MI" (só nesta cópia — ver variações na planilha interna, seção 5.3).
 
 ### 5.3 Arquivamento (em paralelo à entrega)
 - Mover a nota fiscal individual (retranca) e a imagem da planilha formatada (seção 5.2) para a pasta correspondente à função/cargo do colaborador.
@@ -164,7 +178,7 @@ Fonte Verdana em todo o e-mail. Cabeçalho: fundo preto/texto branco negrito. Va
 - Caminho: "FINANCEIRO > 08. NOTAS ARQUIVADAS > ARQUIVO DE NOTAS [PROJETO]" — pastas separadas por projeto ("ARQUIVO DE NOTAS S01" para AREP, "ARQUIVO DE NOTAS REUNION" para Reunion).
 - Padrão de nome de pasta por função — confirmado com exemplos reais: AREP usa "[código] - [CARGO]" (ex.: "1301 - DIRETOR GERAL"); Reunion usa "[código].R - [CARGO]" (ex.: "1301.R- DIRETOR GERAL", "7007.R - ACESSORIA JURÍDICA"); Soft Pré vai seguir o mesmo padrão do AREP ("[código] - [CARGO]") assim que surgirem os primeiros casos.
 - Atualizar a coluna "Check arquivo drive" da planilha para "OK" depois de arquivar cada nota.
-- Atualizar Status Box da planilha interna, contando por pasta de vencimento (cada vencimento tem sua própria contagem): "ENTREGUE MI" para as primeiras 30 notas entregues; "ENTREGUE MI R1" para a 31ª a 60ª; "ENTREGUE MI R2" para a 61ª a 90ª; e assim sucessivamente a cada 30. A cópia enviada ao Danilo usa sempre só "ENTREGUE", nunca "MI" nem número de remessa.
+- Atualizar Status Box da planilha interna, contando por pasta de vencimento/remessa (cada data de remessa é uma pasta nova e reinicia a contagem do zero): "ENTREGUE MI R1" para a 1ª a 30ª nota entregue naquela remessa; "ENTREGUE MI R2" para a 31ª a 60ª; "ENTREGUE MI R3" para a 61ª a 90ª; e assim sucessivamente a cada 30. Exemplo: se no dia 10/08 houver 50 notas entregues, as 30 primeiras ficam "ENTREGUE MI R1" e as 20 restantes "ENTREGUE MI R2"; uma nota de outra data (ex.: 15/08) pertence a outra pasta e a contagem de R recomeça em R1. A cópia enviada ao Danilo usa sempre só "ENTREGA MI", nunca com número de remessa.
 Vencimentos no dia 10 costumam ser os que mais acumulam notas (podendo passar de 30 e precisar de R1, R2...); as demais datas dificilmente ultrapassam 30.
 
 ## 6. Perfis de projeto (parametrização)
@@ -181,6 +195,9 @@ Cada projeto vira um "perfil" de configuração — o motor (as 4 fases) é o me
 | Retranca | S01 | REUNION_S01 | SOFT PRE_S02 |
 | Planilha Cost Report (Box) | Mesmo arquivo do Reunion — linhas sem preenchimento de cor | BR_SMTC_S01__COST REPORT_VS_EXECUÇÃO_1201.xlsx — linhas com preenchimento roxo/cinza | BR_SMTC_S02_SOFTPRE_PROVISÓRIO.xlsx (nome pode mudar, link permanece) |
 | Planilha de Contratos | BR_AREP_S01_CONTROLE_DE_CONTRATOS.xlsb | BR_AREP_S01_REUNION_CONTROLE_DE_CONTRATOS.xlsb | BR_SMTC_S02_CONTROLE_DE_CONTRATOS.xlsb |
+
+### 6.1 Apelidos de projeto (array configurável via Telegram)
+O identificador/assunto de um projeto pode mudar durante a execução do projeto (ex.: em 19/08/2026 o Soft Pré mudou de "SMTC_S02 \| SOFT PRE" para "PNS \| SOFT PRE" por pedido da Danielle, para não vazar o nome do projeto — e e-mails antigos e novos convivem, pois a Michelle já tinha enviado pedidos com o assunto antigo antes da mudança). Por isso, os apelidos de cada projeto NÃO ficam fixos no workflow (diferente do resto do perfil, que é copiado direto para dentro do workflow — seção 6): eles ficam numa aba de configuração à parte na planilha (ex.: "Config_Apelidos", colunas `projeto_id` e `apelido`), lida a cada execução. Um workflow separado no n8n recebe um comando via Telegram (ex.: `/apelido SOFT_PRE PNS | SOFT PRE`) e adiciona a nova linha nessa aba, sem precisar mexer no código do workflow principal. O motor de identificação de projeto deve considerar TODOS os apelidos cadastrados para aquele `projeto_id` como equivalentes (e-mails com qualquer um deles são tratados como o mesmo projeto).
 
 | Papel | Produção | Homologação |
 |---|---|---|
