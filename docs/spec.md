@@ -100,7 +100,9 @@ Mover/copiar a nota desse pouso para dentro do Drive de trabalho (financeiro1@no
 | Google Drive (trabalho) | Google Drive account | financeiro1@novorealitybox.com | ✅ Conectada |
 | Google Drive (particular) | Google Drive - Particular Michelle | michelle.mimiaguia@gmail.com | ✅ Conectada |
 | Telegram | Telegram account | Bot da Michelle | ✅ Conectada |
-| Box | — | — | ⏸️ Em standby — Claudio vai conversar com a Danielle antes de resolver o acesso; não desenhar nenhum workflow que dependa do Box por enquanto |
+| Box | Box account | michelle.mimiaguia@gmail.com (autorizado via app criado numa Box Developer Account separada — necessário porque contas Box comuns/gratuitas não conseguem mais salvar apps no Console do Desenvolvedor) | ✅ Conectada |
+| Claude (Anthropic API) — dev/homolog | Claude account (dev) | Chave `n8n-boxfish-notas-hml`, criada na conta do Claudio (Claude Console, workspace Default), cartão do Claudio — usada em testes e no ambiente de homologação (seção 7.4) | ✅ Criada |
+| Claude (Anthropic API) — produção | Claude account (produção) | Chave de API criada numa conta separada do Claude Console, com o e-mail michelle.mimiaguia@gmail.com e cartão próprio da Michelle — conta e organização totalmente independentes da conta do Claudio, sem consolidação de custo entre elas | ✅ Criada |
 
 
 
@@ -194,6 +196,18 @@ Tudo roda em nuvem, dentro do próprio n8n — sem script separado rodando por f
 - Extração de dados do PDF/imagem da nota fiscal: node de IA do n8n chamando a API da Claude com o anexo, devolvendo os dados em JSON.
 - Hospedagem: instância e2-micro do Google Cloud Free Tier (gratuita para sempre, região EUA), rodando o n8n 24/7 sem custo nem dependência de notebook.
 - Erros: "Error Workflow" nativo do n8n — qualquer falha dispara aviso automático no Telegram.
+- Credencial de IA: no Claude Console, o cartão de pagamento fica no nível da conta/organização (não por chave nem por workspace) — todas as chaves de uma mesma conta são cobradas no mesmo cartão. Por isso o projeto usa **duas contas Anthropic separadas**: (1) chave de dev/homologação `n8n-boxfish-notas-hml`, criada na conta pessoal do Claudio, cartão dele; (2) chave de produção, a criar numa conta nova aberta com o e-mail da Michelle (michelle.mimiaguia@gmail.com), cartão dela — contas e cobranças 100% independentes. No n8n isso vira duas credenciais separadas ("Claude account (dev)" e "Claude account (produção)"), trocadas conforme o perfil ativo (homolog/produção), do mesmo jeito que já é feito com os e-mails de teste (seção 7.4). Recomendado usar o modelo **Claude Haiku 4.5** para a extração de dados do PDF (tarefa estruturada e repetitiva, custo bem menor que Sonnet/Opus, com qualidade suficiente para esse tipo de extração).
+
+### 7.5 Estimativa de custo mensal da API Claude
+Custo pago por token (sem mensalidade fixa — só paga o que usar). Preços oficiais atuais (ago/2026): Haiku 4.5 = US$ 1/US$ 5 por milhão de tokens (entrada/saída); Sonnet 5 = US$ 2/US$ 10 por milhão (preço promocional válido até 31/08/2026, depois volta a US$ 3/US$ 15).
+Estimativa para o volume deste projeto (~50 a 150 notas fiscais/mês somando os 3 projetos, 1 a 2 chamadas de IA por nota — extração + eventual formatação):
+| Cenário | Modelo | Estimativa mensal |
+|---|---|---|
+| Volume baixo (~50 notas/mês) | Haiku 4.5 | < US$ 1 |
+| Volume médio (~100 notas/mês) | Haiku 4.5 | US$ 1 a US$ 3 |
+| Volume alto (~150+ notas/mês, picos no dia 10) | Haiku 4.5 | US$ 3 a US$ 6 |
+| Mesmo volume, usando Sonnet 5 em vez de Haiku | Sonnet 5 | 2 a 3x o valor acima |
+PENDENTE: valores são estimativa pré-implementação; confirmar custo real após o primeiro mês em produção, acompanhando pelo painel de custos do Claude Console. Recomendado configurar um limite de gasto mensal (spend limit) na chave de API como proteção extra.
 
 ### 7.2 Trava de arquivo no Box (evitar sobrescrita)
 A API do Box permite consultar e travar/destravar um arquivo, impedindo que outra pessoa suba uma nova versão por cima enquanto a automação trabalha.
@@ -241,6 +255,8 @@ PENDENTE: Escopo de Recibos de Reembolso (RDP'S) — fora desta automação por 
 | 2 | Instalar n8n Community Edition na instância | Claudio + Claude Code |
 | 3 | Criar o bot no Telegram via @BotFather e a Michelle enviar a primeira mensagem a ele — CONCLUÍDO | Michelle |
 | 4 | Configurar credenciais OAuth no n8n: Gmail, Google Drive e Box (login da própria Michelle) | Michelle + Claudio |
+| 4.1 | Criar chave de API de dev/homologação (`n8n-boxfish-notas-hml`) no Claude Console — CONCLUÍDO | Claudio |
+| 4.2 | Criar conta separada no Claude Console com o e-mail da Michelle, cadastrar o cartão dela e gerar a chave de API de produção — CONCLUÍDO | Michelle |
 | 5 | Claude Code monta os workflows completos (JSON) das 4 fases + perfis de projeto | Claude Code |
 | 6 | Importar os workflows no n8n e validar em ambiente de homologação | Claudio |
 | 7 | Resolver as pendências da seção 9 antes de cada fase entrar em produção | Claudio + Michelle |
