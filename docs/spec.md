@@ -26,17 +26,44 @@ As Fases 3 e 4 acontecem juntas, não uma depois da outra — confirmado por Cla
 - 2º Filtrar Status Box = "PROGRAMAR ATÉ [data]" (texto exato). Regra pelo Status do Contrato:
 - — "Pendente" (já checado na outra planilha) → não dispara.
 - — vazio/"N/A" (já checado na outra planilha) → não dispara.
-- — "OK - Assinado" → monta e programa o e-mail de pedido, informando prazo de envio até data+5 dias, e deixa em RASCUNHO no Gmail. Ao criar esse rascunho pela 1ª vez: Status Box = "SOLICITADA MI".
-- 3º Filtrar Status Box = "SOLICITAR" → monta e-mail para envio imediato, mas por enquanto também fica em RASCUNHO. Mesma regra: Status Box = "SOLICITADA MI" ao criar o rascunho.
-- Quando o colaborador enviar a NF (pela thread original ou por e-mail avulso identificado — seção 4): Status Box = "RECEBIDA MI" + preenchimento das demais colunas correspondentes.
+- — "OK - Assinado" → monta e programa o e-mail de pedido, informando prazo de envio até data+5 dias, e deixa em RASCUNHO no Gmail (modo MVP) ou envia direto (modo automático — ver seção 3.1.2). Status Box deste passo: ver regra de MVP abaixo.
+- 3º Filtrar Status Box = "SOLICITAR"/"SOLICITAR URG"/qualquer variante de "SOLICITAR" → monta e-mail para envio imediato (RASCUNHO no MVP, envio direto no modo automático). Mesma regra de Status Box.
+- Quando o colaborador enviar a NF (pela thread original ou por e-mail avulso identificado — seção 4): Status Box = "RECEBIDA MI" + preenchimento das demais colunas correspondentes. Esta atualização é SEMPRE automática, inclusive no MVP.
 
 ### 3.1.1 Monitoramento e cobrança (a partir do dia "PROGRAMAR ATÉ")
 - No próprio dia do prazo, monitorar e-mails o dia todo: a thread original E qualquer e-mail avulso com NF em anexo (ver seção 4 — identificação fora da thread).
 - Se identificar a nota correspondente: segue fluxo normal (Status Box = "RECEBIDA MI").
-- Se não identificar até o fim do dia: agendar e-mail de cobrança pela MESMA thread para o dia seguinte.
+- Se não identificar até o fim do dia: agendar e-mail de cobrança pela MESMA thread para o dia seguinte (RASCUNHO no MVP, envio direto no modo automático).
 - Repetir a cobrança a cada 5 dias, até aproximadamente 5 dias antes do vencimento da NF (tolerância de alguns dias para mais ou menos é aceitável — não precisa ser exato). Isso funciona porque o ciclo do mês seguinte já abre uma thread nova.
 - Exemplo: Status Box = "PROGRAMAR ATÉ 20/08" e vencimento da NF em 10/09 → monitorar/cobrar a cada 5 dias entre 20/08 e ~05/09.
 - Se chegar ao fim desse ciclo sem resposta: alertar a Michelle via Telegram e ENCERRAR o fluxo automático para aquela nota — nenhuma cobrança adicional é enviada. Ação manual fica a critério da Michelle (é comum o colaborador mandar a NF com valor duplicado no ciclo do mês seguinte).
+- Armazenamento do controle de cobrança (data da última cobrança + contagem): NÃO fica na planilha (editada por terceiros, seria frágil). Fica num arquivo `cobrancas.json` no disco da VM do n8n, lido/escrito pelos nodes nativos de arquivo do n8n (não precisa de configuração extra de infra, diferente do exceljs) — uma entrada por nota, com data da última cobrança e contagem de ciclos.
+
+### 3.1.2 Marcadores de e-mail (labels do Gmail)
+Toda interação da automação com e-mail deve aplicar o marcador **"IA"** (já criado por Claudio no Gmail) + o marcador do projeto/contexto correspondente, para a Michelle conseguir identificar visualmente o que já foi feito pela automação e conferir o processo:
+- Criar e-mail de pedido/cobrança de NF ao colaborador → marcador "IA" + marcador do projeto (ver tabela abaixo).
+- Receber NF fora da thread original, após identificar o projeto → marcador "IA" + marcador do projeto.
+- Criar e-mail de entrega de NF para o Danilo → marcador "IA" + "DANILO FINANCEIRO".
+
+| Projeto | Marcador |
+|---|---|
+| Reunion | REUNION - PEDIDO DE NOTAS |
+| Soft Pré | SOFT PRE - PEDIDO NOTAS |
+| AREP | ARREP - PEDIDO DE NOTAS |
+| Entrega ao Danilo (qualquer projeto) | DANILO FINANCEIRO |
+
+### 3.1.3 MVP — Status Box manual vs. automático, e modo de execução
+Nesta 1ª fase de MVP (testando o fluxo e conferindo cenários, alinhado com a Michelle em reunião), o Status Box de dois pontos específicos NÃO deve ser alterado automaticamente — fica com a Michelle mudar manualmente, enquanto os e-mails estiverem em rascunho:
+- E-mail inicial de pedido/cobrança de NF ao colaborador → alteração do Status Box é MANUAL (Michelle).
+- E-mail de entrega de NF ao Danilo → alteração do Status Box é MANUAL (Michelle).
+- Recebimento de NF (thread ou avulso, quando o colaborador é identificado) → Status Box = "RECEBIDA MI" continua AUTOMÁTICO, mesmo no MVP.
+
+Só depois que o fluxo for validado e aprovado para rodar 100% automatizado é que os dois pontos acima passam a ser automáticos também.
+
+Nova variável de ambiente **`MODO_EXECUCAO`**, além das já existentes de homologação/produção:
+- `"rascunho"` (padrão do MVP atual): e-mails ficam em RASCUNHO no Gmail; Status Box dos pontos acima é manual.
+- `"automatico"`: quando Status Box = "SOLICITAR"/"SOLICITAR URG"/variantes → envia o e-mail direto (sem rascunho); quando Status Box = "PROGRAMAR ATÉ [data]" → programa a data de disparo do e-mail em vez de deixar em rascunho; Status Box dos pontos acima passa a ser 100% automático.
+- Alterável via comando no Telegram (ex.: `/modo automatico`), do mesmo jeito que o comando de apelidos (seção 6.1).
 
 ### 3.2 Dados de origem e tipos de emissão
 Usar apenas as colunas: G (Vencimento), J (Descrição), K (Valor a pagar), L (Status Box), R (E-mail do colaborador).
@@ -149,11 +176,18 @@ As pastas de vencimento (`VENC_MÊS_dd.mm`) já existem pré-criadas para boa pa
 Confirmado por Claudio: essas duas fases acontecem juntas, na mesma execução — não uma depois da outra.
 - Filtrar recebidas por Vencimento (coluna G).
 - Importante: dentro da mesma planilha/aba Notas do S01, AREP e Reunion convivem juntos, diferenciados pela cor de preenchimento da linha (Reunion = roxo/cinza-arroxeado; AREP = sem preenchimento). Depois de filtrar por vencimento, é preciso também "Filtrar por cor" para não misturar notas dos dois projetos que caem no mesmo vencimento. Decisão técnica: o node nativo de planilha do n8n só lê valor de célula, não estilo/cor — a leitura de cor exige um node de Code usando a lib `exceljs`, o que só funciona com `NODE_FUNCTION_ALLOW_EXTERNAL=exceljs` configurado na VM do n8n (variável de ambiente + reinício do serviço + pacote `exceljs` instalado no ambiente). Confirmado configurar isso na VM (não só para o caso AREP/Reunion, mas porque outra planilha do projeto também usa cor de preenchimento e vai precisar da mesma distinção).
-- Agrupar em remessas de até 30 notas (R1, R2, R3...); regra de agrupamento no e-mail: mesmo Fornecedor + mesmo Vencimento = agrupa no mesmo e-mail, sem limite de quantidade.
+- Regra de agrupamento no e-mail: mesmo Fornecedor + mesmo Vencimento = agrupa no mesmo e-mail, sem limite de quantidade.
 - Nunca usar "Classificar" — sempre "Filtrar" (Classificar quebra a estrutura da planilha).
-- Fazer uma cópia da planilha antes de mexer (nunca editar a original), remover as colunas que não vão para o Danilo, formatar "Valor a Pagar" como número com 2 casas decimais mantendo a cor vermelha, mudar Status Box da cópia para "ENTREGA MI".
+- Fazer uma cópia da planilha antes de mexer (nunca editar a original), remover as colunas que não vão para o Danilo, formatar "Valor a Pagar" como número com 2 casas decimais mantendo a cor vermelha, mudar Status Box da cópia para "ENTREGUE".
 - Colar o recorte formatado no e-mail do Danilo (RASCUNHO); essa mesma imagem da planilha formatada também deve ser salva na pasta de arquivamento (seção 5.3), junto com a nota fiscal.
 - Solicitar aprovação via Drive (Danielle + Vanessa).
+
+### 5.0 Regra de lotes/remessas por janela de tempo (não é mais contagem fixa de 30)
+A contagem de remessas NÃO é mais "a cada 30 notas recebidas" — a planilha Cost é dinâmica (entra colaborador novo quase todo dia) e nem sempre há 30+ notas para uma data de vencimento. A separação agora é por JANELA DE TEMPO em relação ao vencimento da NF, aplicada por pasta de vencimento (cada data de vencimento tem sua própria contagem de lotes/R, independente das outras):
+- **Lote 1**: notas recebidas desde o início do ciclo (data "PROGRAMAR ATÉ") até ~12 dias antes do vencimento. Se ≤30 notas → só R1. Se >30 → quebra em R1, R2... Alertar a Michelle via Telegram quando esse lote for criado.
+- **Lote 2**: notas recebidas entre ~12 dias antes e 5 dias antes do vencimento. A numeração de R continua de onde o lote 1 parou (ex.: lote 1 = só R1 → lote 2 começa em R2; lote 1 = R1+R2 → lote 2 começa em R3, podendo virar R3+R4 se passar de 30 notas). Alertar a Michelle via Telegram quando esse lote for criado.
+- **A partir de 5 dias (ou menos) antes do vencimento**: não criar mais lote automaticamente — alertar a Michelle via Telegram para ação manual.
+- Exemplo: Status Box = "PROGRAMAR ATÉ 20/08", vencimento em 10/09 → Lote 1 cobre recebimentos de 20/08 a ~29/08 (12 dias antes); Lote 2 cobre de ~29/08 a ~05/09 (5 dias antes); a partir de ~05/09 sem lote novo, só alerta manual.
 
 ### 5.1 Exemplo real — e-mail de remessa para o Danilo
 | Assunto: SMTC - S01 | REUNION | NOTAS À PAGAR | VENC_20.08.26 | REMESSA_1 |
@@ -167,10 +201,10 @@ Colunas (nesta ordem, SOMENTE estas): Tipo Doc Fiscal, Nº Doc Fiscal, Emissão,
 NUNCA incluir Status Cost nem Status Contrato neste recorte, em nenhum projeto.
 | TIPO DOC FISCAL | Nº DOC FISCAL | VENC. | VALOR A PAGAR | STATUS BOX |
 |---|---|---|---|---|
-| NF | 000792 | 20-ago-26 | 20647,29 | ENTREGA MI |
+| NF | 000792 | 20-ago-26 | 20647,29 | ENTREGUE |
 |  |  | TOTAL | R$ 20.647,29 |  |
 
-Fonte Verdana em todo o e-mail. Cabeçalho: fundo preto/texto branco negrito. Valor a Pagar: número com 2 casas decimais (sem "R$"), vermelho, linha a linha — só a linha de total (fundo preto) leva "R$". Status Box: destaque verde, texto exatamente "ENTREGA MI" (só nesta cópia — ver variações na planilha interna, seção 5.3).
+Fonte Verdana em todo o e-mail. Cabeçalho: fundo preto/texto branco negrito. Valor a Pagar: número com 2 casas decimais (sem "R$"), vermelho, linha a linha — só a linha de total (fundo preto) leva "R$". Status Box: destaque verde, texto exatamente "ENTREGUE" (só nesta cópia — ver variações na planilha interna, seção 5.3).
 
 ### 5.3 Arquivamento (em paralelo à entrega)
 - Mover a nota fiscal individual (retranca) e a imagem da planilha formatada (seção 5.2) para a pasta correspondente à função/cargo do colaborador.
@@ -178,8 +212,9 @@ Fonte Verdana em todo o e-mail. Cabeçalho: fundo preto/texto branco negrito. Va
 - Caminho: "FINANCEIRO > 08. NOTAS ARQUIVADAS > ARQUIVO DE NOTAS [PROJETO]" — pastas separadas por projeto ("ARQUIVO DE NOTAS S01" para AREP, "ARQUIVO DE NOTAS REUNION" para Reunion).
 - Padrão de nome de pasta por função — confirmado com exemplos reais: AREP usa "[código] - [CARGO]" (ex.: "1301 - DIRETOR GERAL"); Reunion usa "[código].R - [CARGO]" (ex.: "1301.R- DIRETOR GERAL", "7007.R - ACESSORIA JURÍDICA"); Soft Pré vai seguir o mesmo padrão do AREP ("[código] - [CARGO]") assim que surgirem os primeiros casos.
 - Atualizar a coluna "Check arquivo drive" da planilha para "OK" depois de arquivar cada nota.
-- Atualizar Status Box da planilha interna, contando por pasta de vencimento/remessa (cada data de remessa é uma pasta nova e reinicia a contagem do zero): "ENTREGUE MI R1" para a 1ª a 30ª nota entregue naquela remessa; "ENTREGUE MI R2" para a 31ª a 60ª; "ENTREGUE MI R3" para a 61ª a 90ª; e assim sucessivamente a cada 30. Exemplo: se no dia 10/08 houver 50 notas entregues, as 30 primeiras ficam "ENTREGUE MI R1" e as 20 restantes "ENTREGUE MI R2"; uma nota de outra data (ex.: 15/08) pertence a outra pasta e a contagem de R recomeça em R1. A cópia enviada ao Danilo usa sempre só "ENTREGA MI", nunca com número de remessa.
-Vencimentos no dia 10 costumam ser os que mais acumulam notas (podendo passar de 30 e precisar de R1, R2...); as demais datas dificilmente ultrapassam 30.
+- Atualizar Status Box da planilha interna com "ENTREGUE MI R{n}", onde `n` é o número do lote/remessa calculado pela regra de janela de tempo (seção 5.0) — não mais por contagem fixa de 30. A cópia enviada ao Danilo usa sempre só "ENTREGUE", nunca "MI" nem número de remessa.
+Vencimentos no dia 10 costumam ser os que mais acumulam notas (podendo passar de 30 num único lote e precisar de R1, R2 dentro do mesmo lote); as demais datas dificilmente ultrapassam 30 por lote.
+- Nomenclatura de pasta de arquivamento (a partir de agora): todas as pastas de remessa criadas no último nível levam o sufixo "_MI". Exemplo: "10.08_BR_SMTC_S01_ARQUIVO_NF_REMESSA_1" vira "10.08_BR_SMTC_S01_ARQUIVO_NF_REMESSA_1_MI". Vale para REUNION e SOFT PRE (e qualquer novo projeto daqui pra frente).
 
 ## 6. Perfis de projeto (parametrização)
 
@@ -197,7 +232,7 @@ Cada projeto vira um "perfil" de configuração — o motor (as 4 fases) é o me
 | Planilha de Contratos | BR_AREP_S01_CONTROLE_DE_CONTRATOS.xlsb | BR_AREP_S01_REUNION_CONTROLE_DE_CONTRATOS.xlsb | BR_SMTC_S02_CONTROLE_DE_CONTRATOS.xlsb |
 
 ### 6.1 Apelidos de projeto (array configurável via Telegram)
-O identificador/assunto de um projeto pode mudar durante a execução do projeto (ex.: em 19/08/2026 o Soft Pré mudou de "SMTC_S02 \| SOFT PRE" para "PNS \| SOFT PRE" por pedido da Danielle, para não vazar o nome do projeto — e e-mails antigos e novos convivem, pois a Michelle já tinha enviado pedidos com o assunto antigo antes da mudança). Por isso, os apelidos de cada projeto NÃO ficam fixos no workflow (diferente do resto do perfil, que é copiado direto para dentro do workflow — seção 6): eles ficam numa aba de configuração à parte na planilha (ex.: "Config_Apelidos", colunas `projeto_id` e `apelido`), lida a cada execução. Um workflow separado no n8n recebe um comando via Telegram (ex.: `/apelido SOFT_PRE PNS | SOFT PRE`) e adiciona a nova linha nessa aba, sem precisar mexer no código do workflow principal. O motor de identificação de projeto deve considerar TODOS os apelidos cadastrados para aquele `projeto_id` como equivalentes (e-mails com qualquer um deles são tratados como o mesmo projeto).
+O identificador/assunto de um projeto pode mudar durante a execução do projeto (ex.: em 19/08/2026 o Soft Pré mudou de "SMTC_S02 \| SOFT PRE" para "PNS \| SOFT PRE" por pedido da Danielle, para não vazar o nome do projeto — e e-mails antigos e novos convivem, pois a Michelle já tinha enviado pedidos com o assunto antigo antes da mudança). Por isso, os apelidos de cada projeto NÃO ficam fixos no workflow (diferente do resto do perfil, que é copiado direto para dentro do workflow — seção 6) e NÃO ficam na planilha (planilha é editada por terceiros, seria frágil como fonte de configuração). Ficam num arquivo `apelidos.json` no disco da VM do n8n (mesmo mecanismo do `cobrancas.json`, seção 3.1.1), lido/escrito pelos nodes nativos de arquivo do n8n. Um workflow separado no n8n recebe um comando via Telegram (ex.: `/apelido SOFT_PRE PNS | SOFT PRE`) e adiciona o novo apelido nesse arquivo, sem precisar mexer no código do workflow principal. O motor de identificação de projeto deve considerar TODOS os apelidos cadastrados para aquele `projeto_id` (antigos e novos) como equivalentes — um e-mail pode chegar com o assunto antigo ou o novo, e ambos devem ser reconhecidos.
 
 | Papel | Produção | Homologação |
 |---|---|---|
