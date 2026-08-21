@@ -12,6 +12,12 @@ tomadas) está em [`docs/spec.md`](docs/spec.md) — fonte da verdade do projeto
 - `/profiles/` — configuração de cada projeto (Reunion, Soft Pré, AREP) em JSON.
 - `/docs/` — documentação, incluindo o `spec.md`.
 - `/scripts/` — lógica mais longa usada em nós de Code do n8n.
+- `/config/` — estado inicial dos arquivos de configuração que rodam em disco na VM
+  do n8n (`config_execucao.json`, `apelidos.json`, `cobrancas.json` — spec.md seções
+  3.1.1 e 6.1). Não faziam parte da estrutura original do repositório; foram
+  adicionados quando essas regras passaram a existir. Em runtime, o n8n lê/escreve
+  esses arquivos direto do disco da VM — o conteúdo aqui é só o ponto de partida
+  versionado, não é sincronizado automaticamente com o disco depois do deploy inicial.
 
 Nenhuma credencial (token, senha, chave de API) deve ir para o Git — essas ficam só
 dentro do n8n (credenciais/variáveis de ambiente).

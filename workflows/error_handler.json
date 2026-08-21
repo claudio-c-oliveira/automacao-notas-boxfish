@@ -1,0 +1,65 @@
+{
+  "name": "Error Handler — Notas Fiscais Box Fish",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "e1a1b001-0000-4000-8000-000000000001",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [0, 0],
+      "notes": "Disparado automaticamente pelo n8n quando qualquer workflow que aponte pra este como 'Error Workflow' (settings > Error Workflow) falha. Referência: spec.md seção 7.1/7.3."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Monta a mensagem de alerta a partir do payload padrão do Error Trigger do n8n.\nconst erro = $input.first().json;\n\nconst nomeWorkflow = erro.workflow && erro.workflow.name ? erro.workflow.name : '(desconhecido)';\nconst execucaoId = erro.execution && erro.execution.id ? erro.execution.id : '(desconhecido)';\nconst execucaoUrl = erro.execution && erro.execution.url ? erro.execution.url : '';\nconst nodeComErro = erro.trigger && erro.trigger.error && erro.trigger.error.node && erro.trigger.error.node.name\n  ? erro.trigger.error.node.name\n  : (erro.execution && erro.execution.lastNodeExecuted) || '(desconhecido)';\nconst mensagemErro = erro.trigger && erro.trigger.error && erro.trigger.error.message\n  ? erro.trigger.error.message\n  : JSON.stringify(erro).slice(0, 500);\n\nconst texto = [\n  '⚠️ *Falha na automação de Notas Fiscais*',\n  '',\n  `Workflow: ${nomeWorkflow}`,\n  `Node com erro: ${nodeComErro}`,\n  `Execução: ${execucaoId}`,\n  execucaoUrl ? `Link: ${execucaoUrl}` : null,\n  '',\n  `Mensagem: ${mensagemErro}`,\n].filter(Boolean).join('\\n');\n\nreturn [{ json: { texto } }];"
+      },
+      "id": "e1a1b002-0000-4000-8000-000000000002",
+      "name": "Montar mensagem de alerta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "chatId": "REPLACE_WITH_MICHELLE_TELEGRAM_CHAT_ID",
+        "text": "={{ $json.texto }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "e1a1b003-0000-4000-8000-000000000003",
+      "name": "Telegram — Alertar Michelle",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [440, 0],
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE_WITH_CREDENTIAL_ID",
+          "name": "Telegram account"
+        }
+      },
+      "notes": "Credencial 'Telegram account' já conectada (spec.md seção 4.3). O chatId da Michelle precisa ser preenchido — ver 'notes' do node 'Montar mensagem de alerta' se quiser embutir fixo em vez de variável de workflow."
+    }
+  ],
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [{ "node": "Montar mensagem de alerta", "type": "main", "index": 0 }]
+      ]
+    },
+    "Montar mensagem de alerta": {
+      "main": [
+        [{ "node": "Telegram — Alertar Michelle", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": {
+    "description": "Error Workflow compartilhado — referenciado pelos workflows fase1_solicitacao_nota.json/.homolog.json (e futuramente Fase 2 e Fase 3+4) em Workflow Settings > Error Workflow. Ver docs/spec.md seções 7.1 e 7.3."
+  }
+}
