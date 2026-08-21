@@ -22,12 +22,14 @@ As Fases 3 e 4 acontecem juntas, não uma depois da outra — confirmado por Cla
 ## 3. Fase 1 — Solicitação de nota ao colaborador
 
 ### 3.1 Passo a passo
-- 1º Verificar Status do Contrato (coluna N da aba Notas). Se vazio ou "N/A", buscar em outra planilha (o arquivo de Controle de Contratos, por projeto — seção 6), cruzando por Razão Social ou nome do colaborador. A comparação ignora diferença de maiúsculas/minúsculas e espaços a mais ou a menos.
-- 2º Filtrar Status Box = "PROGRAMAR ATÉ [data]" (texto exato). Regra pelo Status do Contrato:
-- — "Pendente" (já checado na outra planilha) → não dispara.
-- — vazio/"N/A" (já checado na outra planilha) → não dispara.
-- — "OK - Assinado" → monta e programa o e-mail de pedido, informando prazo de envio até data+5 dias, e deixa em RASCUNHO no Gmail (modo MVP) ou envia direto (modo automático — ver seção 3.1.2). Status Box deste passo: ver regra de MVP abaixo.
-- 3º Filtrar Status Box = "SOLICITAR"/"SOLICITAR URG"/qualquer variante de "SOLICITAR" → monta e-mail para envio imediato (RASCUNHO no MVP, envio direto no modo automático). Mesma regra de Status Box.
+- 1º Verificar Status do Contrato (coluna N da aba Notas). Essa checagem vale IGUALMENTE para os dois gatilhos abaixo ("PROGRAMAR ATÉ" e "SOLICITAR") — não é mais exclusiva do primeiro.
+  - Se a coluna N contém "ASSINADO" (ex.: "OK - Assinado"): segue o fluxo normal de solicitação.
+  - Se a coluna N contém "PENDENTE" ou está vazia/"N/A": NÃO pula mais direto — tenta resolver ativamente. Aplica o marcador de e-mail "CONTRATAÇÃO" (seção 3.1.2) e busca no Gmail, pelo nome do colaborador, se já existe uma thread de "ficha cadastral" preenchida e enviada.
+    - Se encontrar e validar a ficha cadastral enviada: segue o fluxo normal de solicitação E atualiza a coluna N (Status do Contrato) para "OK - ASSINADO".
+    - Se não encontrar/validar: não dispara o e-mail de pedido (linha fica pendente, sem alteração na coluna N).
+  - Cruzamento auxiliar com a planilha de Controle de Contratos (por projeto — seção 6), por Razão Social ou nome do colaborador, ignorando diferença de maiúsculas/minúsculas e espaços a mais ou a menos, continua válido como fonte adicional de checagem quando a coluna N não tiver a informação.
+- 2º Filtrar Status Box = "PROGRAMAR ATÉ [data]" (texto exato). Se a checagem de contrato acima liberar → monta e programa o e-mail de pedido, informando prazo de envio até data+5 dias, e deixa em RASCUNHO no Gmail (modo MVP) ou envia direto (modo automático — ver seção 3.1.3). Status Box deste passo: ver regra de MVP abaixo.
+- 3º Filtrar Status Box = "SOLICITAR"/"SOLICITAR URG"/qualquer variante de "SOLICITAR". Mesma checagem de contrato do passo 1º se aplica aqui também. Se liberar → monta e-mail para envio imediato (RASCUNHO no MVP, envio direto no modo automático). Mesma regra de Status Box.
 - Quando o colaborador enviar a NF (pela thread original ou por e-mail avulso identificado — seção 4): Status Box = "RECEBIDA MI" + preenchimento das demais colunas correspondentes. Esta atualização é SEMPRE automática, inclusive no MVP.
 
 ### 3.1.1 Monitoramento e cobrança (a partir do dia "PROGRAMAR ATÉ")
@@ -38,12 +40,14 @@ As Fases 3 e 4 acontecem juntas, não uma depois da outra — confirmado por Cla
 - Exemplo: Status Box = "PROGRAMAR ATÉ 20/08" e vencimento da NF em 10/09 → monitorar/cobrar a cada 5 dias entre 20/08 e ~05/09.
 - Se chegar ao fim desse ciclo sem resposta: alertar a Michelle via Telegram e ENCERRAR o fluxo automático para aquela nota — nenhuma cobrança adicional é enviada. Ação manual fica a critério da Michelle (é comum o colaborador mandar a NF com valor duplicado no ciclo do mês seguinte).
 - Armazenamento do controle de cobrança (data da última cobrança + contagem): NÃO fica na planilha (editada por terceiros, seria frágil). Fica num arquivo `cobrancas.json` no disco da VM do n8n, lido/escrito pelos nodes nativos de arquivo do n8n (não precisa de configuração extra de infra, diferente do exceljs) — uma entrada por nota, com data da última cobrança e contagem de ciclos.
+- Inicialização dos arquivos JSON (`cobrancas.json`, `apelidos.json`, `config_execucao.json`): a entrega da Fase 1 inclui esses 3 arquivos já criados com valores iniciais sensatos, para a primeira execução funcionar sem passo manual extra — `config_execucao.json` iniciando em `"rascunho"`, `apelidos.json` com o apelido atual de cada um dos 3 projetos (AREP, Reunion, Soft Pré/PNS), `cobrancas.json` vazio. Os workflows de comando via Telegram (`/modo`, `/apelido`) para escrever nesses arquivos depois de criados ficam para uma entrega separada — não fazem parte do escopo desta Fase 1.
 
 ### 3.1.2 Marcadores de e-mail (labels do Gmail)
 Toda interação da automação com e-mail deve aplicar o marcador **"IA"** (já criado por Claudio no Gmail) + o marcador do projeto/contexto correspondente, para a Michelle conseguir identificar visualmente o que já foi feito pela automação e conferir o processo:
 - Criar e-mail de pedido/cobrança de NF ao colaborador → marcador "IA" + marcador do projeto (ver tabela abaixo).
 - Receber NF fora da thread original, após identificar o projeto → marcador "IA" + marcador do projeto.
 - Criar e-mail de entrega de NF para o Danilo → marcador "IA" + "DANILO FINANCEIRO".
+- Buscar/validar ficha cadastral quando o Status do Contrato está "Pendente"/vazio (seção 3.1) → marcador "CONTRATAÇÃO".
 
 | Projeto | Marcador |
 |---|---|
@@ -51,6 +55,7 @@ Toda interação da automação com e-mail deve aplicar o marcador **"IA"** (já
 | Soft Pré | SOFT PRE - PEDIDO NOTAS |
 | AREP | AREP - PEDIDO DE NOTAS |
 | Entrega ao Danilo (qualquer projeto) | DANILO FINANCEIRO |
+| Validação de ficha cadastral (contrato pendente/vazio) | CONTRATAÇÃO |
 
 ### 3.1.3 MVP — Status Box manual vs. automático, e modo de execução
 Nesta 1ª fase de MVP (testando o fluxo e conferindo cenários, alinhado com a Michelle em reunião), o Status Box de dois pontos específicos NÃO deve ser alterado automaticamente — fica com a Michelle mudar manualmente, enquanto os e-mails estiverem em rascunho:
