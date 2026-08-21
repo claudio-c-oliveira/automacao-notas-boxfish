@@ -15,7 +15,7 @@ Fora de escopo por enquanto: processo de Recibos de Reembolso (RDP'S) — reembo
 |---|---|---|
 | 1. Solicitação de nota | Filtra planilha, valida contrato, monta e programa e-mail de pedido em rascunho | n8n (nuvem) |
 | 2. Recebimento e validação | Monitora respostas com NF anexada, extrai dados, atualiza planilha, salva a nota | n8n + IA (extração de PDF) |
-| 3. Remessa para o Danilo + 4. Arquivamento | Agrupa recebidas (até 30/remessa), formata cópia da planilha, sobe no Drive, monta e-mail, arquiva a nota na pasta por função — tudo em paralelo, na mesma execução | n8n + IA (formatação) |
+| 3. Remessa para o Danilo + 4. Arquivamento | Agrupa recebidas em lotes por janela de tempo (seção 5.0), formata cópia da planilha, sobe no Drive, monta e-mail, arquiva a nota na pasta por função — tudo em paralelo, na mesma execução | n8n + IA (formatação) |
 
 As Fases 3 e 4 acontecem juntas, não uma depois da outra — confirmado por Claudio: no momento em que o e-mail do Danilo é preparado, a nota já é arquivada na pasta correta.
 
@@ -49,7 +49,7 @@ Toda interação da automação com e-mail deve aplicar o marcador **"IA"** (já
 |---|---|
 | Reunion | REUNION - PEDIDO DE NOTAS |
 | Soft Pré | SOFT PRE - PEDIDO NOTAS |
-| AREP | ARREP - PEDIDO DE NOTAS |
+| AREP | AREP - PEDIDO DE NOTAS |
 | Entrega ao Danilo (qualquer projeto) | DANILO FINANCEIRO |
 
 ### 3.1.3 MVP — Status Box manual vs. automático, e modo de execução
@@ -169,7 +169,7 @@ SMTC/
 
 As pastas de vencimento (`VENC_MÊS_dd.mm`) já existem pré-criadas para boa parte do ano corrente — o workflow deve checar se a pasta do vencimento existe e criar automaticamente se não existir, nunca assumir que ela sempre estará lá.
 
-**Ordem de escrita confirmada (Opção A)**: a Fase 2 (Salvamento 1) pousa a nota DIRETO dentro da pasta `VENC_[MÊS]_[dd.mm]`, sem pasta de remessa ainda — nesse momento a automação não sabe em qual remessa a nota vai cair (o número da remessa só é calculado na Fase 3+4, ao agrupar até 30 notas daquele vencimento). A subpasta `[dd.mm]_BR_SMTC_[ID]_ARQUIVO_NF_REMESSA_[n]` só é criada pela Fase 3+4, que move as notas já recebidas para dentro dela nesse momento. Os ARQUIVOS individuais dentro dessa pasta seguem o padrão de retranca da seção 4.1 (`[dd.mm]_BR_SMTC_[ID]_[RAZÃO SOCIAL]_#[nº nota]`) — só o NOME DA PASTA de remessa segue a nomenclatura de remessa, não a retranca individual.
+**Ordem de escrita confirmada (Opção A)**: a Fase 2 (Salvamento 1) pousa a nota DIRETO dentro da pasta `VENC_[MÊS]_[dd.mm]`, sem pasta de remessa ainda — nesse momento a automação não sabe em qual remessa a nota vai cair (o número da remessa só é calculado na Fase 3+4, pela regra de lotes por janela de tempo — seção 5.0). A subpasta `[dd.mm]_BR_SMTC_[ID]_ARQUIVO_NF_REMESSA_[n]` só é criada pela Fase 3+4, que move as notas já recebidas para dentro dela nesse momento. Os ARQUIVOS individuais dentro dessa pasta seguem o padrão de retranca da seção 4.1 (`[dd.mm]_BR_SMTC_[ID]_[RAZÃO SOCIAL]_#[nº nota]`) — só o NOME DA PASTA de remessa segue a nomenclatura de remessa, não a retranca individual.
 
 **Fora de escopo, não implementar**: foi encontrado um exemplo real de retranca usando o tipo do documento (`APÓLICE`, `BOLETO`) no lugar do número de 6 dígitos — confirmado por Claudio que é um caso pontual manual (parcela de seguro), não faz parte do processo automatizado.
 ## 5. Fase 3 + 4 — Remessa para o Danilo e Arquivamento (em paralelo)
@@ -244,7 +244,7 @@ O identificador/assunto de um projeto pode mudar durante a execução do projeto
 ### 7.1 Decisão
 Tudo roda em nuvem, dentro do próprio n8n — sem script separado rodando por fora (cron), e sem depender de nenhuma máquina/notebook ligado.
 - Orquestração: n8n Community Edition (self-hosted, gratuito), com nodes nativos de Box, Google Drive e Gmail.
-- Regras determinísticas (datas, zero-padding, contagem de 30 notas): node de Code do n8n, roda dentro da execução do workflow.
+- Regras determinísticas (datas, zero-padding, cálculo de lotes por janela de tempo — seção 5.0): node de Code do n8n, roda dentro da execução do workflow.
 - Extração de dados do PDF/imagem da nota fiscal: node de IA do n8n chamando a API da Claude com o anexo, devolvendo os dados em JSON.
 - Hospedagem: instância e2-micro do Google Cloud Free Tier (gratuita para sempre, região EUA), rodando o n8n 24/7 sem custo nem dependência de notebook.
 - Erros: "Error Workflow" nativo do n8n — qualquer falha dispara aviso automático no Telegram.
@@ -298,7 +298,12 @@ PENDENTE: Escopo de Recibos de Reembolso (RDP'S) — fora desta automação por 
 - Fase 4 (Arquivamento): revalidada e fundida com a Fase 3 (seção 5.3) — acontecem em paralelo, com estrutura de pastas e nomenclatura confirmadas por prints reais dos Drives S01 e S02.
 - Estrutura completa de pastas por função: confirmada por prints reais (não é mais uma lista a levantar do zero — os padrões "[código] - [CARGO]" e "[código].R - [CARGO]" já estão documentados na seção 5.3).
 - Detalhamento de PACOTE e REC + NF: esclarecido — PACOTE é caso raro específico do AREP; REC + NF ocorre em locação, sobretudo com fornecedores, por motivo fiscal (nunca usar "serviço prestado" nesses casos).
-- Numeração de remessa no Status Box interno: confirmada — "ENTREGUE MI" (1ª a 30ª nota daquele vencimento), "ENTREGUE MI R1" (31ª a 60ª), "ENTREGUE MI R2" (61ª a 90ª), contando por pasta de vencimento.
+- Numeração de remessa no Status Box interno: substituída a contagem fixa de 30 por uma regra de lotes por janela de tempo em relação ao vencimento da NF (seção 5.0) — "ENTREGUE MI R1", "ENTREGUE MI R2"... contando por pasta de vencimento, não mais por quantidade fixa de notas.
+- Corte para o Danilo: Status Box = "ENTREGUE" (não "ENTREGA MI" — nomenclatura definitiva confirmada).
+- Marcadores de e-mail (labels do Gmail): confirmados — "IA" + marcador do projeto em toda interação com e-mail (seção 3.1.2).
+- MVP: Status Box do pedido/cobrança ao colaborador e da entrega ao Danilo ficam manuais (Michelle) enquanto o modo de execução for "rascunho"; "RECEBIDA MI" continua automático mesmo no MVP (seção 3.1.3).
+- Armazenamento de controle de cobrança, apelidos de projeto e modo de execução: NÃO ficam na planilha — ficam em arquivos JSON no disco da VM do n8n (`cobrancas.json`, `apelidos.json`, `config_execucao.json`), lidos/escritos pelos nodes nativos de arquivo do n8n (seções 3.1.1, 3.1.3, 6.1).
+- Nome do projeto confirmado como "AREP" (uma letra R) em todo o documento — confirmado por Claudio junto com a Michelle; a grafia "ARREP" usada temporariamente numa rodada anterior foi revertida.
 
 ## 11. Checklist de próximos passos
 | # | Ação | Responsável |
