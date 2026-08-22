@@ -9,6 +9,14 @@
  * arquivo existe pra manter tudo versionado, legível e testável fora do n8n.
  *
  * Referências de seção são todas de docs/spec.md.
+ *
+ * ATENÇÃO (spec.md seção 3.2, commit 1ca83a7): o parsing da coluna J e a
+ * identificação de linha RECIBO/NOTA FISCAL (seção 3.2.1) usam IA (API da
+ * Claude) — NÃO são mais 100% determinísticos. As funções de "montagem"
+ * abaixo (templates de e-mail, agrupamento, regra de assunto) continuam
+ * determinísticas; quem chama a IA e interpreta o texto semanticamente é um
+ * node HTTP Request separado no workflow (ver montarPromptParsingColunaJ /
+ * parseRespostaIA abaixo, que só preparam/interpretam a chamada).
  */
 
 'use strict';
@@ -51,7 +59,7 @@ function formatarDataBR(data) {
   return `${dd}/${mm}/${aaaa}`;
 }
 
-/** Formata data como dd.mm (usado em retranca/pastas — não usado nesta fase, mas mantido por consistência com Fase 2/3+4). */
+/** Formata data como dd.mm (usado no "ENVIAR ATÉ" do assunto). */
 function formatarDataCurta(data) {
   const dd = String(data.getDate()).padStart(2, '0');
   const mm = String(data.getMonth() + 1).padStart(2, '0');
@@ -77,58 +85,36 @@ function ehVarianteSolicitar(statusBox) {
   return /^SOLICITAR/i.test((statusBox || '').trim());
 }
 
+const MESES_ABREV_PT = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
+
 // ─────────────────────────────────────────────────────────────────────────
 // NODE: "Separar AREP/Reunion por cor" (exceljs)
 // Roda só sobre as linhas do Cost Report S01 (AREP+Reunion compartilhado).
 // Regra: Reunion = preenchimento roxo/cinza-arroxeado; AREP = sem preenchimento (seção 5/6).
 // ─────────────────────────────────────────────────────────────────────────
 
-/**
- * @param {Object} cell - célula do exceljs (worksheet.getCell(...))
- * @returns {boolean} true se a linha tem preenchimento (não é branco/sem cor)
- */
 function linhaTemPreenchimento(cell) {
   const fill = cell && cell.fill;
   if (!fill || fill.type !== 'pattern' || fill.pattern !== 'solid') return false;
   const argb = fill.fgColor && fill.fgColor.argb;
   if (!argb) return false;
-  // Branco puro ou sem alpha conta como "sem preenchimento".
   return argb !== 'FFFFFFFF' && argb !== '00000000';
 }
 
-/**
- * @param {string} argb - cor ARGB da célula da coluna usada como referência de preenchimento da linha
- * @returns {'AREP'|'REUNION'} projeto detectado pela cor
- */
 function detectarProjetoPorCor(temPreenchimento) {
   return temPreenchimento ? 'REUNION' : 'AREP';
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// NODE: "Checagem de contrato" (1ª parte da lógica principal — seção 3.1)
-// Decide, pra cada linha, se o contrato está liberado, e se precisa buscar
-// ficha cadastral no Gmail antes de decidir.
+// NODE: "Checagem de contrato" (seção 3.1)
 // ─────────────────────────────────────────────────────────────────────────
 
-/**
- * @param {string} statusContrato - valor bruto da coluna N
- * @returns {'ASSINADO'|'PENDENTE_VAZIO'} classificação simples da coluna N
- */
 function classificarStatusContrato(statusContrato) {
   const norm = normalizar(statusContrato);
   if (norm.includes('assinado')) return 'ASSINADO';
-  return 'PENDENTE_VAZIO'; // cobre "Pendente", vazio, "N/A" e qualquer outro valor não reconhecido
+  return 'PENDENTE_VAZIO';
 }
 
-/**
- * Cruzamento auxiliar com a planilha de Controle de Contratos do projeto
- * (seção 3.1, linha 30): por Razão Social OU nome do colaborador,
- * normalizado (maiúsc./minúsc. e espaços extras ignorados).
- *
- * @param {{razaoSocial?: string, nomeColaborador?: string}} nota
- * @param {Array<{razaoSocial: string, nomeColaborador: string, status: string}>} linhasContratos
- * @returns {{liberado: boolean, statusEncontrado?: string}}
- */
 function cruzarComPlanilhaContratos(nota, linhasContratos) {
   const alvoRazao = normalizar(nota.razaoSocial);
   const alvoNome = normalizar(nota.nomeColaborador);
@@ -142,21 +128,6 @@ function cruzarComPlanilhaContratos(nota, linhasContratos) {
   return { liberado: status === 'ASSINADO', statusEncontrado: encontrada.status };
 }
 
-/**
- * Busca/validação de ficha cadastral via Gmail — SEM IA, regra determinística
- * (seção 3.1, corrigida no commit 8a06d6b).
- *
- * O sinal de validação é: dentro de uma thread marcada "CONTRATAÇÃO" e
- * relacionada ao colaborador, existe uma MENSAGEM cujo remetente é de FORA
- * do domínio da empresa (o colaborador/representante, não a Michelle/
- * equipe) e que tem pelo menos 1 anexo — ou seja, a RESPOSTA do colaborador
- * com a documentação, não o pedido original (que só teria o modelo em
- * branco).
- *
- * @param {Array<{from: string, hasAttachment: boolean}>} mensagensDaThread - mensagens de uma thread Gmail já buscada (marcador "CONTRATAÇÃO" + nome do colaborador), na ordem em que foram enviadas
- * @param {string} dominioEmpresa - ex.: "novorealitybox.com"
- * @returns {boolean} true se validado
- */
 function validarFichaCadastral(mensagensDaThread, dominioEmpresa) {
   const dominioNorm = normalizar(dominioEmpresa);
   return (mensagensDaThread || []).some((msg) => {
@@ -166,15 +137,6 @@ function validarFichaCadastral(mensagensDaThread, dominioEmpresa) {
   });
 }
 
-/**
- * Decide se a nota está liberada pra disparo, seguindo a ordem da seção 3.1:
- * 1) coluna N já "ASSINADO" → libera direto.
- * 2) senão, cruza com planilha de Contratos → libera se achar "ASSINADO".
- * 3) senão, sinaliza que precisa buscar ficha cadastral no Gmail (a busca em
- *    si acontece em outro node, porque exige uma chamada real ao Gmail).
- *
- * @returns {{liberado: boolean, precisaBuscarFichaCadastral: boolean, motivoLiberacao?: string}}
- */
 function avaliarContratoEtapa1(nota, linhasContratos) {
   const statusN = classificarStatusContrato(nota.statusContrato);
   if (statusN === 'ASSINADO') {
@@ -187,14 +149,6 @@ function avaliarContratoEtapa1(nota, linhasContratos) {
   return { liberado: false, precisaBuscarFichaCadastral: true };
 }
 
-/**
- * 2ª parte, depois da busca no Gmail (node "Checagem de contrato — etapa 2").
- * Se validou a ficha cadastral: libera E marca a coluna N pra atualizar
- * pra "OK - ASSINADO" (isso NÃO é bloqueado por MODO_EXECUCAO — seção 3.1,
- * linha 31).
- *
- * @returns {{liberado: boolean, atualizarColunaNPara?: string}}
- */
 function avaliarContratoEtapa2(fichaCadastralValidada) {
   if (fichaCadastralValidada) {
     return { liberado: true, atualizarColunaNPara: 'OK - ASSINADO' };
@@ -203,53 +157,73 @@ function avaliarContratoEtapa2(fichaCadastralValidada) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// NODE: "Tipo de emissão e Ref." (seção 3.2) — heurística por palavra-chave
-// na Descrição (coluna J), já que o spec não define uma coluna dedicada
-// pro tipo. ASSUNÇÃO: default = "NF normal" quando nenhuma palavra-chave
-// bate; PACOTE só é considerado fora do AREP se explicitamente citado
-// (seção 3.2: "não deve se repetir fora do AREP").
+// NODE: "Preparar chamada de IA (parsing coluna J)" — seção 3.2, 3.2.1
+//
+// A IA (Claude) é usada para interpretar semanticamente a coluna J porque
+// não existe um separador de posição confiável entre Cargo e Nome (ex.:
+// "AGENCIAMENTO DE FIGURAÇÃO" vs "LARISSA CRISTIANE DO AMARAL GOMES" não têm
+// um padrão estrutural que os diferencie — só o conteúdo semântico).
+//
+// Este node só MONTA o prompt; quem chama a API é o node HTTP Request
+// seguinte no workflow (credencial "Claude account (dev)" ou "(produção)",
+// modelo Claude Haiku 4.5 — seção 7.1).
 // ─────────────────────────────────────────────────────────────────────────
 
-/**
- * @param {string} descricao - coluna J
- * @param {string} projetoId - 'AREP' | 'REUNION' | 'SOFT_PRE'
- * @returns {'NF_NORMAL'|'JOB'|'DIARIA'|'PACOTE'|'REC_NF'}
- */
-function determinarTipoEmissao(descricao, projetoId) {
-  const norm = normalizar(descricao);
-  if (projetoId === 'AREP' && /\bpacote\b/.test(norm)) return 'PACOTE';
-  if (/\brec\b.*\bnf\b|\bloca[cç][aã]o\b/.test(norm)) return 'REC_NF';
-  if (/\bdi[aá]ria\b/.test(norm)) return 'DIARIA';
-  if (/\bjob\b/.test(norm)) return 'JOB';
-  return 'NF_NORMAL';
+const PROMPT_SISTEMA_PARSING_COLUNA_J = `Você extrai dados estruturados da coluna "Descrição" (coluna J) de uma planilha de controle de notas fiscais da produtora Box Fish.
+
+O texto pode descrever:
+(a) um COLABORADOR prestando serviço — geralmente tem um Cargo, um Nome de pessoa, e opcionalmente um período (DD/MM A DD/MM) e uma palavra-chave de tipo entre parênteses (JOB, DIÁRIA, DIÁRIAS, PACOTE, REC, REC+NF); ou
+(b) um FORNECEDOR de locação/recibo — geralmente é uma empresa (razão social), sem nome de pessoa física, descrevendo uma locação (equipamento, estúdio, gerador etc.) ou um serviço faturado por fornecedor.
+
+Responda SOMENTE com um objeto JSON (sem markdown, sem texto fora do JSON) no formato:
+{
+  "tipoLinha": "colaborador" | "fornecedor",
+  "periodo": "DD/MM A DD/MM" | null,
+  "tipoEmissao": "NF_NORMAL" | "JOB" | "DIARIA" | "PACOTE" | "REC" | "REC_NF" | null,
+  "parcela": "P.X/Y" | null,
+  "cargo": string | "FALTA INFORMAÇÃO" | null,
+  "nomeColaborador": string | "FALTA INFORMAÇÃO" | null,
+  "documentoLinha": "RECIBO" | "NOTA_FISCAL" | null,
+  "descricaoServicoOuLocacao": string,
+  "situacaoNaoMapeada": string | null
 }
 
-/** Extrai "P.X/Y" (parcela de JOB), se houver, da Descrição (seção 3.2). */
-function extrairParcela(descricao) {
-  const m = /\bP\.?\s*(\d+)\s*\/\s*(\d+)\b/i.exec(descricao || '');
-  return m ? `P.${m[1]}/${m[2]}` : null;
-}
-
-const MESES_ABREV_PT = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
+Regras:
+- "tipoEmissao" só se aplica a colaborador (JOB/DIÁRIA/PACOTE) ou é REC/REC_NF pra fornecedor; ausência de palavra-chave em caso de colaborador = "NF_NORMAL".
+- "documentoLinha" só se aplica a fornecedor: use o prefixo "(REC)"/"(NF)" quando existir no texto; se não houver marcação inequívoca, infira pelo conteúdo semântico (locação/aluguel = RECIBO; prestação de serviço = NOTA_FISCAL) SOMENTE se estiver claro; caso contrário null.
+- "descricaoServicoOuLocacao": o texto do serviço ou da locação, SEM o nome do projeto (REUNION, AREP, SOFT PRE, PNS, PNL etc. — remova essas menções) e SEM o período (que já vai no campo "periodo").
+- Se não conseguir preencher cargo e/ou nomeColaborador com confiança (caso colaborador), use "FALTA INFORMAÇÃO" nesse campo — NUNCA invente.
+- Se encontrar qualquer situação não coberta por estas regras (ambiguidade real, formato inesperado, impossível decidir RECIBO vs NOTA_FISCAL sem adivinhar), preencha "situacaoNaoMapeada" descrevendo o problema — NUNCA adivinhe um valor pra contornar isso.`;
 
 /**
- * Monta o texto "REF. ..." do ASSUNTO (não confundir com o "Ref." do corpo
- * do e-mail, que vem do perfil/apelido) — seção 3.2.
+ * @param {{colunaJ: string, colunaH: string}} nota
+ * @returns {{system: string, user: string}} payload pronto pro node HTTP Request (Claude Messages API)
  */
-function montarRefAssunto(tipoEmissao, dataVencimento, descricao) {
-  const parcela = extrairParcela(descricao);
-  switch (tipoEmissao) {
-    case 'JOB':
-      return parcela ? `REF. JOB (${parcela})` : 'REF. JOB';
-    case 'DIARIA':
-      return 'REF. DIÁRIA';
-    case 'PACOTE':
-      return 'REF. PACOTE';
-    case 'REC_NF':
-      return `EMISSÃO DE NF E REC | REF. ${MESES_ABREV_PT[dataVencimento.getMonth()]}`;
-    case 'NF_NORMAL':
-    default:
-      return `REF. ${MESES_ABREV_PT[dataVencimento.getMonth()]}`;
+function montarPromptParsingColunaJ(nota) {
+  return {
+    system: PROMPT_SISTEMA_PARSING_COLUNA_J,
+    user: JSON.stringify({ colunaJ: nota.colunaJ || '', colunaH: nota.colunaH || '' }),
+  };
+}
+
+/**
+ * Interpreta a resposta da IA (texto bruto retornado pela API da Claude).
+ * Nunca lança exceção — qualquer falha de parsing vira `situacaoNaoMapeada`,
+ * seguindo a regra geral de segurança (seção 3.2, item 6): nunca adivinhar,
+ * sempre alertar.
+ *
+ * @param {string} textoResposta
+ * @returns {Object} objeto no formato descrito em PROMPT_SISTEMA_PARSING_COLUNA_J
+ */
+function parseRespostaIA(textoResposta) {
+  try {
+    const obj = JSON.parse(textoResposta);
+    if (!obj || !obj.tipoLinha) {
+      return { situacaoNaoMapeada: 'Resposta da IA sem "tipoLinha" — resposta bruta: ' + String(textoResposta).slice(0, 300) };
+    }
+    return obj;
+  } catch (e) {
+    return { situacaoNaoMapeada: 'Resposta da IA não é JSON válido: ' + String(textoResposta).slice(0, 300) };
   }
 }
 
@@ -257,11 +231,6 @@ function montarRefAssunto(tipoEmissao, dataVencimento, descricao) {
 // NODE: "Resolver apelido" (seção 6.1) — apelidos.json
 // ─────────────────────────────────────────────────────────────────────────
 
-/**
- * @param {Object} apelidos - conteúdo de config/apelidos.json, ex.: {"SOFT_PRE": ["SMTC - S02 | SOFT PRE", "PNS | SOFT PRE"]}
- * @param {string} projetoId
- * @returns {string} apelido mais recente (último do array) — usado em e-mails NOVOS
- */
 function resolverApelidoAtual(apelidos, projetoId) {
   const lista = (apelidos && apelidos[projetoId]) || [];
   if (lista.length === 0) {
@@ -270,9 +239,6 @@ function resolverApelidoAtual(apelidos, projetoId) {
   return lista[lista.length - 1];
 }
 
-/**
- * @returns {boolean} true se `assunto` bate com QUALQUER apelido cadastrado pro projeto (usado na identificação de e-mails recebidos — Fase 2, mas a função mora aqui por depender só de apelidos.json)
- */
 function assuntoCorrespondeAoProjeto(assunto, apelidos, projetoId) {
   const lista = (apelidos && apelidos[projetoId]) || [];
   const assuntoNorm = normalizar(assunto);
@@ -280,7 +246,7 @@ function assuntoCorrespondeAoProjeto(assunto, apelidos, projetoId) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// NODE: "Montar e-mail de pedido" (seções 3.2, 3.3, 3.4)
+// NODE: "Montar e-mail — colaborador" (seções 3.2, 3.3, 3.4)
 // Réplica fiel do template real — mesmo espaçamento, negrito, grifo,
 // disclaimer e assinatura. HTML porque o rascunho do Gmail é rich text.
 // ─────────────────────────────────────────────────────────────────────────
@@ -297,36 +263,75 @@ const AVISO_DADOS_BANCARIOS_HTML = `<span style="background-color:#FFFF00;">"Os 
 O cadastro é feito baseado nas informações cedidas pelo contratado através do preenchimento de ficha cadastral da Box.<br>
 Qualquer alteração bancária ou mudança na forma de pagamento deve ser notificada por e-mail pelo contratado e se faz necessário atualização da ficha cadastral e envio prévio ao responsável financeiro do projeto."</span>`;
 
+/** Extrai "P.X/Y" (parcela), se houver — usado como fallback quando a IA não retorna `parcela`. */
+function extrairParcela(descricao) {
+  const m = /\bP\.?\s*(\d+)\s*\/\s*(\d+)\b/i.exec(descricao || '');
+  return m ? `P.${m[1]}/${m[2]}` : null;
+}
+
+/**
+ * Monta o texto "REF. ..." do ASSUNTO pra caso COLABORADOR (não confundir
+ * com o "Ref." do corpo do e-mail, que vem do perfil/apelido) — seção 3.2.
+ */
+function montarRefAssuntoColaborador(tipoEmissao, dataEnvio, parcela) {
+  switch (tipoEmissao) {
+    case 'JOB':
+      return parcela ? `REF. JOB (${parcela})` : 'REF. JOB';
+    case 'DIARIA':
+      return 'REF. DIÁRIA';
+    case 'PACOTE':
+      return 'REF. PACOTE';
+    case 'NF_NORMAL':
+    default:
+      // Mês vem do ENVIO, não do vencimento — evidência real (seção 3.2.1,
+      // exemplo Media Arts): envio 25/08 -> "REF. LOCAÇÃO - AGO", vencimento
+      // 20/09 (seria SET se fosse por vencimento). Mesma convenção aplicada
+      // aqui por consistência (não há exemplo NF_NORMAL puro pra confirmar,
+      // mas ambos usam o mesmo padrão "REF. [MÊS]").
+      return `REF. ${MESES_ABREV_PT[dataEnvio.getMonth()]}`;
+  }
+}
+
+/**
+ * Monta o texto do período pro CORPO do e-mail, com a palavra-chave de tipo
+ * entre parênteses logo em seguida quando houver (seção 3.2, item 2: "No
+ * corpo do e-mail, ela SEMPRE aparece entre parênteses logo após o período,
+ * ex.: 'Período de 25/08 A 27/08 (JOB)'"). NF normal não escreve nada entre
+ * parênteses (ausência de palavra-chave).
+ *
+ * @param {string|null} periodo - "DD/MM A DD/MM" (campo `periodo` retornado pela IA), ou null/vazio se não houver
+ * @param {'NF_NORMAL'|'JOB'|'DIARIA'|'PACOTE'} tipoEmissao
+ * @returns {string} ex.: "25/08 A 27/08 (JOB)", "" (NF normal sem período)
+ */
+function montarPeriodoTexto(periodo, tipoEmissao) {
+  if (!periodo) return '';
+  const PALAVRA_CHAVE = { JOB: 'JOB', DIARIA: 'DIÁRIA', PACOTE: 'PACOTE' };
+  const palavra = PALAVRA_CHAVE[tipoEmissao];
+  return palavra ? `${periodo} (${palavra})` : periodo;
+}
+
 /**
  * @param {Object} params
- * @param {string} params.primeiroNome - ex.: "GUILHERME" ou apelido curto como "BRU" (seção 3.4 mostra "Olá BRU!" pro nome "BRUNA BORTOLAZO" — ASSUNÇÃO: uso o primeiro nome completo por padrão; apelidos carinhosos tipo "BRU" não têm regra determinística, ficam a cargo de ajuste manual se a Michelle preferir)
- * @param {Date} params.dataEnvio - prazo de envio (data do "PROGRAMAR ATÉ", ou hoje se "SOLICITAR")
+ * @param {string} params.primeiroNome
+ * @param {Date} params.dataEnvio - prazo de envio
  * @param {Date} params.dataVencimento
  * @param {string} params.textoRef - perfil.texto_ref (seção 6, ex.: "SMTC - REUNION")
  * @param {number} params.valor
- * @param {string} params.servicoPrestadoComo - cargo/função (coluna J), ou descrição de locação (nunca "serviço prestado" se REC_NF)
+ * @param {string} params.cargo
  * @param {string} params.nomeColaborador
- * @param {string} params.periodoTexto - ex.: "25/08 A 27/08 (JOB)" — vazio se NF normal/mensal
- * @param {boolean} params.ehLocacao - seção 3.2, regra crítica: nunca "serviço prestado" em locação
+ * @param {string} params.periodoTexto - já composto via montarPeriodoTexto(), ex.: "25/08 A 27/08 (JOB)" — vazio se NF normal/mensal
  * @returns {string} corpo do e-mail em HTML
  */
-function montarCorpoEmailPedido(params) {
-  const {
-    primeiroNome, dataEnvio, dataVencimento, textoRef, valor,
-    servicoPrestadoComo, nomeColaborador, periodoTexto, ehLocacao,
-  } = params;
-
+function montarCorpoEmailColaborador(params) {
+  const { primeiroNome, dataEnvio, dataVencimento, textoRef, valor, cargo, nomeColaborador, periodoTexto } = params;
   const valorFormatado = valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const linhaServico = ehLocacao
-    ? `Locação: ${servicoPrestadoComo}` // regra crítica (3.2): nunca "Serviço Prestado como" em locação
-    : `Serviço Prestado como: ${servicoPrestadoComo}`;
 
   return `Olá ${primeiroNome}! Tudo bem?<br><br>
 Seguem as instruções para a emissão da sua nota fiscal que deverá ser enviada até o dia ${formatarDataBR(dataEnvio)} com vencimento em ${formatarDataBR(dataVencimento)}.<br><br>
 ${TOMADOR_HTML}<br><br>
 1- Emitir nota fiscal no valor de R$ ${valorFormatado} com os dados abaixo no corpo da nota:<br>
 Ref. "${textoRef}"<br>
-${linhaServico}<br>
+Serviço Prestado como: ${cargo}<br>
 Colaborador: ${nomeColaborador}<br>
 ${periodoTexto ? `Período de ${periodoTexto}<br>` : ''}
 Dados bancários:<br>
@@ -339,13 +344,137 @@ ${AVISO_DADOS_BANCARIOS_HTML}<br><br>
 Muito obrigada! Beijo 🌷`;
 }
 
-/**
- * Monta o assunto completo: prefixo do apelido + sufixo fixo + REF. + nome.
- * Ex.: "SMTC - S01 | REUNION | EMISSÃO DE NF | REF. JOB (ENVIAR ATÉ 10.08) | GUILHERME HENRIQUE PORTES SIQUEIRA"
- */
-function montarAssuntoPedido({ apelidoAtual, refAssunto, dataEnvio, nomeColaborador }) {
+function montarAssuntoColaborador({ apelidoAtual, refAssunto, dataEnvio, nomeColaborador }) {
   const enviarAte = `ENVIAR ATÉ ${formatarDataCurta(dataEnvio)}`;
   return `${apelidoAtual} | EMISSÃO DE NF | ${refAssunto} (${enviarAte}) | ${nomeColaborador}`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// NODE: "Agrupar e montar e-mail — fornecedor (REC/REC+NF)" (seção 3.2.1)
+//
+// Diferente do caso colaborador (1 linha = 1 e-mail), aqui MÚLTIPLAS linhas
+// da planilha (mesmo projeto + fornecedor + vencimento) viram UM e-mail com
+// blocos numerados — 1 bloco por linha, ordem: todos os RECIBO primeiro,
+// depois todas as NOTA_FISCAL (regra confirmada por 2 exemplos reais).
+// ─────────────────────────────────────────────────────────────────────────
+
+/**
+ * Agrupa linhas classificadas tipoLinha='fornecedor' por (projeto, fornecedor
+ * normalizado, vencimento). Preserva a ordem original de aparição na planilha
+ * dentro de cada grupo (spec.md: "Numerar os blocos na ordem em que aparecem
+ * na planilha").
+ *
+ * @param {Array<Object>} linhasFornecedor - itens já com `nota` e o resultado da IA (`documentoLinha`, `descricaoServicoOuLocacao`, etc.) anexado
+ * @returns {Array<Array<Object>>} lista de grupos (cada grupo é uma lista de itens)
+ */
+function agruparLinhasFornecedor(linhasFornecedor) {
+  const grupos = new Map();
+  for (const item of linhasFornecedor) {
+    const chave = [item.nota.projetoId, normalizar(item.nota.colunaH), item.nota.colunaG].join('|');
+    if (!grupos.has(chave)) grupos.set(chave, []);
+    grupos.get(chave).push(item);
+  }
+  return Array.from(grupos.values());
+}
+
+/**
+ * Ordena os itens de um grupo: RECIBO primeiro (ordem original), depois
+ * NOTA_FISCAL (ordem original). Itens sem classificação clara (`documentoLinha`
+ * null/ausente) são separados — não entram no e-mail, viram alerta (regra
+ * geral de segurança, seção 3.2 item 6 / 3.2.1: "NÃO adivinhar").
+ *
+ * @returns {{blocosOrdenados: Array<Object>, semClassificacao: Array<Object>}}
+ */
+function ordenarBlocosGrupo(grupo) {
+  const recibos = grupo.filter((i) => i.documentoLinha === 'RECIBO');
+  const notas = grupo.filter((i) => i.documentoLinha === 'NOTA_FISCAL');
+  const semClassificacao = grupo.filter((i) => i.documentoLinha !== 'RECIBO' && i.documentoLinha !== 'NOTA_FISCAL');
+  return { blocosOrdenados: [...recibos, ...notas], semClassificacao };
+}
+
+function montarBlocoRecibo(numero, item, textoRef) {
+  const valorFormatado = item.nota.colunaK.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return `${numero}- Emitir RECIBO no valor de R$ ${valorFormatado} com os dados abaixo no corpo do recibo:<br>
+Ref. "${textoRef}"<br>
+Fornecedor: ${item.nota.colunaH}<br>
+Período de ${item.periodo || ''} - ${item.descricaoServicoOuLocacao}<br>
+Dados bancários:<br>
+Chave pix:<br>
+---------------------------------------------------------------------`;
+}
+
+function montarBlocoNotaFiscal(numero, item, textoRef) {
+  const valorFormatado = item.nota.colunaK.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return `${numero}- Emitir NOTA FISCAL no valor de R$ ${valorFormatado} com os dados abaixo no corpo da nota:<br>
+Ref. "${textoRef}"<br>
+Fornecedor: ${item.nota.colunaH}<br>
+Serviço Prestado: ${item.descricaoServicoOuLocacao}<br>
+Período de ${item.periodo || ''}<br>
+Dados bancários:<br>
+Chave pix:<br>
+---------------------------------------------------------------------`;
+}
+
+/**
+ * Monta o corpo completo do e-mail de fornecedor (1 ou mais blocos).
+ * ASSUNÇÃO (flagada): normalizei a formatação (espaçamento, "com vencimento
+ * em DD/MM/AAAA") pro mesmo padrão usado no template de colaborador — os 2
+ * exemplos reais da seção 3.2.1 têm pequenas variações entre si (dia da
+ * semana citado só num deles, "para"/"em", ano com 2 ou 4 dígitos) que
+ * pareceram inconsistência de digitação manual, não regra confirmada.
+ *
+ * @param {Object} params
+ * @param {Array<Object>} params.blocosOrdenados - itens já ordenados (ordenarBlocosGrupo)
+ * @param {boolean} params.temNotaFiscal
+ * @param {Date} params.dataEnvio
+ * @param {Date} params.dataVencimento
+ * @param {string} params.textoRef
+ * @returns {string} HTML
+ */
+function montarCorpoEmailFornecedor(params) {
+  const { blocosOrdenados, temNotaFiscal, dataEnvio, dataVencimento, textoRef } = params;
+
+  const abertura = temNotaFiscal
+    ? `Seguem as instruções para a emissão do RECIBO e da NOTA FISCAL que deverão ser enviadas até o dia ${formatarDataBR(dataEnvio)} com vencimento em ${formatarDataBR(dataVencimento)}:`
+    : `Seguem as instruções para a emissão da sua FATURA que deverá ser enviada até o dia ${formatarDataBR(dataEnvio)} com vencimento em ${formatarDataBR(dataVencimento)}.`; // seção 3.2.1: REC puro sempre fala "FATURA" na abertura, mesmo o bloco dizendo "Emitir RECIBO"
+
+  const blocosHtml = blocosOrdenados
+    .map((item, idx) => (item.documentoLinha === 'RECIBO' ? montarBlocoRecibo(idx + 1, item, textoRef) : montarBlocoNotaFiscal(idx + 1, item, textoRef)))
+    .join('<br><br>\n');
+
+  return `Olá! Tudo bem?<br><br>
+${abertura}<br><br>
+${TOMADOR_HTML}<br><br>
+${blocosHtml}<br><br>
+Importante: Peço a gentileza de enviar a sua nota nestes e-mails:<br>
+financeiro@novorealitybox.com<br>
+financeiro1@novorealitybox.com<br><br>
+${AVISO_DADOS_BANCARIOS_HTML}<br><br>
+Muito obrigada! Beijo 🌷`;
+}
+
+/**
+ * Regra do assunto pra fornecedor (seção 3.2.1) — diferencia REC puro de
+ * REC+NF pelo texto do "Ref.", não pela palavra RECIBO/FATURA.
+ *
+ * @param {Object} params
+ * @param {string} params.apelidoAtual
+ * @param {boolean} params.temNotaFiscal
+ * @param {string|null} params.parcela - "P.X/Y", se a linha (REC puro) indicar locação parcelada
+ * @param {Date} params.dataEnvio
+ * @param {string} params.fornecedor
+ * @returns {string}
+ */
+function montarAssuntoFornecedor({ apelidoAtual, temNotaFiscal, parcela, dataEnvio, fornecedor }) {
+  // Mês vem do ENVIO, não do vencimento — confirmado pelo exemplo real da
+  // Media Arts (seção 3.2.1): envio 25/08, vencimento 20/09/2026, assunto
+  // real é "REF. LOCAÇÃO - AGO" (mês do envio), não "SET" (mês do vencimento).
+  const mes = MESES_ABREV_PT[dataEnvio.getMonth()];
+  const palavraDocumento = temNotaFiscal ? 'EMISSÃO DE FATURA' : 'EMISSÃO DE RECIBO'; // REC puro: a palavra é indiferente por spec — fixamos "RECIBO" por padrão determinístico
+  const ref = temNotaFiscal
+    ? `REF. LOCAÇÃO E SERVIÇOS - ${mes}`
+    : `REF. LOCAÇÃO - ${mes}${parcela ? ' - ' + parcela : ''}`;
+  return `${apelidoAtual} | ${palavraDocumento} | ${ref} | (ENVIAR ATÉ ${formatarDataCurta(dataEnvio)}) | ${fornecedor}`;
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -362,7 +491,6 @@ const MARCADOR_IA = 'IA';
 const MARCADOR_CONTRATACAO = 'CONTRATAÇÃO';
 const MARCADOR_DANILO = 'DANILO FINANCEIRO'; // usado só na Fase 3+4, mantido aqui por ser a mesma tabela
 
-/** @returns {string[]} marcadores a aplicar num e-mail de pedido/cobrança */
 function marcadoresPedidoCobranca(projetoId) {
   return [MARCADOR_IA, MARCADOR_PROJETO[projetoId]];
 }
@@ -371,23 +499,10 @@ function marcadoresPedidoCobranca(projetoId) {
 // NODE: "Modo de execução" (seção 3.1.3) — config_execucao.json
 // ─────────────────────────────────────────────────────────────────────────
 
-/**
- * @param {{modo: 'rascunho'|'automatico'}} config
- * @returns {boolean}
- */
 function ehModoAutomatico(config) {
   return config && config.modo === 'automatico';
 }
 
-/**
- * Decide a ação de envio do e-mail (rascunho/agendar/enviar) e se a coluna L
- * deve ser escrita automaticamente — separado da checagem de contrato
- * (coluna N), que nunca é bloqueada pelo modo (seção 3.1, linha 31).
- *
- * @param {'PROGRAMAR_ATE'|'SOLICITAR'} gatilho
- * @param {boolean} modoAutomatico
- * @returns {{acaoGmail: 'criar_rascunho'|'agendar_envio'|'enviar_direto', atualizarColunaL: boolean, novoValorColunaL?: string}}
- */
 function decidirAcaoEnvio(gatilho, modoAutomatico) {
   if (!modoAutomatico) {
     return { acaoGmail: 'criar_rascunho', atualizarColunaL: false };
@@ -395,7 +510,6 @@ function decidirAcaoEnvio(gatilho, modoAutomatico) {
   if (gatilho === 'SOLICITAR') {
     return { acaoGmail: 'enviar_direto', atualizarColunaL: true, novoValorColunaL: 'SOLICITADA MI' };
   }
-  // PROGRAMAR_ATE em modo automático: agenda o disparo pra data do prazo (seção 3.1.3).
   return { acaoGmail: 'agendar_envio', atualizarColunaL: true, novoValorColunaL: 'SOLICITADA MI' };
 }
 
@@ -404,39 +518,19 @@ function decidirAcaoEnvio(gatilho, modoAutomatico) {
 // ─────────────────────────────────────────────────────────────────────────
 
 const INTERVALO_COBRANCA_DIAS = 5;
-const MARGEM_FIM_CICLO_DIAS = 5; // "até aproximadamente 5 dias antes do vencimento"
+const MARGEM_FIM_CICLO_DIAS = 5;
 
-/**
- * @typedef {Object} EstadoCobranca
- * @property {string} dataUltimaCobranca - ISO date
- * @property {number} contagemCiclos
- * @property {boolean} encerrado
- */
-
-/**
- * Decide a ação de monitoramento pra uma nota já "SOLICITADA MI" cujo Status
- * Box ainda não é "RECEBIDA MI".
- *
- * @param {Object} params
- * @param {Date} params.hoje
- * @param {Date} params.dataProgramarAte
- * @param {Date} params.dataVencimentoNF
- * @param {EstadoCobranca|undefined} params.estadoAtual - undefined = 1ª checagem
- * @returns {{acao: 'nenhuma'|'cobrar'|'encerrar_sem_resposta', novoEstado?: EstadoCobranca}}
- */
 function avaliarCobranca({ hoje, dataProgramarAte, dataVencimentoNF, estadoAtual }) {
   if (estadoAtual && estadoAtual.encerrado) {
-    return { acao: 'nenhuma' }; // ciclo já encerrado, sem mais ação automática (seção 3.1.1)
+    return { acao: 'nenhuma' };
   }
 
   const fimDoCiclo = somarDias(dataVencimentoNF, -MARGEM_FIM_CICLO_DIAS);
 
-  // Ainda não chegou o dia do prazo original — nada a fazer.
   if (diferencaDias(hoje, dataProgramarAte) < 0) {
     return { acao: 'nenhuma' };
   }
 
-  // Passou do fim do ciclo sem resposta → alerta + encerra.
   if (diferencaDias(hoje, fimDoCiclo) >= 0) {
     return {
       acao: 'encerrar_sem_resposta',
@@ -448,7 +542,6 @@ function avaliarCobranca({ hoje, dataProgramarAte, dataVencimentoNF, estadoAtual
     };
   }
 
-  // 1ª cobrança: dia seguinte ao prazo original (seção 3.1.1, "agendar... para o dia seguinte").
   if (!estadoAtual) {
     const diaDaPrimeiraCobranca = somarDias(dataProgramarAte, 1);
     if (diferencaDias(hoje, diaDaPrimeiraCobranca) >= 0) {
@@ -460,7 +553,6 @@ function avaliarCobranca({ hoje, dataProgramarAte, dataVencimentoNF, estadoAtual
     return { acao: 'nenhuma' };
   }
 
-  // Cobranças seguintes: a cada ~5 dias desde a última.
   const dataUltima = new Date(estadoAtual.dataUltimaCobranca);
   if (diferencaDias(hoje, dataUltima) >= INTERVALO_COBRANCA_DIAS) {
     return {
@@ -496,13 +588,21 @@ module.exports = {
   validarFichaCadastral,
   avaliarContratoEtapa1,
   avaliarContratoEtapa2,
-  determinarTipoEmissao,
-  extrairParcela,
-  montarRefAssunto,
+  montarPromptParsingColunaJ,
+  parseRespostaIA,
   resolverApelidoAtual,
   assuntoCorrespondeAoProjeto,
-  montarCorpoEmailPedido,
-  montarAssuntoPedido,
+  extrairParcela,
+  montarRefAssuntoColaborador,
+  montarPeriodoTexto,
+  montarCorpoEmailColaborador,
+  montarAssuntoColaborador,
+  agruparLinhasFornecedor,
+  ordenarBlocosGrupo,
+  montarBlocoRecibo,
+  montarBlocoNotaFiscal,
+  montarCorpoEmailFornecedor,
+  montarAssuntoFornecedor,
   marcadoresPedidoCobranca,
   ehModoAutomatico,
   decidirAcaoEnvio,
@@ -511,4 +611,5 @@ module.exports = {
   MARCADOR_IA,
   MARCADOR_CONTRATACAO,
   MARCADOR_DANILO,
+  MESES_ABREV_PT,
 };

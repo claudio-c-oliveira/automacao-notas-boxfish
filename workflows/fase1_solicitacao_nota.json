@@ -1,7 +1,7 @@
 {
   "name": "Fase 1 — Solicitação de nota (Produção)",
   "meta": {
-    "description": "Automação de solicitação de nota fiscal aos colaboradores (docs/spec.md seção 3). Cobre os 3 projetos (AREP, Reunion, Soft Pré) num único workflow parametrizado. Ver /home/.../.claude/plans (histórico de planejamento) e docs/spec.md como fonte da verdade — não editar a lógica de negócio aqui sem antes atualizar o spec.md."
+    "description": "Automação de solicitação de nota fiscal aos colaboradores (docs/spec.md seção 3). Cobre os 3 projetos (AREP, Reunion, Soft Pré) num único workflow parametrizado. Ver /home/.../.claude/plans (histórico de planejamento) e docs/spec.md como fonte da verdade — não editar a lógica de negócio aqui sem antes atualizar o spec.md. Fechamento REC/REC+NF (spec.md secao 3.2/3.2.1, commit 1ca83a7): Fase 1 agora usa IA (Claude) pra interpretar a coluna J e classificar RECIBO/NOTA_FISCAL em casos de fornecedor/locacao; linhas de fornecedor com mesmo vencimento sao agrupadas num unico e-mail multi-bloco. Fechamento REC/REC+NF (spec.md secao 3.2/3.2.1, commit 1ca83a7): Fase 1 agora usa IA (Claude) pra interpretar a coluna J e classificar RECIBO/NOTA_FISCAL em casos de fornecedor/locacao; linhas de fornecedor com mesmo vencimento sao agrupadas num unico e-mail multi-bloco. Fechamento REC/REC+NF (spec.md secao 3.2/3.2.1, commit 1ca83a7): Fase 1 agora usa IA (Claude) pra interpretar a coluna J e classificar RECIBO/NOTA_FISCAL em casos de fornecedor/locacao; linhas de fornecedor com mesmo vencimento sao agrupadas num unico e-mail multi-bloco."
   },
   "nodes": [
     {
@@ -10,19 +10,31 @@
       "name": "Manual Trigger",
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
-      "position": [0, 0]
+      "position": [
+        0,
+        0
+      ]
     },
     {
       "parameters": {
         "rule": {
-          "interval": [{ "field": "days", "daysInterval": 1, "triggerAtHour": 8 }]
+          "interval": [
+            {
+              "field": "days",
+              "daysInterval": 1,
+              "triggerAtHour": 8
+            }
+          ]
         }
       },
       "id": "n02-schedule-trigger",
       "name": "Schedule Trigger (diário 08h)",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [0, 160]
+      "position": [
+        0,
+        160
+      ]
     },
     {
       "parameters": {
@@ -34,7 +46,10 @@
       "name": "Ler config_execucao.json",
       "type": "n8n-nodes-base.readWriteFile",
       "typeVersion": 1,
-      "position": [260, -80],
+      "position": [
+        260,
+        -80
+      ],
       "notes": "Caminho é local à VM do n8n (docs/spec.md seção 3.1.1). Ajustar fileSelector pro caminho real de deploy — o repositório guarda o conteúdo inicial em config/config_execucao.json, mas em runtime o n8n lê do disco da própria VM, não do Git."
     },
     {
@@ -47,7 +62,10 @@
       "name": "Ler cobrancas.json",
       "type": "n8n-nodes-base.readWriteFile",
       "typeVersion": 1,
-      "position": [260, 0]
+      "position": [
+        260,
+        0
+      ]
     },
     {
       "parameters": {
@@ -59,7 +77,10 @@
       "name": "Ler apelidos.json",
       "type": "n8n-nodes-base.readWriteFile",
       "typeVersion": 1,
-      "position": [260, 80]
+      "position": [
+        260,
+        80
+      ]
     },
     {
       "parameters": {
@@ -69,7 +90,10 @@
       "name": "Merge — arquivos de config",
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3,
-      "position": [480, 0]
+      "position": [
+        480,
+        0
+      ]
     },
     {
       "parameters": {
@@ -79,7 +103,10 @@
       "name": "Carregar config + perfis",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [700, 0]
+      "position": [
+        700,
+        0
+      ]
     },
     {
       "parameters": {
@@ -91,8 +118,16 @@
       "name": "Box — Download Cost Report S01",
       "type": "n8n-nodes-base.box",
       "typeVersion": 1,
-      "position": [700, 200],
-      "credentials": { "boxOAuth2Api": { "id": "REPLACE", "name": "Box account" } },
+      "position": [
+        700,
+        200
+      ],
+      "credentials": {
+        "boxOAuth2Api": {
+          "id": "REPLACE",
+          "name": "Box account"
+        }
+      },
       "notes": "Arquivo compartilhado AREP+Reunion (perfis.AREP/REUNION.planilha_cost_report — spec.md seção 6). fileId precisa ser preenchido com o ID real do Box."
     },
     {
@@ -105,8 +140,16 @@
       "name": "Box — Download Cost Report S02 (Soft Pré)",
       "type": "n8n-nodes-base.box",
       "typeVersion": 1,
-      "position": [700, 320],
-      "credentials": { "boxOAuth2Api": { "id": "REPLACE", "name": "Box account" } }
+      "position": [
+        700,
+        320
+      ],
+      "credentials": {
+        "boxOAuth2Api": {
+          "id": "REPLACE",
+          "name": "Box account"
+        }
+      }
     },
     {
       "parameters": {
@@ -118,8 +161,16 @@
       "name": "Box — Download Contratos AREP",
       "type": "n8n-nodes-base.box",
       "typeVersion": 1,
-      "position": [700, 440],
-      "credentials": { "boxOAuth2Api": { "id": "REPLACE", "name": "Box account" } }
+      "position": [
+        700,
+        440
+      ],
+      "credentials": {
+        "boxOAuth2Api": {
+          "id": "REPLACE",
+          "name": "Box account"
+        }
+      }
     },
     {
       "parameters": {
@@ -131,8 +182,16 @@
       "name": "Box — Download Contratos Reunion",
       "type": "n8n-nodes-base.box",
       "typeVersion": 1,
-      "position": [700, 560],
-      "credentials": { "boxOAuth2Api": { "id": "REPLACE", "name": "Box account" } }
+      "position": [
+        700,
+        560
+      ],
+      "credentials": {
+        "boxOAuth2Api": {
+          "id": "REPLACE",
+          "name": "Box account"
+        }
+      }
     },
     {
       "parameters": {
@@ -144,8 +203,16 @@
       "name": "Box — Download Contratos Soft Pré",
       "type": "n8n-nodes-base.box",
       "typeVersion": 1,
-      "position": [700, 680],
-      "credentials": { "boxOAuth2Api": { "id": "REPLACE", "name": "Box account" } }
+      "position": [
+        700,
+        680
+      ],
+      "credentials": {
+        "boxOAuth2Api": {
+          "id": "REPLACE",
+          "name": "Box account"
+        }
+      }
     },
     {
       "parameters": {
@@ -155,7 +222,10 @@
       "name": "Merge — downloads + config",
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3,
-      "position": [940, 300],
+      "position": [
+        940,
+        300
+      ],
       "notes": "Combina (por posição, 1 item cada) a saída de 'Carregar config + perfis' com os 5 downloads do Box, só pra garantir que todos rodaram antes do próximo node — o Code seguinte lê o conteúdo de cada um via $('Nome do node') por referência direta, não pelos dados deste merge."
     },
     {
@@ -166,7 +236,10 @@
       "name": "Parsear planilhas (exceljs) e separar AREP/Reunion por cor",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1160, 300],
+      "position": [
+        1160,
+        300
+      ],
       "notes": "1 item de saída por LINHA da aba Notas (S01 + S02), já com projetoId resolvido. Pré-requisito de infra: NODE_FUNCTION_ALLOW_EXTERNAL=exceljs na VM."
     },
     {
@@ -177,7 +250,10 @@
       "name": "Filtrar por Status Box (novo pedido / monitoramento)",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1380, 300]
+      "position": [
+        1380,
+        300
+      ]
     },
     {
       "parameters": {
@@ -187,14 +263,28 @@
       "name": "Checagem de contrato — etapa 1",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1600, 300]
+      "position": [
+        1600,
+        300
+      ]
     },
     {
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
           "conditions": [
-            { "leftValue": "={{ $json.precisaBuscarFichaCadastral }}", "rightValue": true, "operator": { "type": "boolean", "operation": "equals" } }
+            {
+              "leftValue": "={{ $json.precisaBuscarFichaCadastral }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
           ],
           "combinator": "and"
         }
@@ -203,7 +293,10 @@
       "name": "IF — Precisa buscar ficha cadastral?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [1820, 300]
+      "position": [
+        1820,
+        300
+      ]
     },
     {
       "parameters": {
@@ -216,8 +309,16 @@
       "name": "Gmail — Buscar thread CONTRATAÇÃO",
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.1,
-      "position": [2040, 220],
-      "credentials": { "gmailOAuth2": { "id": "REPLACE", "name": "Gmail account" } },
+      "position": [
+        2040,
+        220
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "REPLACE",
+          "name": "Gmail account"
+        }
+      },
       "notes": "Busca por marcador CONTRATAÇÃO + nome do colaborador (seção 3.1.2/3.1). Ajustar a query real conforme testes em homologação — o operador 'label:' do Gmail é case/acento sensível dependendo de como o marcador foi criado."
     },
     {
@@ -228,38 +329,392 @@
       "name": "Checagem de contrato — etapa 2 (validar ficha)",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2260, 220]
+      "position": [
+        2260,
+        220
+      ]
     },
     {
-      "parameters": { "numberInputs": 2 },
+      "parameters": {
+        "numberInputs": 2
+      },
       "id": "n19-merge-contrato",
       "name": "Merge — resultado da checagem de contrato",
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3,
-      "position": [2480, 300],
+      "position": [
+        2480,
+        300
+      ],
       "notes": "Reúne: (entrada 1) itens que já vieram liberados/negados na etapa 1 sem precisar de Gmail [inclui monitoramento, que passou direto]; (entrada 2) itens resolvidos na etapa 2. Modo 'append'."
     },
     {
       "parameters": {
-        "jsCode": "// Monta e-mail (novo_pedido liberado) OU avalia cobrança (monitoramento).\n// Produz um campo `acao` que o Switch seguinte usa pra rotear.\n\nconst MESES_ABREV_PT = ['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ'];\nconst MARCADOR_PROJETO = { REUNION: 'REUNION - PEDIDO DE NOTAS', SOFT_PRE: 'SOFT PRE - PEDIDO NOTAS', AREP: 'AREP - PEDIDO DE NOTAS' };\n\nfunction somarDias(data, dias) { const d = new Date(data); d.setDate(d.getDate() + dias); return d; }\nfunction diferencaDias(a, b) { const MS = 86400000; const u1 = Date.UTC(a.getFullYear(), a.getMonth(), a.getDate()); const u2 = Date.UTC(b.getFullYear(), b.getMonth(), b.getDate()); return Math.round((u1 - u2) / MS); }\nfunction formatarDataBR(d) { return String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0') + '/' + d.getFullYear(); }\nfunction formatarDataCurta(d) { return String(d.getDate()).padStart(2,'0') + '.' + String(d.getMonth()+1).padStart(2,'0'); }\nfunction normalizar(t) { return t ? String(t).normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toLowerCase().trim() : ''; }\n\nfunction determinarTipoEmissao(descricao, projetoId) {\n  const norm = normalizar(descricao);\n  if (projetoId === 'AREP' && /\\bpacote\\b/.test(norm)) return 'PACOTE';\n  if (/\\brec\\b.*\\bnf\\b|\\bloca[cç][aã]o\\b/.test(norm)) return 'REC_NF';\n  if (/\\bdi[aá]ria\\b/.test(norm)) return 'DIARIA';\n  if (/\\bjob\\b/.test(norm)) return 'JOB';\n  return 'NF_NORMAL';\n}\nfunction extrairParcela(descricao) { const m = /\\bP\\.?\\s*(\\d+)\\s*\\/\\s*(\\d+)\\b/i.exec(descricao || ''); return m ? ('P.' + m[1] + '/' + m[2]) : null; }\nfunction montarRefAssunto(tipo, dataVenc, descricao) {\n  const parcela = extrairParcela(descricao);\n  if (tipo === 'JOB') return parcela ? ('REF. JOB (' + parcela + ')') : 'REF. JOB';\n  if (tipo === 'DIARIA') return 'REF. DIÁRIA';\n  if (tipo === 'PACOTE') return 'REF. PACOTE';\n  if (tipo === 'REC_NF') return 'EMISSÃO DE NF E REC | REF. ' + MESES_ABREV_PT[dataVenc.getMonth()];\n  return 'REF. ' + MESES_ABREV_PT[dataVenc.getMonth()];\n}\nfunction resolverApelidoAtual(apelidos, projetoId) {\n  const lista = (apelidos && apelidos[projetoId]) || [];\n  if (!lista.length) throw new Error('Sem apelido cadastrado para ' + projetoId);\n  return lista[lista.length - 1];\n}\n\nconst TOMADOR_HTML = 'Tomador<br>\\nBOXFISH PRODUTORA DE PROGRAMAS TELEVISIVOS, INTERNET E FILMES PUBLICITÁRIOS LTDA.<br>\\nEndereço: Rua Butantã, 194, sala 24, Pinheiros.<br>\\nCEP 05.424-000 - São Paulo, SP<br>\\nCNPJ: 14.788.649/0001-23<br>\\nIM: 4.436.095-9<br>\\nIE: ISENTA';\nconst AVISO_HTML = '<span style=\"background-color:#FFFF00;\">\"Os dados bancários considerados para pagamento são os que estão cadastrados.<br>\\nO cadastro é feito baseado nas informações cedidas pelo contratado através do preenchimento de ficha cadastral da Box.<br>\\nQualquer alteração bancária ou mudança na forma de pagamento deve ser notificada por e-mail pelo contratado e se faz necessário atualização da ficha cadastral e envio prévio ao responsável financeiro do projeto.\"</span>';\n\nfunction montarCorpoEmailPedido(p) {\n  const valorFmt = p.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });\n  const linhaServico = p.ehLocacao ? ('Locação: ' + p.servicoPrestadoComo) : ('Serviço Prestado como: ' + p.servicoPrestadoComo);\n  return 'Olá ' + p.primeiroNome + '! Tudo bem?<br><br>\\n' +\n    'Seguem as instruções para a emissão da sua nota fiscal que deverá ser enviada até o dia ' + formatarDataBR(p.dataEnvio) + ' com vencimento em ' + formatarDataBR(p.dataVencimento) + '.<br><br>\\n' +\n    TOMADOR_HTML + '<br><br>\\n' +\n    '1- Emitir nota fiscal no valor de R$ ' + valorFmt + ' com os dados abaixo no corpo da nota:<br>\\n' +\n    'Ref. \"' + p.textoRef + '\"<br>\\n' + linhaServico + '<br>\\n' +\n    'Colaborador: ' + p.nomeColaborador + '<br>\\n' +\n    (p.periodoTexto ? ('Período de ' + p.periodoTexto + '<br>\\n') : '') +\n    'Dados bancários:<br>\\nChave pix:<br>\\n---------------------------------------------------------------------<br><br>\\n' +\n    'Importante: Peço a gentileza de enviar a sua nota nestes e-mails:<br>\\nfinanceiro@novorealitybox.com<br>\\nfinanceiro1@novorealitybox.com<br><br>\\n' +\n    AVISO_HTML + '<br><br>\\nMuito obrigada! Beijo 🌷';\n}\n\nfunction ehModoAutomatico(config) { return config && config.modo === 'automatico'; }\n\nfunction decidirAcaoEnvio(gatilho, modoAutomatico) {\n  if (!modoAutomatico) return { acaoGmail: 'criar_rascunho', atualizarColunaL: false };\n  if (gatilho === 'SOLICITAR') return { acaoGmail: 'enviar_direto', atualizarColunaL: true, novoValorColunaL: 'SOLICITADA MI' };\n  return { acaoGmail: 'agendar_envio', atualizarColunaL: true, novoValorColunaL: 'SOLICITADA MI' };\n}\n\nfunction avaliarCobranca({ hoje, dataProgramarAte, dataVencimentoNF, estadoAtual }) {\n  if (estadoAtual && estadoAtual.encerrado) return { acao: 'nenhuma' };\n  const fimDoCiclo = somarDias(dataVencimentoNF, -5);\n  if (diferencaDias(hoje, dataProgramarAte) < 0) return { acao: 'nenhuma' };\n  if (diferencaDias(hoje, fimDoCiclo) >= 0) {\n    return { acao: 'encerrar_sem_resposta', novoEstado: { dataUltimaCobranca: estadoAtual ? estadoAtual.dataUltimaCobranca : null, contagemCiclos: estadoAtual ? estadoAtual.contagemCiclos : 0, encerrado: true } };\n  }\n  if (!estadoAtual) {\n    const diaPrimeira = somarDias(dataProgramarAte, 1);\n    if (diferencaDias(hoje, diaPrimeira) >= 0) {\n      return { acao: 'cobrar', novoEstado: { dataUltimaCobranca: hoje.toISOString().slice(0,10), contagemCiclos: 1, encerrado: false } };\n    }\n    return { acao: 'nenhuma' };\n  }\n  const dataUltima = new Date(estadoAtual.dataUltimaCobranca);\n  if (diferencaDias(hoje, dataUltima) >= 5) {\n    return { acao: 'cobrar', novoEstado: { dataUltimaCobranca: hoje.toISOString().slice(0,10), contagemCiclos: estadoAtual.contagemCiclos + 1, encerrado: false } };\n  }\n  return { acao: 'nenhuma' };\n}\n\nconst hoje = new Date();\nconst saida = [];\n\nfor (const item of $input.all()) {\n  const d = item.json;\n\n  if (d.fluxo === 'monitoramento') {\n    const vencimento = new Date(d.nota.colunaG);\n    const chaveCobranca = d.perfil.retranca + '_L' + d.nota.linha;\n    const estadoAtual = d.cobrancas ? d.cobrancas[chaveCobranca] : undefined;\n    // dataProgramarAte da nota original: não temos mais o texto 'PROGRAMAR ATÉ' (já virou SOLICITADA MI),\n    // então usamos a data registrada em cobrancas.json na 1ª passagem; se não existir ainda, usamos hoje\n    // como aproximação conservadora (evita cobrar cedo demais) — ver docs/spec.md 3.1.1.\n    const dataProgramarAte = estadoAtual && estadoAtual.dataProgramarAteOriginal ? new Date(estadoAtual.dataProgramarAteOriginal) : hoje;\n    const resultado = avaliarCobranca({ hoje, dataProgramarAte, dataVencimentoNF: vencimento, estadoAtual });\n    saida.push({ json: { ...d, acao: resultado.acao === 'cobrar' ? (d.config.modo === 'automatico' ? 'cobrar_enviar' : 'cobrar_rascunho') : resultado.acao, chaveCobranca, novoEstadoCobranca: resultado.novoEstado } });\n    continue;\n  }\n\n  // fluxo === 'novo_pedido'\n  if (!d.liberado) {\n    saida.push({ json: { ...d, acao: 'pendente_contrato' } });\n    continue;\n  }\n\n  const partesDescricao = (d.nota.colunaJ || '').split(' - ');\n  const cargo = partesDescricao[0] || '';\n  const nomeColaborador = (partesDescricao[1] || d.nota.colunaH || '').trim();\n  const primeiroNome = nomeColaborador.split(' ')[0] || nomeColaborador;\n  const periodoTexto = partesDescricao.length >= 3 ? partesDescricao.slice(2).join(' - ') : '';\n\n  const dataVencimento = new Date(d.nota.colunaG);\n  const dataEnvio = d.gatilho === 'PROGRAMAR_ATE' ? new Date(new Date(d.dataProgramarAte)) : hoje;\n  // prazo de envio = data (\"PROGRAMAR ATÉ\") + 5 dias — spec.md seção 3.1, 2º.\n  const dataEnvioComPrazo = d.gatilho === 'PROGRAMAR_ATE' ? (function(){ const dd = new Date(dataEnvio); dd.setDate(dd.getDate()+5); return dd; })() : dataEnvio;\n\n  const tipoEmissao = determinarTipoEmissao(d.nota.colunaJ, d.nota.projetoId);\n  const ehLocacao = tipoEmissao === 'REC_NF';\n  const refAssunto = montarRefAssunto(tipoEmissao, dataVencimento, d.nota.colunaJ);\n  const apelidoAtual = resolverApelidoAtual(d.apelidos, d.nota.projetoId);\n\n  const corpo = montarCorpoEmailPedido({\n    primeiroNome, dataEnvio: dataEnvioComPrazo, dataVencimento,\n    textoRef: d.perfil.texto_ref, valor: d.nota.colunaK,\n    servicoPrestadoComo: cargo, nomeColaborador, periodoTexto, ehLocacao,\n  });\n  const assunto = apelidoAtual + ' | EMISSÃO DE NF | ' + refAssunto + ' (ENVIAR ATÉ ' + formatarDataCurta(dataEnvioComPrazo) + ') | ' + nomeColaborador;\n\n  const decisao = decidirAcaoEnvio(d.gatilho, ehModoAutomatico(d.config));\n\n  saida.push({\n    json: {\n      ...d,\n      acao: decisao.acaoGmail,\n      atualizarColunaL: decisao.atualizarColunaL,\n      novoValorColunaL: decisao.novoValorColunaL,\n      emailDestino: d.nota.colunaR,\n      assunto,\n      corpoHtml: corpo,\n      marcadores: ['IA', MARCADOR_PROJETO[d.nota.projetoId]],\n    },\n  });\n}\n\nreturn saida;"
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $json.fluxo }}",
+              "rightValue": "monitoramento",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
       },
-      "id": "n20-montar-email-ou-cobranca",
-      "name": "Montar e-mail / avaliar cobrança",
+      "id": "n20a-if-monitoramento",
+      "name": "IF — É monitoramento?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2700,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Avalia cobranca para linhas ja SOLICITADA MI (fluxo='monitoramento') - secao 3.1.1.\nfunction somarDias(data, dias) { const d = new Date(data); d.setDate(d.getDate() + dias); return d; }\nfunction diferencaDias(a, b) { const MS = 86400000; const u1 = Date.UTC(a.getFullYear(), a.getMonth(), a.getDate()); const u2 = Date.UTC(b.getFullYear(), b.getMonth(), b.getDate()); return Math.round((u1 - u2) / MS); }\nfunction avaliarCobranca({ hoje, dataProgramarAte, dataVencimentoNF, estadoAtual }) {\n  if (estadoAtual && estadoAtual.encerrado) return { acao: 'nenhuma' };\n  const fimDoCiclo = somarDias(dataVencimentoNF, -5);\n  if (diferencaDias(hoje, dataProgramarAte) < 0) return { acao: 'nenhuma' };\n  if (diferencaDias(hoje, fimDoCiclo) >= 0) {\n    return { acao: 'encerrar_sem_resposta', novoEstado: { dataUltimaCobranca: estadoAtual ? estadoAtual.dataUltimaCobranca : null, contagemCiclos: estadoAtual ? estadoAtual.contagemCiclos : 0, encerrado: true } };\n  }\n  if (!estadoAtual) {\n    const diaPrimeira = somarDias(dataProgramarAte, 1);\n    if (diferencaDias(hoje, diaPrimeira) >= 0) {\n      return { acao: 'cobrar', novoEstado: { dataUltimaCobranca: hoje.toISOString().slice(0,10), contagemCiclos: 1, encerrado: false } };\n    }\n    return { acao: 'nenhuma' };\n  }\n  const dataUltima = new Date(estadoAtual.dataUltimaCobranca);\n  if (diferencaDias(hoje, dataUltima) >= 5) {\n    return { acao: 'cobrar', novoEstado: { dataUltimaCobranca: hoje.toISOString().slice(0,10), contagemCiclos: estadoAtual.contagemCiclos + 1, encerrado: false } };\n  }\n  return { acao: 'nenhuma' };\n}\n\nconst hoje = new Date();\nreturn $input.all().map((item) => {\n  const d = item.json;\n  const vencimento = new Date(d.nota.colunaG);\n  const chaveCobranca = d.perfil.retranca + '_L' + d.nota.linha;\n  const estadoAtual = d.cobrancas ? d.cobrancas[chaveCobranca] : undefined;\n  const dataProgramarAte = estadoAtual && estadoAtual.dataProgramarAteOriginal ? new Date(estadoAtual.dataProgramarAteOriginal) : hoje;\n  const resultado = avaliarCobranca({ hoje, dataProgramarAte, dataVencimentoNF: vencimento, estadoAtual });\n  const acao = resultado.acao === 'cobrar' ? (d.config.modo === 'automatico' ? 'cobrar_enviar' : 'cobrar_rascunho') : resultado.acao;\n  return { json: { ...d, acao, chaveCobranca, novoEstadoCobranca: resultado.novoEstado } };\n});"
+      },
+      "id": "n20b-avaliar-cobranca",
+      "name": "Avaliar cobrança",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2700, 300],
-      "notes": "ASSUNÇÃO flagada: determinarTipoEmissao é heurística por palavra-chave na Descrição (coluna J), pois o spec.md não define uma coluna dedicada pro tipo — default NF_NORMAL. Ver scripts/fase1_logica.js para a versão testada isoladamente."
+      "position": [
+        2920,
+        40
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $json.liberado }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      },
+      "id": "n20c-if-liberado",
+      "name": "IF — Contrato liberado?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2920,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map((item) => ({ json: { ...item.json, acao: 'pendente_contrato' } }));"
+      },
+      "id": "n20d-marcar-pendente",
+      "name": "Marcar pendente_contrato",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3140,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "anthropicApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  model: 'claude-haiku-4-5',\n  max_tokens: 1024,\n  system: \"Voce extrai dados estruturados da coluna \\\"Descricao\\\" (coluna J) de uma planilha de controle de notas fiscais da produtora Box Fish.\\n\\nO texto pode descrever:\\n(a) um COLABORADOR prestando servico - geralmente tem um Cargo, um Nome de pessoa, e opcionalmente um periodo (DD/MM A DD/MM) e uma palavra-chave de tipo entre parenteses (JOB, DIARIA, DIARIAS, PACOTE, REC, REC+NF); ou\\n(b) um FORNECEDOR de locacao/recibo - geralmente e uma empresa (razao social), sem nome de pessoa fisica, descrevendo uma locacao (equipamento, estudio, gerador etc.) ou um servico faturado por fornecedor.\\n\\nResponda SOMENTE com um objeto JSON (sem markdown, sem texto fora do JSON) no formato:\\n{\\\"tipoLinha\\\": \\\"colaborador\\\"|\\\"fornecedor\\\", \\\"periodo\\\": \\\"DD/MM A DD/MM\\\"|null, \\\"tipoEmissao\\\": \\\"NF_NORMAL\\\"|\\\"JOB\\\"|\\\"DIARIA\\\"|\\\"PACOTE\\\"|\\\"REC\\\"|\\\"REC_NF\\\"|null, \\\"parcela\\\": \\\"P.X/Y\\\"|null, \\\"cargo\\\": string|\\\"FALTA INFORMACAO\\\"|null, \\\"nomeColaborador\\\": string|\\\"FALTA INFORMACAO\\\"|null, \\\"documentoLinha\\\": \\\"RECIBO\\\"|\\\"NOTA_FISCAL\\\"|null, \\\"descricaoServicoOuLocacao\\\": string, \\\"situacaoNaoMapeada\\\": string|null}\\n\\nRegras: tipoEmissao so se aplica a colaborador (JOB/DIARIA/PACOTE) ou fornecedor (REC/REC_NF); ausencia de palavra-chave em colaborador = NF_NORMAL. documentoLinha so se aplica a fornecedor: use o prefixo (REC)/(NF) quando existir; se nao houver marcacao inequivoca, infira semanticamente SO se estiver claro, senao null. descricaoServicoOuLocacao: sem nome do projeto (REUNION, AREP, SOFT PRE, PNS, PNL etc.) e sem o periodo. Se nao conseguir preencher cargo/nomeColaborador com confianca, use FALTA INFORMACAO - nunca invente. Se achar qualquer situacao nao coberta por estas regras, preencha situacaoNaoMapeada descrevendo o problema - nunca adivinhe um valor pra contornar isso.\",\n  messages: [{ role: 'user', content: JSON.stringify({ colunaJ: $json.nota.colunaJ || '', colunaH: $json.nota.colunaH || '' }) }]\n}) }}"
+      },
+      "id": "n20e-ia-parsing",
+      "name": "IA — Parsing coluna J (Claude)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3140,
+        140
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "REPLACE",
+          "name": "Claude account (produção)"
+        }
+      },
+      "notes": "PRODUÇÃO usa credencial 'Claude account (produção)' — trocar aqui (no .homolog.json fica 'Claude account (dev)', spec.md seção 7.1/7.4). Modelo Haiku 4.5 por custo/latência (seção 7.1). Rodar 1x por linha (novo_pedido + contrato liberado) — seção 3.2."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Interpreta a resposta da IA — nunca lanca excecao, falha vira situacaoNaoMapeada\n// (regra geral de seguranca, secao 3.2 item 6: nunca adivinhar, sempre alertar).\nfunction parseRespostaIA(textoResposta) {\n  try {\n    const obj = JSON.parse(textoResposta);\n    if (!obj || !obj.tipoLinha) return { situacaoNaoMapeada: 'Resposta da IA sem tipoLinha: ' + String(textoResposta).slice(0,300) };\n    return obj;\n  } catch (e) {\n    return { situacaoNaoMapeada: 'Resposta da IA nao e JSON valido: ' + String(textoResposta).slice(0,300) };\n  }\n}\n\nconst item = $input.first();\nconst textoResposta = item.json.content && item.json.content[0] ? item.json.content[0].text : '';\nconst resultado = parseRespostaIA(textoResposta);\nreturn [{ json: { ...$('IF — Contrato liberado?').item.json, ...resultado } }];"
+      },
+      "id": "n20f-interpretar-ia",
+      "name": "Interpretar resposta da IA",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3360,
+        140
+      ],
+      "notes": "Formato de resposta assume a Claude Messages API padrao ($json.content[0].text) — ajustar se o node HTTP Request anterior for trocado por um node de IA nativo do n8n."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $json.situacaoNaoMapeada }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ]
+        }
+      },
+      "id": "n20g-if-nao-mapeada",
+      "name": "IF — Situação não mapeada?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        3580,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map((item) => ({ json: { ...item.json, acao: 'alerta_situacao_nao_mapeada' } }));"
+      },
+      "id": "n20h-marcar-alerta",
+      "name": "Marcar alerta — situação não mapeada",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3800,
+        40
+      ],
+      "notes": "Cobre tanto falha de parsing da resposta da IA quanto qualquer situacaoNaoMapeada que a propria IA reportar (secao 3.2 item 6 e 3.2.1: nunca adivinhar RECIBO vs NOTA_FISCAL sem marcacao clara)."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $json.tipoLinha }}",
+              "rightValue": "colaborador",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      },
+      "id": "n20i-if-colaborador",
+      "name": "IF — Tipo de linha = colaborador?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        3800,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Monta o e-mail de pedido pra caso COLABORADOR (secoes 3.2, 3.3, 3.4).\n// dados de tipoLinha/periodo/tipoEmissao/cargo/nomeColaborador ja vieram da IA (node anterior).\n\nconst MESES_ABREV_PT = ['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ'];\nconst MARCADOR_PROJETO = { REUNION: 'REUNION - PEDIDO DE NOTAS', SOFT_PRE: 'SOFT PRE - PEDIDO NOTAS', AREP: 'AREP - PEDIDO DE NOTAS' };\nconst TOMADOR_HTML = 'Tomador<br>\\nBOXFISH PRODUTORA DE PROGRAMAS TELEVISIVOS, INTERNET E FILMES PUBLICITÁRIOS LTDA.<br>\\nEndereço: Rua Butantã, 194, sala 24, Pinheiros.<br>\\nCEP 05.424-000 - São Paulo, SP<br>\\nCNPJ: 14.788.649/0001-23<br>\\nIM: 4.436.095-9<br>\\nIE: ISENTA';\nconst AVISO_HTML = '<span style=\"background-color:#FFFF00;\">\"Os dados bancários considerados para pagamento são os que estão cadastrados.<br>\\nO cadastro é feito baseado nas informações cedidas pelo contratado através do preenchimento de ficha cadastral da Box.<br>\\nQualquer alteração bancária ou mudança na forma de pagamento deve ser notificada por e-mail pelo contratado e se faz necessário atualização da ficha cadastral e envio prévio ao responsável financeiro do projeto.\"</span>';\n\nfunction formatarDataBR(d) { return String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0') + '/' + d.getFullYear(); }\nfunction formatarDataCurta(d) { return String(d.getDate()).padStart(2,'0') + '.' + String(d.getMonth()+1).padStart(2,'0'); }\nfunction montarRefAssuntoColaborador(tipoEmissao, dataEnvio, parcela) {\n  if (tipoEmissao === 'JOB') return parcela ? ('REF. JOB (' + parcela + ')') : 'REF. JOB';\n  if (tipoEmissao === 'DIARIA') return 'REF. DIÁRIA';\n  if (tipoEmissao === 'PACOTE') return 'REF. PACOTE';\n  return 'REF. ' + MESES_ABREV_PT[dataEnvio.getMonth()]; // mes do ENVIO, nao do vencimento (evidencia: exemplo Media Arts, secao 3.2.1)\n}\nfunction montarPeriodoTexto(periodo, tipoEmissao) {\n  if (!periodo) return '';\n  const PALAVRA_CHAVE = { JOB: 'JOB', DIARIA: 'DIÁRIA', PACOTE: 'PACOTE' };\n  const palavra = PALAVRA_CHAVE[tipoEmissao];\n  return palavra ? (periodo + ' (' + palavra + ')') : periodo;\n}\nfunction montarCorpoEmailColaborador(p) {\n  const valorFmt = p.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });\n  return 'Olá ' + p.primeiroNome + '! Tudo bem?<br><br>\\n' +\n    'Seguem as instruções para a emissão da sua nota fiscal que deverá ser enviada até o dia ' + formatarDataBR(p.dataEnvio) + ' com vencimento em ' + formatarDataBR(p.dataVencimento) + '.<br><br>\\n' +\n    TOMADOR_HTML + '<br><br>\\n' +\n    '1- Emitir nota fiscal no valor de R$ ' + valorFmt + ' com os dados abaixo no corpo da nota:<br>\\n' +\n    'Ref. \"' + p.textoRef + '\"<br>\\n' +\n    'Serviço Prestado como: ' + p.cargo + '<br>\\n' +\n    'Colaborador: ' + p.nomeColaborador + '<br>\\n' +\n    (p.periodoTexto ? ('Período de ' + p.periodoTexto + '<br>\\n') : '') +\n    'Dados bancários:<br>\\nChave pix:<br>\\n---------------------------------------------------------------------<br><br>\\n' +\n    'Importante: Peço a gentileza de enviar a sua nota nestes e-mails:<br>\\nfinanceiro@novorealitybox.com<br>\\nfinanceiro1@novorealitybox.com<br><br>\\n' +\n    AVISO_HTML + '<br><br>\\nMuito obrigada! Beijo 🌷';\n}\nfunction ehModoAutomatico(config) { return config && config.modo === 'automatico'; }\nfunction decidirAcaoEnvio(gatilho, modoAutomatico) {\n  if (!modoAutomatico) return { acaoGmail: 'criar_rascunho', atualizarColunaL: false };\n  if (gatilho === 'SOLICITAR') return { acaoGmail: 'enviar_direto', atualizarColunaL: true, novoValorColunaL: 'SOLICITADA MI' };\n  return { acaoGmail: 'agendar_envio', atualizarColunaL: true, novoValorColunaL: 'SOLICITADA MI' };\n}\n\nconst hoje = new Date();\nconst saida = [];\n\nfor (const item of $input.all()) {\n  const d = item.json;\n  const cargo = d.cargo === 'FALTA INFORMAÇÃO' || d.cargo === 'FALTA INFORMACAO' ? 'FALTA INFORMAÇÃO' : (d.cargo || d.nota.colunaJ);\n  const nomeColaborador = d.nomeColaborador === 'FALTA INFORMAÇÃO' || d.nomeColaborador === 'FALTA INFORMACAO' ? 'FALTA INFORMAÇÃO' : (d.nomeColaborador || d.nota.colunaH);\n  const temLacuna = cargo === 'FALTA INFORMAÇÃO' || nomeColaborador === 'FALTA INFORMAÇÃO';\n  const primeiroNome = (nomeColaborador === 'FALTA INFORMAÇÃO' ? 'Colaborador' : nomeColaborador).split(' ')[0];\n\n  const dataVencimento = new Date(d.nota.colunaG);\n  const dataBase = d.gatilho === 'PROGRAMAR_ATE' ? new Date(d.dataProgramarAte) : hoje;\n  const dataEnvio = d.gatilho === 'PROGRAMAR_ATE' ? (function(){ const dd = new Date(dataBase); dd.setDate(dd.getDate()+5); return dd; })() : dataBase;\n\n  const tipoEmissao = d.tipoEmissao || 'NF_NORMAL';\n  const refAssunto = montarRefAssuntoColaborador(tipoEmissao, dataEnvio, d.parcela);\n  const apelidoAtual = (d.apelidos && d.apelidos[d.nota.projetoId] && d.apelidos[d.nota.projetoId].length) ? d.apelidos[d.nota.projetoId][d.apelidos[d.nota.projetoId].length - 1] : d.perfil.prefixo_assunto_pedido;\n\n  const periodoTexto = montarPeriodoTexto(d.periodo, tipoEmissao);\n  const corpo = montarCorpoEmailColaborador({ primeiroNome, dataEnvio, dataVencimento, textoRef: d.perfil.texto_ref, valor: d.nota.colunaK, cargo, nomeColaborador, periodoTexto });\n  const assunto = apelidoAtual + ' | EMISSÃO DE NF | ' + refAssunto + ' (ENVIAR ATÉ ' + formatarDataCurta(dataEnvio) + ') | ' + nomeColaborador;\n\n  const decisao = decidirAcaoEnvio(d.gatilho, ehModoAutomatico(d.config));\n\n  saida.push({ json: {\n    ...d,\n    acao: decisao.acaoGmail,\n    atualizarColunaL: decisao.atualizarColunaL,\n    novoValorColunaL: decisao.novoValorColunaL,\n    emailDestino: d.nota.colunaR,\n    assunto,\n    corpoHtml: corpo,\n    marcadores: ['IA', MARCADOR_PROJETO[d.nota.projetoId]],\n    temLacunaInformacao: temLacuna,\n  } });\n}\n\nreturn saida;"
+      },
+      "id": "n20j-montar-email-colaborador",
+      "name": "Montar e-mail colaborador",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4020,
+        140
+      ],
+      "notes": "Se cargo/nomeColaborador = FALTA INFORMAÇÃO (secao 3.2 item 5), o e-mail e montado assim mesmo, com o campo temLacunaInformacao=true pro relatorio final avisar a Michelle via Telegram."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Agrupa linhas FORNECEDOR (mesmo projeto+fornecedor+vencimento) e monta 1 e-mail\n// multi-bloco por grupo (secao 3.2.1). Roda 1x pra TODOS os itens fornecedor da execucao\n// (mode = runOnceForAllItems).\n\nconst MESES_ABREV_PT = ['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ'];\nconst MARCADOR_PROJETO = { REUNION: 'REUNION - PEDIDO DE NOTAS', SOFT_PRE: 'SOFT PRE - PEDIDO NOTAS', AREP: 'AREP - PEDIDO DE NOTAS' };\nconst TOMADOR_HTML = 'Tomador<br>\\nBOXFISH PRODUTORA DE PROGRAMAS TELEVISIVOS, INTERNET E FILMES PUBLICITÁRIOS LTDA.<br>\\nEndereço: Rua Butantã, 194, sala 24, Pinheiros.<br>\\nCEP 05.424-000 - São Paulo, SP<br>\\nCNPJ: 14.788.649/0001-23<br>\\nIM: 4.436.095-9<br>\\nIE: ISENTA';\nconst AVISO_HTML = '<span style=\"background-color:#FFFF00;\">\"Os dados bancários considerados para pagamento são os que estão cadastrados.<br>\\nO cadastro é feito baseado nas informações cedidas pelo contratado através do preenchimento de ficha cadastral da Box.<br>\\nQualquer alteração bancária ou mudança na forma de pagamento deve ser notificada por e-mail pelo contratado e se faz necessário atualização da ficha cadastral e envio prévio ao responsável financeiro do projeto.\"</span>';\n\nfunction normalizar(t) { return t ? String(t).normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toLowerCase().trim() : ''; }\nfunction formatarDataBR(d) { return String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0') + '/' + d.getFullYear(); }\nfunction formatarDataCurta(d) { return String(d.getDate()).padStart(2,'0') + '.' + String(d.getMonth()+1).padStart(2,'0'); }\nfunction ehModoAutomatico(config) { return config && config.modo === 'automatico'; }\nfunction decidirAcaoEnvio(gatilho, modoAutomatico) {\n  if (!modoAutomatico) return { acaoGmail: 'criar_rascunho', atualizarColunaL: false };\n  if (gatilho === 'SOLICITAR') return { acaoGmail: 'enviar_direto', atualizarColunaL: true, novoValorColunaL: 'SOLICITADA MI' };\n  return { acaoGmail: 'agendar_envio', atualizarColunaL: true, novoValorColunaL: 'SOLICITADA MI' };\n}\n\nfunction agruparLinhasFornecedor(itens) {\n  const grupos = new Map();\n  for (const item of itens) {\n    const chave = [item.nota.projetoId, normalizar(item.nota.colunaH), item.nota.colunaG].join('|');\n    if (!grupos.has(chave)) grupos.set(chave, []);\n    grupos.get(chave).push(item);\n  }\n  return Array.from(grupos.values());\n}\nfunction ordenarBlocosGrupo(grupo) {\n  const recibos = grupo.filter((i) => i.documentoLinha === 'RECIBO');\n  const notas = grupo.filter((i) => i.documentoLinha === 'NOTA_FISCAL');\n  const semClassificacao = grupo.filter((i) => i.documentoLinha !== 'RECIBO' && i.documentoLinha !== 'NOTA_FISCAL');\n  return { blocosOrdenados: [...recibos, ...notas], semClassificacao };\n}\nfunction montarBlocoRecibo(numero, item, textoRef) {\n  const valorFmt = item.nota.colunaK.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });\n  return numero + '- Emitir RECIBO no valor de R$ ' + valorFmt + ' com os dados abaixo no corpo do recibo:<br>\\n' +\n    'Ref. \"' + textoRef + '\"<br>\\nFornecedor: ' + item.nota.colunaH + '<br>\\n' +\n    'Período de ' + (item.periodo || '') + ' - ' + item.descricaoServicoOuLocacao + '<br>\\n' +\n    'Dados bancários:<br>\\nChave pix:<br>\\n---------------------------------------------------------------------';\n}\nfunction montarBlocoNotaFiscal(numero, item, textoRef) {\n  const valorFmt = item.nota.colunaK.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });\n  return numero + '- Emitir NOTA FISCAL no valor de R$ ' + valorFmt + ' com os dados abaixo no corpo da nota:<br>\\n' +\n    'Ref. \"' + textoRef + '\"<br>\\nFornecedor: ' + item.nota.colunaH + '<br>\\n' +\n    'Serviço Prestado: ' + item.descricaoServicoOuLocacao + '<br>\\n' +\n    'Período de ' + (item.periodo || '') + '<br>\\n' +\n    'Dados bancários:<br>\\nChave pix:<br>\\n---------------------------------------------------------------------';\n}\nfunction montarCorpoEmailFornecedor({ blocosOrdenados, temNotaFiscal, dataEnvio, dataVencimento, textoRef }) {\n  const abertura = temNotaFiscal\n    ? 'Seguem as instruções para a emissão do RECIBO e da NOTA FISCAL que deverão ser enviadas até o dia ' + formatarDataBR(dataEnvio) + ' com vencimento em ' + formatarDataBR(dataVencimento) + ':'\n    : 'Seguem as instruções para a emissão da sua FATURA que deverá ser enviada até o dia ' + formatarDataBR(dataEnvio) + ' com vencimento em ' + formatarDataBR(dataVencimento) + '.';\n  const blocosHtml = blocosOrdenados.map((item, idx) => item.documentoLinha === 'RECIBO' ? montarBlocoRecibo(idx+1, item, textoRef) : montarBlocoNotaFiscal(idx+1, item, textoRef)).join('<br><br>\\n');\n  return 'Olá! Tudo bem?<br><br>\\n' + abertura + '<br><br>\\n' + TOMADOR_HTML + '<br><br>\\n' + blocosHtml + '<br><br>\\n' +\n    'Importante: Peço a gentileza de enviar a sua nota nestes e-mails:<br>\\nfinanceiro@novorealitybox.com<br>\\nfinanceiro1@novorealitybox.com<br><br>\\n' +\n    AVISO_HTML + '<br><br>\\nMuito obrigada! Beijo 🌷';\n}\nfunction montarAssuntoFornecedor({ apelidoAtual, temNotaFiscal, parcela, dataEnvio, fornecedor }) {\n  const mes = MESES_ABREV_PT[dataEnvio.getMonth()]; // mes do ENVIO (evidencia: exemplo Media Arts, secao 3.2.1)\n  const palavraDocumento = temNotaFiscal ? 'EMISSÃO DE FATURA' : 'EMISSÃO DE RECIBO';\n  const ref = temNotaFiscal ? ('REF. LOCAÇÃO E SERVIÇOS - ' + mes) : ('REF. LOCAÇÃO - ' + mes + (parcela ? (' - ' + parcela) : ''));\n  return apelidoAtual + ' | ' + palavraDocumento + ' | ' + ref + ' | (ENVIAR ATÉ ' + formatarDataCurta(dataEnvio) + ') | ' + fornecedor;\n}\n\nconst hoje = new Date();\nconst itens = $input.all().map((i) => i.json);\nconst grupos = agruparLinhasFornecedor(itens);\nconst saida = [];\n\nfor (const grupo of grupos) {\n  const { blocosOrdenados, semClassificacao } = ordenarBlocosGrupo(grupo);\n\n  if (semClassificacao.length > 0) {\n    // Regra de seguranca (secao 3.2.1): nao adivinhar RECIBO vs NOTA_FISCAL sem marcacao clara.\n    saida.push({ json: { ...semClassificacao[0], acao: 'alerta_situacao_nao_mapeada', situacaoNaoMapeada: 'Não foi possível classificar RECIBO/NOTA_FISCAL para ' + semClassificacao.length + ' linha(s) do fornecedor ' + grupo[0].nota.colunaH } });\n    continue;\n  }\n  if (blocosOrdenados.length === 0) continue;\n\n  const primeiro = blocosOrdenados[0];\n  const temNotaFiscal = blocosOrdenados.some((b) => b.documentoLinha === 'NOTA_FISCAL');\n  const dataVencimento = new Date(primeiro.nota.colunaG);\n  const dataBase = primeiro.gatilho === 'PROGRAMAR_ATE' ? new Date(primeiro.dataProgramarAte) : hoje;\n  const dataEnvio = primeiro.gatilho === 'PROGRAMAR_ATE' ? (function(){ const dd = new Date(dataBase); dd.setDate(dd.getDate()+5); return dd; })() : dataBase;\n  const apelidoAtual = (primeiro.apelidos && primeiro.apelidos[primeiro.nota.projetoId] && primeiro.apelidos[primeiro.nota.projetoId].length) ? primeiro.apelidos[primeiro.nota.projetoId][primeiro.apelidos[primeiro.nota.projetoId].length - 1] : primeiro.perfil.prefixo_assunto_pedido;\n\n  const corpo = montarCorpoEmailFornecedor({ blocosOrdenados, temNotaFiscal, dataEnvio, dataVencimento, textoRef: primeiro.perfil.texto_ref });\n  const assunto = montarAssuntoFornecedor({ apelidoAtual, temNotaFiscal, parcela: primeiro.parcela, dataEnvio, fornecedor: primeiro.nota.colunaH });\n  const decisao = decidirAcaoEnvio(primeiro.gatilho, ehModoAutomatico(primeiro.config));\n\n  saida.push({ json: {\n    ...primeiro,\n    acao: decisao.acaoGmail,\n    atualizarColunaL: decisao.atualizarColunaL,\n    novoValorColunaL: decisao.novoValorColunaL,\n    // ASSUNÇÃO: e-mail de contato do fornecedor vem da mesma coluna R (\"E-mail do colaborador\")\n    // da 1a linha do grupo — a planilha nao documenta uma coluna separada pra e-mail de fornecedor.\n    emailDestino: primeiro.nota.colunaR,\n    assunto,\n    corpoHtml: corpo,\n    marcadores: ['IA', MARCADOR_PROJETO[primeiro.nota.projetoId]],\n    linhasAfetadas: blocosOrdenados.map((b) => ({ projetoId: b.nota.projetoId, linha: b.nota.linha, atualizarColunaNPara: b.atualizarColunaNPara })),\n  } });\n}\n\nreturn saida;",
+        "mode": "runOnceForAllItems"
+      },
+      "id": "n20k-montar-email-fornecedor",
+      "name": "Agrupar e montar e-mail fornecedor",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4020,
+        340
+      ],
+      "notes": "LIMITAÇÃO CONHECIDA (flagada, não resolvida nesta entrega): se, num mesmo grupo fornecedor+vencimento, algumas linhas passarem no gate de contrato liberado e outras não, o e-mail sai só com as linhas liberadas (bloco faltante) em vez de esperar todas — cenário pouco provável (linhas do mesmo fornecedor tendem a ter o mesmo status de contrato) mas não tratado explicitamente."
+    },
+    {
+      "parameters": {
+        "numberInputs": 5
+      },
+      "id": "n21-merge-rotas",
+      "name": "Merge — rotas (cobrança/pendente/alerta/colaborador/fornecedor)",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        4260,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "REPLACE_WITH_MICHELLE_TELEGRAM_CHAT_ID",
+        "text": "={{ '⚠️ Situação não mapeada (Fase 1)\\n\\nProjeto: ' + $json.nota.projetoId + '\\nLinha: ' + $json.nota.linha + '\\nFornecedor/Descrição: ' + ($json.nota.colunaH || $json.nota.colunaJ) + '\\n\\n' + $json.situacaoNaoMapeada }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "n_telegram_alerta_nao_mapeada",
+      "name": "Telegram — Alertar situação não mapeada",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        4700,
+        620
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE",
+          "name": "Telegram account"
+        }
+      },
+      "notes": "Seção 3.2 item 6 / 3.2.1 — regra geral de segurança: nunca adivinhar, sempre alertar a Michelle com o ponto de indecisão."
     },
     {
       "parameters": {
         "rules": {
           "values": [
-            { "conditions": { "conditions": [{ "leftValue": "={{ $json.acao }}", "rightValue": "criar_rascunho", "operator": { "type": "string", "operation": "equals" } }] }, "renameOutput": true, "outputKey": "criar_rascunho" },
-            { "conditions": { "conditions": [{ "leftValue": "={{ $json.acao }}", "rightValue": "enviar_direto", "operator": { "type": "string", "operation": "equals" } }] }, "renameOutput": true, "outputKey": "enviar_direto" },
-            { "conditions": { "conditions": [{ "leftValue": "={{ $json.acao }}", "rightValue": "agendar_envio", "operator": { "type": "string", "operation": "equals" } }] }, "renameOutput": true, "outputKey": "agendar_envio" },
-            { "conditions": { "conditions": [{ "leftValue": "={{ $json.acao }}", "rightValue": "cobrar_rascunho", "operator": { "type": "string", "operation": "equals" } }] }, "renameOutput": true, "outputKey": "cobrar_rascunho" },
-            { "conditions": { "conditions": [{ "leftValue": "={{ $json.acao }}", "rightValue": "cobrar_enviar", "operator": { "type": "string", "operation": "equals" } }] }, "renameOutput": true, "outputKey": "cobrar_enviar" },
-            { "conditions": { "conditions": [{ "leftValue": "={{ $json.acao }}", "rightValue": "encerrar_sem_resposta", "operator": { "type": "string", "operation": "equals" } }] }, "renameOutput": true, "outputKey": "encerrar_sem_resposta" }
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.acao }}",
+                    "rightValue": "criar_rascunho",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "criar_rascunho"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.acao }}",
+                    "rightValue": "enviar_direto",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "enviar_direto"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.acao }}",
+                    "rightValue": "agendar_envio",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "agendar_envio"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.acao }}",
+                    "rightValue": "cobrar_rascunho",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "cobrar_rascunho"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.acao }}",
+                    "rightValue": "cobrar_enviar",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "cobrar_enviar"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.acao }}",
+                    "rightValue": "encerrar_sem_resposta",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "encerrar_sem_resposta"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.acao }}",
+                    "rightValue": "alerta_situacao_nao_mapeada",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "alerta_situacao_nao_mapeada"
+            }
           ]
         },
         "fallbackOutput": "extra",
@@ -269,7 +724,10 @@
       "name": "Switch — ação",
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3,
-      "position": [2920, 300],
+      "position": [
+        4480,
+        240
+      ],
       "notes": "fallback ('extra') pega 'pendente_contrato' e 'nenhuma' — vão direto pro relatório, sem ação de e-mail."
     },
     {
@@ -279,14 +737,24 @@
         "to": "={{ $json.emailDestino }}",
         "subject": "={{ $json.assunto }}",
         "message": "={{ $json.corpoHtml }}",
-        "options": { "labels": "={{ $json.marcadores.join(',') }}" }
+        "options": {
+          "labels": "={{ $json.marcadores.join(',') }}"
+        }
       },
       "id": "n22-gmail-criar-rascunho",
       "name": "Gmail — Criar rascunho (pedido)",
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.1,
-      "position": [3140, 20],
-      "credentials": { "gmailOAuth2": { "id": "REPLACE", "name": "Gmail account" } },
+      "position": [
+        4700,
+        20
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "REPLACE",
+          "name": "Gmail account"
+        }
+      },
       "notes": "Modo MVP ('rascunho') — Status Box (coluna L) NÃO é atualizado automaticamente aqui (seção 3.1.3, manual pela Michelle)."
     },
     {
@@ -296,14 +764,24 @@
         "to": "={{ $json.emailDestino }}",
         "subject": "={{ $json.assunto }}",
         "message": "={{ $json.corpoHtml }}",
-        "options": { "labels": "={{ $json.marcadores.join(',') }}" }
+        "options": {
+          "labels": "={{ $json.marcadores.join(',') }}"
+        }
       },
       "id": "n23-gmail-enviar-direto",
       "name": "Gmail — Enviar direto (automático)",
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.1,
-      "position": [3140, 140],
-      "credentials": { "gmailOAuth2": { "id": "REPLACE", "name": "Gmail account" } },
+      "position": [
+        4700,
+        140
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "REPLACE",
+          "name": "Gmail account"
+        }
+      },
       "notes": "Só roda quando MODO_EXECUCAO=automatico E gatilho=SOLICITAR (envio imediato)."
     },
     {
@@ -312,7 +790,10 @@
       "name": "NoOp — Agendar envio (TODO)",
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
-      "position": [3140, 260],
+      "position": [
+        4700,
+        260
+      ],
       "notes": "LIMITAÇÃO CONHECIDA: a API do Gmail não tem 'agendar envio' nativo pra rascunhos criados via API (é um recurso só do cliente Gmail). Enquanto MODO_EXECUCAO='rascunho' (padrão do MVP) este branch nunca roda. Quando formos ativar 'automatico' de verdade, resolver isso é pré-requisito — provavelmente via um 2º workflow agendado que verifica 'a data do prazo chegou?' e então dispara o envio, ou registrando a data-alvo em cobrancas.json e reusando a lógica de monitoramento pra disparar no dia certo. Não implementado nesta entrega — flagado aqui de propósito."
     },
     {
@@ -321,14 +802,24 @@
         "operation": "reply",
         "messageId": "={{ $json.nota.threadId }}",
         "message": "={{ 'Bom dia! Reforçando o pedido de emissão da nota fiscal — ' + $json.assunto }}",
-        "options": { "labels": "={{ ['IA', $json.marcadores ? $json.marcadores[1] : ''].join(',') }}" }
+        "options": {
+          "labels": "={{ ['IA', $json.marcadores ? $json.marcadores[1] : ''].join(',') }}"
+        }
       },
       "id": "n25-gmail-cobranca-rascunho",
       "name": "Gmail — Cobrança (rascunho, responde Todos)",
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.1,
-      "position": [3140, 380],
-      "credentials": { "gmailOAuth2": { "id": "REPLACE", "name": "Gmail account" } },
+      "position": [
+        4700,
+        380
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "REPLACE",
+          "name": "Gmail account"
+        }
+      },
       "notes": "ASSUNÇÃO: nota.threadId precisa vir preenchido a partir da thread original de pedido (não temos, nesta entrega, o mecanismo que grava o threadId no momento da criação do rascunho — próxima iteração deve gravar o threadId retornado por n22 em cobrancas.json pra permitir a resposta na MESMA thread, seção 3.1.1). Por ora este node está estruturalmente correto mas depende desse dado existir."
     },
     {
@@ -337,14 +828,25 @@
         "operation": "reply",
         "messageId": "={{ $json.nota.threadId }}",
         "message": "={{ 'Bom dia! Reforçando o pedido de emissão da nota fiscal — ' + $json.assunto }}",
-        "options": { "labels": "={{ ['IA', $json.marcadores ? $json.marcadores[1] : ''].join(',') }}", "sendTo": "reply-all" }
+        "options": {
+          "labels": "={{ ['IA', $json.marcadores ? $json.marcadores[1] : ''].join(',') }}",
+          "sendTo": "reply-all"
+        }
       },
       "id": "n26-gmail-cobranca-enviar",
       "name": "Gmail — Cobrança (enviar, automático)",
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.1,
-      "position": [3140, 500],
-      "credentials": { "gmailOAuth2": { "id": "REPLACE", "name": "Gmail account" } }
+      "position": [
+        4700,
+        500
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "REPLACE",
+          "name": "Gmail account"
+        }
+      }
     },
     {
       "parameters": {},
@@ -352,31 +854,49 @@
       "name": "NoOp — pendente/nenhuma",
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
-      "position": [3140, 620]
+      "position": [
+        4700,
+        740
+      ]
     },
     {
-      "parameters": { "numberInputs": 6 },
+      "parameters": {
+        "numberInputs": 7
+      },
       "id": "n28-merge-resultados",
       "name": "Merge — resultados consolidados",
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3,
-      "position": [3380, 300]
+      "position": [
+        4940,
+        380
+      ]
     },
     {
       "parameters": {
-        "jsCode": "// Consolida: (a) mudanças de coluna N/L a escrever no Box, (b) novo cobrancas.json, (c) itens pra alertar via Telegram (encerramento de ciclo sem resposta).\n\nconst itens = $input.all().map((i) => i.json);\n\nconst mudancasColunaN = itens\n  .filter((d) => d.atualizarColunaNPara)\n  .map((d) => ({ projetoId: d.nota.projetoId, linha: d.nota.linha, valor: d.atualizarColunaNPara }));\n\nconst mudancasColunaL = itens\n  .filter((d) => d.atualizarColunaL && d.novoValorColunaL)\n  .map((d) => ({ projetoId: d.nota.projetoId, linha: d.nota.linha, valor: d.novoValorColunaL }));\n\nconst cobrancasAtualizadas = { ...(itens[0] ? itens[0].cobrancas : {}) };\nfor (const d of itens) {\n  if (d.chaveCobranca && d.novoEstadoCobranca) {\n    cobrancasAtualizadas[d.chaveCobranca] = d.novoEstadoCobranca;\n  }\n}\n\nconst alertasEncerramento = itens.filter((d) => d.acao === 'encerrar_sem_resposta');\nconst rascunhosCriados = itens.filter((d) => d.acao === 'criar_rascunho' || d.acao === 'cobrar_rascunho');\nconst enviosDiretos = itens.filter((d) => d.acao === 'enviar_direto' || d.acao === 'cobrar_enviar');\nconst pendentesContrato = itens.filter((d) => d.acao === 'pendente_contrato');\n\nreturn [{\n  json: {\n    mudancasColunaN,\n    mudancasColunaL,\n    cobrancasAtualizadas,\n    resumo: {\n      rascunhosCriados: rascunhosCriados.length,\n      enviosDiretos: enviosDiretos.length,\n      pendentesContrato: pendentesContrato.length,\n      alertasEncerramento: alertasEncerramento.map((a) => ({ colaborador: (a.nota.colunaJ || '').split(' - ')[1] || a.nota.colunaH, projetoId: a.nota.projetoId })),\n    },\n  },\n}];"
+        "jsCode": "// Consolida: (a) mudancas de coluna N/L a escrever no Box, (b) novo cobrancas.json,\n// (c) resumo pro relatorio (incl. lacunas de informacao e alertas de situacao nao mapeada).\n// Suporta tanto itens de 1 linha (colaborador/cobranca/pendente) quanto itens de\n// GRUPO fornecedor (varias linhas por item, campo linhasAfetadas — secao 3.2.1).\n\nconst itens = $input.all().map((i) => i.json);\n\nconst mudancasColunaN = [];\nconst mudancasColunaL = [];\n\nfor (const d of itens) {\n  if (Array.isArray(d.linhasAfetadas)) {\n    for (const la of d.linhasAfetadas) {\n      if (la.atualizarColunaNPara) mudancasColunaN.push({ projetoId: la.projetoId, linha: la.linha, valor: la.atualizarColunaNPara });\n      if (d.atualizarColunaL && d.novoValorColunaL) mudancasColunaL.push({ projetoId: la.projetoId, linha: la.linha, valor: d.novoValorColunaL });\n    }\n    continue;\n  }\n  if (d.atualizarColunaNPara) mudancasColunaN.push({ projetoId: d.nota.projetoId, linha: d.nota.linha, valor: d.atualizarColunaNPara });\n  if (d.atualizarColunaL && d.novoValorColunaL) mudancasColunaL.push({ projetoId: d.nota.projetoId, linha: d.nota.linha, valor: d.novoValorColunaL });\n}\n\nconst cobrancasAtualizadas = { ...(itens[0] ? itens[0].cobrancas : {}) };\nfor (const d of itens) {\n  if (d.chaveCobranca && d.novoEstadoCobranca) cobrancasAtualizadas[d.chaveCobranca] = d.novoEstadoCobranca;\n}\n\nconst alertasEncerramento = itens.filter((d) => d.acao === 'encerrar_sem_resposta');\nconst alertasSituacaoNaoMapeada = itens.filter((d) => d.acao === 'alerta_situacao_nao_mapeada');\nconst rascunhosCriados = itens.filter((d) => d.acao === 'criar_rascunho' || d.acao === 'cobrar_rascunho');\nconst enviosDiretos = itens.filter((d) => d.acao === 'enviar_direto' || d.acao === 'cobrar_enviar');\nconst pendentesContrato = itens.filter((d) => d.acao === 'pendente_contrato');\nconst comLacunaInformacao = itens.filter((d) => d.temLacunaInformacao);\n\nreturn [{ json: {\n  mudancasColunaN, mudancasColunaL, cobrancasAtualizadas,\n  resumo: {\n    rascunhosCriados: rascunhosCriados.length,\n    enviosDiretos: enviosDiretos.length,\n    pendentesContrato: pendentesContrato.length,\n    comLacunaInformacao: comLacunaInformacao.length,\n    alertasSituacaoNaoMapeada: alertasSituacaoNaoMapeada.length,\n    alertasEncerramento: alertasEncerramento.map((a) => ({ colaboradorOuFornecedor: a.nomeColaborador || a.nota.colunaH, projetoId: a.nota.projetoId })),\n  },\n} }];"
       },
       "id": "n29-consolidar",
       "name": "Consolidar mudanças e cobrancas.json",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [3600, 300]
+      "position": [
+        5160,
+        380
+      ]
     },
     {
       "parameters": {
         "conditions": {
           "conditions": [
-            { "leftValue": "={{ $json.mudancasColunaN.length + $json.mudancasColunaL.length }}", "rightValue": 0, "operator": { "type": "number", "operation": "gt" } }
+            {
+              "leftValue": "={{ $json.mudancasColunaN.length + $json.mudancasColunaL.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
           ]
         }
       },
@@ -384,7 +904,10 @@
       "name": "IF — Há mudanças pra escrever no Box?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [3820, 300]
+      "position": [
+        5380,
+        380
+      ]
     },
     {
       "parameters": {
@@ -393,13 +916,23 @@
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "boxOAuth2Api",
         "sendBody": true,
-        "bodyParameters": { "parameters": [{ "name": "lock", "value": "={{ { type: 'lock', is_download_prevented: false } }}" }] }
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "lock",
+              "value": "={{ { type: 'lock', is_download_prevented: false } }}"
+            }
+          ]
+        }
       },
       "id": "n31-box-lock",
       "name": "Box — Lock (HTTP Request)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [4040, 220],
+      "position": [
+        5600,
+        220
+      ],
       "notes": "spec.md seção 7.2 — o node nativo do Box não expõe lock/unlock, então usamos HTTP Request com a credencial Box OAuth2 predefinida. Rodar 1x por arquivo Cost Report que tiver mudança (S01 e/ou S02, conforme mudancasColunaN/L.projetoId). fileId placeholder — resolver dinamicamente por projeto."
     },
     {
@@ -412,8 +945,16 @@
       "name": "Box — Reler (pós-lock)",
       "type": "n8n-nodes-base.box",
       "typeVersion": 1,
-      "position": [4260, 220],
-      "credentials": { "boxOAuth2Api": { "id": "REPLACE", "name": "Box account" } }
+      "position": [
+        5820,
+        220
+      ],
+      "credentials": {
+        "boxOAuth2Api": {
+          "id": "REPLACE",
+          "name": "Box account"
+        }
+      }
     },
     {
       "parameters": {
@@ -423,7 +964,10 @@
       "name": "Aplicar mudanças (exceljs) e preparar upload",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [4480, 220]
+      "position": [
+        6040,
+        220
+      ]
     },
     {
       "parameters": {
@@ -436,8 +980,16 @@
       "name": "Box — Upload nova versão",
       "type": "n8n-nodes-base.box",
       "typeVersion": 1,
-      "position": [4700, 220],
-      "credentials": { "boxOAuth2Api": { "id": "REPLACE", "name": "Box account" } }
+      "position": [
+        6260,
+        220
+      ],
+      "credentials": {
+        "boxOAuth2Api": {
+          "id": "REPLACE",
+          "name": "Box account"
+        }
+      }
     },
     {
       "parameters": {
@@ -446,14 +998,24 @@
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "boxOAuth2Api",
         "sendBody": true,
-        "bodyParameters": { "parameters": [{ "name": "lock", "value": "={{ null }}" }] },
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "lock",
+              "value": "={{ null }}"
+            }
+          ]
+        },
         "onError": "continueRegularOutput"
       },
       "id": "n35-box-unlock",
       "name": "Box — Unlock (sempre, mesmo em erro)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [4920, 220],
+      "position": [
+        6480,
+        220
+      ],
       "notes": "onError=continueRegularOutput: mesmo se o upload (n34) falhar, este node precisa rodar pra não deixar o arquivo travado (spec.md seção 7.2, 'destravar sempre, mesmo em falha no meio do processo'). Ligação de erro de n31/n32/n33/n34 -> aqui deve ser configurada também nas 'connections' (ver settings do workflow)."
     },
     {
@@ -466,94 +1028,694 @@
       "name": "Gravar cobrancas.json",
       "type": "n8n-nodes-base.readWriteFile",
       "typeVersion": 1,
-      "position": [3820, 460],
+      "position": [
+        5380,
+        620
+      ],
       "notes": "Precisa do binário pronto — node anterior (implícito) converte $json.cobrancasAtualizadas em binário JSON. Ver nota de implementação: inserir um Code/Convert to File entre n29 e este node se o readWriteFile exigir binário explícito (varia por versão do n8n)."
     },
     {
       "parameters": {
         "chatId": "REPLACE_WITH_MICHELLE_TELEGRAM_CHAT_ID",
-        "text": "={{ '📋 Relatório Fase 1 — Solicitação de Nota\\n\\nRascunhos criados: ' + $json.resumo.rascunhosCriados + '\\nEnvios diretos: ' + $json.resumo.enviosDiretos + '\\nPendentes de contrato: ' + $json.resumo.pendentesContrato + '\\nCiclos encerrados sem resposta: ' + $json.resumo.alertasEncerramento.length }}",
-        "additionalFields": { "parse_mode": "Markdown" }
+        "text": "={{ '📋 Relatório Fase 1 — Solicitação de Nota\\n\\nRascunhos criados: ' + $json.resumo.rascunhosCriados + '\\nEnvios diretos: ' + $json.resumo.enviosDiretos + '\\nPendentes de contrato: ' + $json.resumo.pendentesContrato + '\\nCom lacuna de informação (FALTA INFORMAÇÃO): ' + $json.resumo.comLacunaInformacao + '\\nSituações não mapeadas (alertadas): ' + $json.resumo.alertasSituacaoNaoMapeada + '\\nCiclos encerrados sem resposta: ' + $json.resumo.alertasEncerramento.length }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
       },
       "id": "n37-telegram-relatorio",
       "name": "Telegram — Relatório final",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [4040, 460],
-      "credentials": { "telegramApi": { "id": "REPLACE", "name": "Telegram account" } }
+      "position": [
+        5600,
+        460
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE",
+          "name": "Telegram account"
+        }
+      }
     }
   ],
   "connections": {
-    "Manual Trigger": { "main": [[{ "node": "Ler config_execucao.json", "type": "main", "index": 0 }, { "node": "Ler cobrancas.json", "type": "main", "index": 0 }, { "node": "Ler apelidos.json", "type": "main", "index": 0 }]] },
-    "Schedule Trigger (diário 08h)": { "main": [[{ "node": "Ler config_execucao.json", "type": "main", "index": 0 }, { "node": "Ler cobrancas.json", "type": "main", "index": 0 }, { "node": "Ler apelidos.json", "type": "main", "index": 0 }]] },
-    "Ler config_execucao.json": { "main": [[{ "node": "Merge — arquivos de config", "type": "main", "index": 0 }]] },
-    "Ler cobrancas.json": { "main": [[{ "node": "Merge — arquivos de config", "type": "main", "index": 1 }]] },
-    "Ler apelidos.json": { "main": [[{ "node": "Merge — arquivos de config", "type": "main", "index": 2 }]] },
-    "Merge — arquivos de config": { "main": [[{ "node": "Carregar config + perfis", "type": "main", "index": 0 }]] },
-    "Carregar config + perfis": {
-      "main": [[
-        { "node": "Box — Download Cost Report S01", "type": "main", "index": 0 },
-        { "node": "Box — Download Cost Report S02 (Soft Pré)", "type": "main", "index": 0 },
-        { "node": "Box — Download Contratos AREP", "type": "main", "index": 0 },
-        { "node": "Box — Download Contratos Reunion", "type": "main", "index": 0 },
-        { "node": "Box — Download Contratos Soft Pré", "type": "main", "index": 0 },
-        { "node": "Merge — downloads + config", "type": "main", "index": 0 }
-      ]]
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Ler config_execucao.json",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Ler cobrancas.json",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Ler apelidos.json",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
-    "Box — Download Cost Report S01": { "main": [[{ "node": "Merge — downloads + config", "type": "main", "index": 1 }]] },
-    "Box — Download Cost Report S02 (Soft Pré)": { "main": [[{ "node": "Merge — downloads + config", "type": "main", "index": 2 }]] },
-    "Box — Download Contratos AREP": { "main": [[{ "node": "Merge — downloads + config", "type": "main", "index": 3 }]] },
-    "Box — Download Contratos Reunion": { "main": [[{ "node": "Merge — downloads + config", "type": "main", "index": 4 }]] },
-    "Box — Download Contratos Soft Pré": { "main": [[{ "node": "Merge — downloads + config", "type": "main", "index": 5 }]] },
-    "Merge — downloads + config": { "main": [[{ "node": "Parsear planilhas (exceljs) e separar AREP/Reunion por cor", "type": "main", "index": 0 }]] },
-    "Parsear planilhas (exceljs) e separar AREP/Reunion por cor": { "main": [[{ "node": "Filtrar por Status Box (novo pedido / monitoramento)", "type": "main", "index": 0 }]] },
-    "Filtrar por Status Box (novo pedido / monitoramento)": { "main": [[{ "node": "Checagem de contrato — etapa 1", "type": "main", "index": 0 }]] },
-    "Checagem de contrato — etapa 1": { "main": [[{ "node": "IF — Precisa buscar ficha cadastral?", "type": "main", "index": 0 }]] },
+    "Schedule Trigger (diário 08h)": {
+      "main": [
+        [
+          {
+            "node": "Ler config_execucao.json",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Ler cobrancas.json",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Ler apelidos.json",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ler config_execucao.json": {
+      "main": [
+        [
+          {
+            "node": "Merge — arquivos de config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ler cobrancas.json": {
+      "main": [
+        [
+          {
+            "node": "Merge — arquivos de config",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Ler apelidos.json": {
+      "main": [
+        [
+          {
+            "node": "Merge — arquivos de config",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Merge — arquivos de config": {
+      "main": [
+        [
+          {
+            "node": "Carregar config + perfis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Carregar config + perfis": {
+      "main": [
+        [
+          {
+            "node": "Box — Download Cost Report S01",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Box — Download Cost Report S02 (Soft Pré)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Box — Download Contratos AREP",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Box — Download Contratos Reunion",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Box — Download Contratos Soft Pré",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge — downloads + config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Box — Download Cost Report S01": {
+      "main": [
+        [
+          {
+            "node": "Merge — downloads + config",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Box — Download Cost Report S02 (Soft Pré)": {
+      "main": [
+        [
+          {
+            "node": "Merge — downloads + config",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Box — Download Contratos AREP": {
+      "main": [
+        [
+          {
+            "node": "Merge — downloads + config",
+            "type": "main",
+            "index": 3
+          }
+        ]
+      ]
+    },
+    "Box — Download Contratos Reunion": {
+      "main": [
+        [
+          {
+            "node": "Merge — downloads + config",
+            "type": "main",
+            "index": 4
+          }
+        ]
+      ]
+    },
+    "Box — Download Contratos Soft Pré": {
+      "main": [
+        [
+          {
+            "node": "Merge — downloads + config",
+            "type": "main",
+            "index": 5
+          }
+        ]
+      ]
+    },
+    "Merge — downloads + config": {
+      "main": [
+        [
+          {
+            "node": "Parsear planilhas (exceljs) e separar AREP/Reunion por cor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parsear planilhas (exceljs) e separar AREP/Reunion por cor": {
+      "main": [
+        [
+          {
+            "node": "Filtrar por Status Box (novo pedido / monitoramento)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filtrar por Status Box (novo pedido / monitoramento)": {
+      "main": [
+        [
+          {
+            "node": "Checagem de contrato — etapa 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Checagem de contrato — etapa 1": {
+      "main": [
+        [
+          {
+            "node": "IF — Precisa buscar ficha cadastral?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "IF — Precisa buscar ficha cadastral?": {
       "main": [
-        [{ "node": "Gmail — Buscar thread CONTRATAÇÃO", "type": "main", "index": 0 }],
-        [{ "node": "Merge — resultado da checagem de contrato", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Gmail — Buscar thread CONTRATAÇÃO",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Merge — resultado da checagem de contrato",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
-    "Gmail — Buscar thread CONTRATAÇÃO": { "main": [[{ "node": "Checagem de contrato — etapa 2 (validar ficha)", "type": "main", "index": 0 }]] },
-    "Checagem de contrato — etapa 2 (validar ficha)": { "main": [[{ "node": "Merge — resultado da checagem de contrato", "type": "main", "index": 1 }]] },
-    "Merge — resultado da checagem de contrato": { "main": [[{ "node": "Montar e-mail / avaliar cobrança", "type": "main", "index": 0 }]] },
-    "Montar e-mail / avaliar cobrança": { "main": [[{ "node": "Switch — ação", "type": "main", "index": 0 }]] },
+    "Gmail — Buscar thread CONTRATAÇÃO": {
+      "main": [
+        [
+          {
+            "node": "Checagem de contrato — etapa 2 (validar ficha)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Checagem de contrato — etapa 2 (validar ficha)": {
+      "main": [
+        [
+          {
+            "node": "Merge — resultado da checagem de contrato",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge — resultado da checagem de contrato": {
+      "main": [
+        [
+          {
+            "node": "IF — É monitoramento?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — É monitoramento?": {
+      "main": [
+        [
+          {
+            "node": "Avaliar cobrança",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "IF — Contrato liberado?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Avaliar cobrança": {
+      "main": [
+        [
+          {
+            "node": "Merge — rotas (cobrança/pendente/alerta/colaborador/fornecedor)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — Contrato liberado?": {
+      "main": [
+        [
+          {
+            "node": "IA — Parsing coluna J (Claude)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Marcar pendente_contrato",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Marcar pendente_contrato": {
+      "main": [
+        [
+          {
+            "node": "Merge — rotas (cobrança/pendente/alerta/colaborador/fornecedor)",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "IA — Parsing coluna J (Claude)": {
+      "main": [
+        [
+          {
+            "node": "Interpretar resposta da IA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Interpretar resposta da IA": {
+      "main": [
+        [
+          {
+            "node": "IF — Situação não mapeada?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — Situação não mapeada?": {
+      "main": [
+        [
+          {
+            "node": "Marcar alerta — situação não mapeada",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "IF — Tipo de linha = colaborador?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Marcar alerta — situação não mapeada": {
+      "main": [
+        [
+          {
+            "node": "Merge — rotas (cobrança/pendente/alerta/colaborador/fornecedor)",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "IF — Tipo de linha = colaborador?": {
+      "main": [
+        [
+          {
+            "node": "Montar e-mail colaborador",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Agrupar e montar e-mail fornecedor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Montar e-mail colaborador": {
+      "main": [
+        [
+          {
+            "node": "Merge — rotas (cobrança/pendente/alerta/colaborador/fornecedor)",
+            "type": "main",
+            "index": 3
+          }
+        ]
+      ]
+    },
+    "Agrupar e montar e-mail fornecedor": {
+      "main": [
+        [
+          {
+            "node": "Merge — rotas (cobrança/pendente/alerta/colaborador/fornecedor)",
+            "type": "main",
+            "index": 4
+          }
+        ]
+      ]
+    },
+    "Merge — rotas (cobrança/pendente/alerta/colaborador/fornecedor)": {
+      "main": [
+        [
+          {
+            "node": "Switch — ação",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "Switch — ação": {
       "main": [
-        [{ "node": "Gmail — Criar rascunho (pedido)", "type": "main", "index": 0 }],
-        [{ "node": "Gmail — Enviar direto (automático)", "type": "main", "index": 0 }],
-        [{ "node": "NoOp — Agendar envio (TODO)", "type": "main", "index": 0 }],
-        [{ "node": "Gmail — Cobrança (rascunho, responde Todos)", "type": "main", "index": 0 }],
-        [{ "node": "Gmail — Cobrança (enviar, automático)", "type": "main", "index": 0 }],
-        [{ "node": "NoOp — pendente/nenhuma", "type": "main", "index": 0 }],
-        [{ "node": "NoOp — pendente/nenhuma", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Gmail — Criar rascunho (pedido)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Gmail — Enviar direto (automático)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "NoOp — Agendar envio (TODO)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Gmail — Cobrança (rascunho, responde Todos)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Gmail — Cobrança (enviar, automático)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "NoOp — pendente/nenhuma",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Telegram — Alertar situação não mapeada",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "NoOp — pendente/nenhuma",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
-    "Gmail — Criar rascunho (pedido)": { "main": [[{ "node": "Merge — resultados consolidados", "type": "main", "index": 0 }]] },
-    "Gmail — Enviar direto (automático)": { "main": [[{ "node": "Merge — resultados consolidados", "type": "main", "index": 1 }]] },
-    "NoOp — Agendar envio (TODO)": { "main": [[{ "node": "Merge — resultados consolidados", "type": "main", "index": 2 }]] },
-    "Gmail — Cobrança (rascunho, responde Todos)": { "main": [[{ "node": "Merge — resultados consolidados", "type": "main", "index": 3 }]] },
-    "Gmail — Cobrança (enviar, automático)": { "main": [[{ "node": "Merge — resultados consolidados", "type": "main", "index": 4 }]] },
-    "NoOp — pendente/nenhuma": { "main": [[{ "node": "Merge — resultados consolidados", "type": "main", "index": 5 }]] },
-    "Merge — resultados consolidados": { "main": [[{ "node": "Consolidar mudanças e cobrancas.json", "type": "main", "index": 0 }]] },
+    "Gmail — Criar rascunho (pedido)": {
+      "main": [
+        [
+          {
+            "node": "Merge — resultados consolidados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail — Enviar direto (automático)": {
+      "main": [
+        [
+          {
+            "node": "Merge — resultados consolidados",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "NoOp — Agendar envio (TODO)": {
+      "main": [
+        [
+          {
+            "node": "Merge — resultados consolidados",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Gmail — Cobrança (rascunho, responde Todos)": {
+      "main": [
+        [
+          {
+            "node": "Merge — resultados consolidados",
+            "type": "main",
+            "index": 3
+          }
+        ]
+      ]
+    },
+    "Gmail — Cobrança (enviar, automático)": {
+      "main": [
+        [
+          {
+            "node": "Merge — resultados consolidados",
+            "type": "main",
+            "index": 4
+          }
+        ]
+      ]
+    },
+    "Telegram — Alertar situação não mapeada": {
+      "main": [
+        [
+          {
+            "node": "Merge — resultados consolidados",
+            "type": "main",
+            "index": 5
+          }
+        ]
+      ]
+    },
+    "NoOp — pendente/nenhuma": {
+      "main": [
+        [
+          {
+            "node": "Merge — resultados consolidados",
+            "type": "main",
+            "index": 6
+          }
+        ]
+      ]
+    },
+    "Merge — resultados consolidados": {
+      "main": [
+        [
+          {
+            "node": "Consolidar mudanças e cobrancas.json",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "Consolidar mudanças e cobrancas.json": {
-      "main": [[
-        { "node": "IF — Há mudanças pra escrever no Box?", "type": "main", "index": 0 },
-        { "node": "Gravar cobrancas.json", "type": "main", "index": 0 },
-        { "node": "Telegram — Relatório final", "type": "main", "index": 0 }
-      ]]
+      "main": [
+        [
+          {
+            "node": "IF — Há mudanças pra escrever no Box?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Gravar cobrancas.json",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Telegram — Relatório final",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "IF — Há mudanças pra escrever no Box?": {
       "main": [
-        [{ "node": "Box — Lock (HTTP Request)", "type": "main", "index": 0 }],
+        [
+          {
+            "node": "Box — Lock (HTTP Request)",
+            "type": "main",
+            "index": 0
+          }
+        ],
         []
       ]
     },
-    "Box — Lock (HTTP Request)": { "main": [[{ "node": "Box — Reler (pós-lock)", "type": "main", "index": 0 }]] },
-    "Box — Reler (pós-lock)": { "main": [[{ "node": "Aplicar mudanças (exceljs) e preparar upload", "type": "main", "index": 0 }]] },
-    "Aplicar mudanças (exceljs) e preparar upload": { "main": [[{ "node": "Box — Upload nova versão", "type": "main", "index": 0 }]] },
-    "Box — Upload nova versão": { "main": [[{ "node": "Box — Unlock (sempre, mesmo em erro)", "type": "main", "index": 0 }]] }
+    "Box — Lock (HTTP Request)": {
+      "main": [
+        [
+          {
+            "node": "Box — Reler (pós-lock)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Box — Reler (pós-lock)": {
+      "main": [
+        [
+          {
+            "node": "Aplicar mudanças (exceljs) e preparar upload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aplicar mudanças (exceljs) e preparar upload": {
+      "main": [
+        [
+          {
+            "node": "Box — Upload nova versão",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Box — Upload nova versão": {
+      "main": [
+        [
+          {
+            "node": "Box — Unlock (sempre, mesmo em erro)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
   },
   "active": false,
   "settings": {
