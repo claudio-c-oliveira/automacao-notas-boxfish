@@ -1,0 +1,802 @@
+{
+  "name": "Fase 2 — Verificar pendências de identificação",
+  "meta": {
+    "description": "Ciclo 8h/18h de perguntas sem resposta (spec.md seção 4) + resolução da resposta da Michelle no Telegram. Correlação de resposta CORRIGIDA (commit 3db5653): reply é a forma principal, nunca adivinha entre pendências múltiplas."
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "f2p-01-schedule",
+      "name": "Schedule Trigger (de hora em hora)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "fileSelector": "/config/pendencias_identificacao.json",
+        "options": {}
+      },
+      "id": "f2p-02-ler-pendencias-a",
+      "name": "Ler pendencias_identificacao.json (agendado)",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Ciclo 8h/18h (seção 4): sem resposta em 8h -> reenvia lembrete; mais 18h\n// (26h total) sem resposta -> encerra o ciclo, sem ação automática.\nfunction diferencaHoras(a, b) { return (a.getTime() - b.getTime()) / (1000*60*60); }\nfunction avaliarPendenciaIdentificacao({ agora, pendencia }) {\n  const primeiraPergunta = new Date(pendencia.primeiraPerguntaEm);\n  const horasDecorridas = diferencaHoras(agora, primeiraPergunta);\n  if (!pendencia.lembreteEnviado) {\n    if (horasDecorridas >= 8) return { acao: 'reenviar_lembrete' };\n    return { acao: 'nenhuma' };\n  }\n  if (horasDecorridas >= 26) return { acao: 'encerrar_sem_resposta' };\n  return { acao: 'nenhuma' };\n}\n\nfunction parseBinaryJson(item) {\n  if (!item || !item.binary || !item.binary.data) return {};\n  return JSON.parse(Buffer.from(item.binary.data.data, 'base64').toString('utf8'));\n}\nconst pendencias = parseBinaryJson($input.first());\nconst agora = new Date();\n\nconst saida = [];\nfor (const [chave, p] of Object.entries(pendencias)) {\n  if (p.resolvida) continue;\n  const resultado = avaliarPendenciaIdentificacao({ agora, pendencia: p });\n  if (resultado.acao !== 'nenhuma') {\n    saida.push({ json: { chave, pendencia: p, acao: resultado.acao, todasPendencias: pendencias } });\n  }\n}\nreturn saida;"
+      },
+      "id": "f2p-03-avaliar-pendencias",
+      "name": "Avaliar pendências (8h/18h)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $json.acao }}",
+              "rightValue": "reenviar_lembrete",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      },
+      "id": "f2p-04-if-lembrete",
+      "name": "IF — Reenviar lembrete?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        660,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "REPLACE_WITH_MICHELLE_TELEGRAM_CHAT_ID",
+        "text": "={{ '⏰ Lembrete — ainda preciso identificar essa nota (Fase 2)\\n\\nNome/razão social: ' + ($json.pendencia.dadosReferencia.nomeOuRazaoSocial || '?') + '\\nValor: ' + ($json.pendencia.dadosReferencia.valor || '?') + '\\n\\nResponda a ESTA mensagem (usando \"responder\") com a linha/colaborador correta.' }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "f2p-05-telegram-lembrete",
+      "name": "Telegram — Reenviar lembrete",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        880,
+        -80
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "REPLACE_WITH_MICHELLE_TELEGRAM_CHAT_ID",
+        "text": "={{ '🛑 Ciclo encerrado sem resposta (Fase 2)\\n\\nNome/razão social: ' + ($json.pendencia.dadosReferencia.nomeOuRazaoSocial || '?') + '\\nValor: ' + ($json.pendencia.dadosReferencia.valor || '?') + '\\n\\nPassaram 26h sem resposta — não vou mais perguntar automaticamente sobre essa nota. Fica pendente pra você resolver manualmente.' }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "f2p-06-telegram-encerrar",
+      "name": "Telegram — Avisar encerramento",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        880,
+        80
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const enviado = $input.first().json;\nconst origem = $('Avaliar pendências (8h/18h)').first().json;\nconst pendencias = { ...origem.todasPendencias };\npendencias[origem.chave] = { ...pendencias[origem.chave], lembreteEnviado: true, mensagemIdLembrete: enviado.message_id || (enviado.result && enviado.result.message_id) || null };\nreturn [{ json: { pendencias } }];"
+      },
+      "id": "f2p-07-marcar-lembrete",
+      "name": "Marcar lembrete enviado",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const origem = $('Avaliar pendências (8h/18h)').first().json;\nconst pendencias = { ...origem.todasPendencias };\npendencias[origem.chave] = { ...pendencias[origem.chave], resolvida: true, statusFinal: 'encerrado_sem_resposta' };\nreturn [{ json: { pendencias } }];"
+      },
+      "id": "f2p-08-marcar-encerrado",
+      "name": "Marcar encerrado sem resposta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "numberInputs": 2
+      },
+      "id": "f2p-09-merge-atualizacoes",
+      "name": "Merge — atualizações de pendências",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        1320,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Consolida todas as atualizações desta execução (podem ser várias pendências\n// tratadas na mesma varredura) num único pendencias_identificacao.json.\nconst itens = $input.all().map((i) => i.json);\nlet consolidado = {};\nfor (const it of itens) {\n  consolidado = { ...consolidado, ...it.pendencias };\n}\nreturn [{ json: {}, binary: { data: { data: Buffer.from(JSON.stringify(consolidado, null, 2)).toString('base64'), mimeType: 'application/json', fileName: 'pendencias_identificacao.json' } } }];"
+      },
+      "id": "f2p-10-consolidar",
+      "name": "Consolidar atualizações de pendências",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "/config/pendencias_identificacao.json",
+        "dataPropertyName": "data"
+      },
+      "id": "f2p-11-gravar",
+      "name": "Gravar pendencias_identificacao.json (agendado)",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        1760,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ]
+      },
+      "id": "f2p-12-telegram-trigger",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        300
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "fileSelector": "/config/pendencias_identificacao.json",
+        "options": {}
+      },
+      "id": "f2p-13-ler-pendencias-b",
+      "name": "Ler pendencias_identificacao.json (resposta)",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        220,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Correlaciona a resposta da Michelle à pendência certa (seção 4, CORRIGIDO —\n// commit 3db5653): reply é a forma principal. Sem reply + 2 ou mais pendências\n// abertas -> NUNCA adivinhar, pede reply explícito de novo.\nfunction correlacionarRespostaMichelle(mensagemRecebida, pendencias) {\n  const abertas = Object.entries(pendencias || {}).filter(([, p]) => !p.resolvida);\n  if (mensagemRecebida.replyToMessageId) {\n    const chave = abertas.map(([k]) => k).find(\n      (k) => pendencias[k].mensagemIdOriginal === mensagemRecebida.replyToMessageId || pendencias[k].mensagemIdLembrete === mensagemRecebida.replyToMessageId\n    );\n    if (chave) return { resultado: 'correlacionada', chaveCobranca: chave };\n  }\n  if (abertas.length === 0) return { resultado: 'nenhuma_pendencia' };\n  if (abertas.length === 1) return { resultado: 'correlacionada', chaveCobranca: abertas[0][0] };\n  return { resultado: 'ambiguo_pedir_reply', chavesAbertas: abertas.map(([k]) => k) };\n}\n\nfunction parseBinaryJson(item) {\n  if (!item || !item.binary || !item.binary.data) return {};\n  return JSON.parse(Buffer.from(item.binary.data.data, 'base64').toString('utf8'));\n}\nconst pendencias = parseBinaryJson($('Ler pendencias_identificacao.json (resposta)').first());\nconst msg = $('Telegram Trigger').first().json.message || {};\nconst mensagemRecebida = { replyToMessageId: msg.reply_to_message && msg.reply_to_message.message_id, texto: (msg.text || '').trim() };\n\nconst correlacao = correlacionarRespostaMichelle(mensagemRecebida, pendencias);\nreturn [{ json: { correlacao, mensagemRecebida, pendencias, chatId: msg.chat && msg.chat.id } }];"
+      },
+      "id": "f2p-14-correlacionar",
+      "name": "Correlacionar resposta da Michelle",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.correlacao.resultado }}",
+                    "rightValue": "correlacionada",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "correlacionada"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.correlacao.resultado }}",
+                    "rightValue": "ambiguo_pedir_reply",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "ambiguo_pedir_reply"
+            }
+          ]
+        },
+        "fallbackOutput": "extra"
+      },
+      "id": "f2p-15-switch-correlacao",
+      "name": "Switch — resultado da correlação",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [
+        660,
+        300
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "f2p-16-noop-nenhuma-pendencia",
+      "name": "NoOp — mensagem sem pendência relacionada",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        880,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// 2+ pendências abertas e sem reply válido — reenvia a pergunta de CADA uma\n// pedindo reply explícito (seção 4, correção: nunca adivinhar).\nconst d = $input.first().json;\nreturn d.correlacao.chavesAbertas.map((chave) => ({ json: { chatId: d.chatId, chave, pendencia: d.pendencias[chave] } }));"
+      },
+      "id": "f2p-17-preparar-ambiguo",
+      "name": "Preparar reenvio (ambíguo)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "={{ '⚠️ Tenho mais de uma nota pendente de identificação ao mesmo tempo — não vou adivinhar qual você quis responder.\\n\\nPra essa aqui (' + ($json.pendencia.dadosReferencia.nomeOuRazaoSocial || '?') + ', R$ ' + ($json.pendencia.dadosReferencia.valor || '?') + '), responda usando \"responder\" NESTA mensagem específica.' }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "f2p-18-telegram-pedir-reply",
+      "name": "Telegram — Pedir reply explícito",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1100,
+        300
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "download",
+        "fileId": "REPLACE_WITH_FILE_ID_COST_REPORT_S01"
+      },
+      "id": "f2p-19-box-s01",
+      "name": "Box — Download Cost Report S01",
+      "type": "n8n-nodes-base.box",
+      "typeVersion": 1,
+      "position": [
+        880,
+        620
+      ],
+      "credentials": {
+        "boxOAuth2Api": {
+          "id": "REPLACE",
+          "name": "Box account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "download",
+        "fileId": "REPLACE_WITH_FILE_ID_COST_REPORT_S02"
+      },
+      "id": "f2p-20-box-s02",
+      "name": "Box — Download Cost Report S02 (Soft Pré)",
+      "type": "n8n-nodes-base.box",
+      "typeVersion": 1,
+      "position": [
+        880,
+        740
+      ],
+      "credentials": {
+        "boxOAuth2Api": {
+          "id": "REPLACE",
+          "name": "Box account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "numberInputs": 3
+      },
+      "id": "f2p-21-merge-box",
+      "name": "Merge — planilhas + correlação",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        1100,
+        620
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Interpreta o texto livre da resposta da Michelle: tenta achar, por\n// comparação normalizada (substring), um nome/fornecedor da planilha que\n// bata com o que ela escreveu. Escolha de implementação (não é IA aqui —\n// nesse ponto um humano já desambiguou, um match de texto simples e\n// auditável é suficiente; flagado como decisão, ajustável se necessário).\nconst ExcelJS = require('exceljs');\nfunction normalizar(t) { return t ? String(t).normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim() : ''; }\nfunction linhaTemPreenchimento(cell) {\n  const fill = cell && cell.fill;\n  if (!fill || fill.type !== 'pattern' || fill.pattern !== 'solid') return false;\n  const argb = fill.fgColor && fill.fgColor.argb;\n  return !!argb && argb !== 'FFFFFFFF' && argb !== '00000000';\n}\nasync function lerRoster(nodeName, projetoFixo) {\n  const item = $(nodeName).first();\n  const buffer = Buffer.from(item.binary.data.data, 'base64');\n  const wb = new ExcelJS.Workbook();\n  await wb.xlsx.load(buffer);\n  const ws = wb.getWorksheet('Notas') || wb.worksheets[0];\n  const linhas = [];\n  ws.eachRow({ includeEmpty: false }, (row, rowNumber) => {\n    if (rowNumber === 1) return;\n    const projetoId = projetoFixo || (linhaTemPreenchimento(row.getCell('L')) ? 'REUNION' : 'AREP');\n    linhas.push({ projetoId, linha: rowNumber, colunaB: row.getCell('B').text, colunaC: row.getCell('C').text, colunaG: row.getCell('G').text, colunaH: row.getCell('H').text, nome: (row.getCell('J').text.split(' - ')[1] || row.getCell('H').text) });\n  });\n  return linhas;\n}\nconst roster = [...(await lerRoster('Box — Download Cost Report S01', null)), ...(await lerRoster('Box — Download Cost Report S02 (Soft Pré)', 'SOFT_PRE'))];\n\nconst correlacaoItem = $('Correlacionar resposta da Michelle').first().json;\nconst textoResposta = normalizar(correlacaoItem.mensagemRecebida.texto);\nconst candidato = roster.find((r) => textoResposta.includes(normalizar(r.nome)) || textoResposta.includes(normalizar(r.colunaH)));\n\nreturn [{ json: { ...correlacaoItem, candidato } }];"
+      },
+      "id": "f2p-22-interpretar-resposta-texto",
+      "name": "Achar linha indicada no texto da resposta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        620
+      ],
+      "notes": "Pré-requisito de infra: NODE_FUNCTION_ALLOW_EXTERNAL=exceljs (mesmo da Fase 1/2)."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $json.candidato }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ]
+        }
+      },
+      "id": "f2p-23-if-achou-candidato",
+      "name": "IF — Achou linha no texto?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        620
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Achou — monta o payload pra finalizar a nota (mesmo formato usado por\n// fase2_recebimento_validacao.json) e marca a pendência como resolvida.\nconst d = $input.first().json;\nconst c = d.candidato;\nconst chave = d.correlacao.chaveCobranca;\nconst pendencia = d.pendencias[chave];\n\nconst perfis = { AREP: { retranca: 'S01' }, REUNION: { retranca: 'REUNION_S01' }, SOFT_PRE: { retranca: 'SOFT PRE_S02' } };\n\nconst payload = {\n  projetoId: c.projetoId, linha: c.linha,\n  chaveCobranca: perfis[c.projetoId].retranca + '_L' + c.linha,\n  tipoDocumento: pendencia.dadosReferencia.tipoDocumento || 'NF',\n  numeroNota: pendencia.dadosReferencia.numeroNota || '000000',\n  dataEmissao: pendencia.dadosReferencia.dataEmissao,\n  dataVencimento: c.colunaG,\n  razaoSocialOuNome: pendencia.dadosReferencia.nomeOuRazaoSocial || c.nome,\n  codigo: c.colunaB, cargo: c.colunaC,\n  perfilRetranca: perfis[c.projetoId].retranca,\n};\n\nconst pendenciasAtualizadas = { ...d.pendencias };\npendenciasAtualizadas[chave] = { ...pendencia, resolvida: true, statusFinal: 'resolvida_por_michelle' };\n\nreturn [{ json: { payload, pendenciasAtualizadas } }];"
+      },
+      "id": "f2p-24-resolver-pendencia",
+      "name": "Montar payload pra finalizar + marcar resolvida",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": "REPLACE_WITH_fase2_finalizar_nota_WORKFLOW_ID",
+        "mode": "each",
+        "workflowInputs": {
+          "value": "={{ $json.payload }}"
+        }
+      },
+      "id": "f2p-25-executar-finalizar",
+      "name": "Execute Workflow — Finalizar nota",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1980,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: {}, binary: { data: { data: Buffer.from(JSON.stringify($json.pendenciasAtualizadas, null, 2)).toString('base64'), mimeType: 'application/json', fileName: 'pendencias_identificacao.json' } } }];"
+      },
+      "id": "f2p-26-preparar-grava-resolvida",
+      "name": "Preparar gravação (resolvida)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        680
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "/config/pendencias_identificacao.json",
+        "dataPropertyName": "data"
+      },
+      "id": "f2p-27-gravar-resolvida",
+      "name": "Gravar pendencias_identificacao.json (resolvida)",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        1980,
+        680
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Correlacionar resposta da Michelle').first().json.chatId }}",
+        "text": "Não achei essa nem no roster comparando com o texto que você mandou — pode responder só com o nome do colaborador/fornecedor exatamente como aparece na planilha?"
+      },
+      "id": "f2p-28-telegram-nao-achou",
+      "name": "Telegram — Não achei, pedir de novo",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1760,
+        780
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE",
+          "name": "Telegram account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule Trigger (de hora em hora)": {
+      "main": [
+        [
+          {
+            "node": "Ler pendencias_identificacao.json (agendado)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ler pendencias_identificacao.json (agendado)": {
+      "main": [
+        [
+          {
+            "node": "Avaliar pendências (8h/18h)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Avaliar pendências (8h/18h)": {
+      "main": [
+        [
+          {
+            "node": "IF — Reenviar lembrete?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — Reenviar lembrete?": {
+      "main": [
+        [
+          {
+            "node": "Telegram — Reenviar lembrete",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Telegram — Avisar encerramento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram — Reenviar lembrete": {
+      "main": [
+        [
+          {
+            "node": "Marcar lembrete enviado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram — Avisar encerramento": {
+      "main": [
+        [
+          {
+            "node": "Marcar encerrado sem resposta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Marcar lembrete enviado": {
+      "main": [
+        [
+          {
+            "node": "Merge — atualizações de pendências",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Marcar encerrado sem resposta": {
+      "main": [
+        [
+          {
+            "node": "Merge — atualizações de pendências",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge — atualizações de pendências": {
+      "main": [
+        [
+          {
+            "node": "Consolidar atualizações de pendências",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consolidar atualizações de pendências": {
+      "main": [
+        [
+          {
+            "node": "Gravar pendencias_identificacao.json (agendado)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Ler pendencias_identificacao.json (resposta)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ler pendencias_identificacao.json (resposta)": {
+      "main": [
+        [
+          {
+            "node": "Correlacionar resposta da Michelle",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Correlacionar resposta da Michelle": {
+      "main": [
+        [
+          {
+            "node": "Switch — resultado da correlação",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch — resultado da correlação": {
+      "main": [
+        [
+          {
+            "node": "Box — Download Cost Report S01",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Box — Download Cost Report S02 (Soft Pré)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge — planilhas + correlação",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Preparar reenvio (ambíguo)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "NoOp — mensagem sem pendência relacionada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Box — Download Cost Report S01": {
+      "main": [
+        [
+          {
+            "node": "Merge — planilhas + correlação",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Box — Download Cost Report S02 (Soft Pré)": {
+      "main": [
+        [
+          {
+            "node": "Merge — planilhas + correlação",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Merge — planilhas + correlação": {
+      "main": [
+        [
+          {
+            "node": "Achar linha indicada no texto da resposta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Achar linha indicada no texto da resposta": {
+      "main": [
+        [
+          {
+            "node": "IF — Achou linha no texto?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — Achou linha no texto?": {
+      "main": [
+        [
+          {
+            "node": "Montar payload pra finalizar + marcar resolvida",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Telegram — Não achei, pedir de novo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Montar payload pra finalizar + marcar resolvida": {
+      "main": [
+        [
+          {
+            "node": "Execute Workflow — Finalizar nota",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Preparar gravação (resolvida)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar gravação (resolvida)": {
+      "main": [
+        [
+          {
+            "node": "Gravar pendencias_identificacao.json (resolvida)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar reenvio (ambíguo)": {
+      "main": [
+        [
+          {
+            "node": "Telegram — Pedir reply explícito",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "REPLACE_WITH_error_handler_WORKFLOW_ID"
+  },
+  "staticData": null
+}

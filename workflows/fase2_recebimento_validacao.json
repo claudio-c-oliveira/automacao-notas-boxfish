@@ -1,0 +1,864 @@
+{
+  "name": "Fase 2 — Recebimento e validação da nota",
+  "meta": {
+    "description": "Monitora e-mails com NF/recibo anexado (spec.md seção 4): thread conhecida (via threadId em cobrancas.json) ou avulso (extração + match via IA). Chama fase2_finalizar_nota.json (Execute Workflow) pra atualizar a planilha e fazer os 2 salvamentos em paralelo. Sem match confiável: registra pendência e pergunta no Telegram (seção 4, ciclo 8h/18h tratado em fase2_verificar_pendencias.json)."
+  },
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "f2r-01-manual",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "search",
+        "q": "has:attachment newer_than:2d",
+        "returnAll": true
+      },
+      "id": "f2r-02-buscar-recentes",
+      "name": "Gmail — Buscar e-mails recentes com anexo",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        220,
+        0
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "REPLACE",
+          "name": "Gmail account"
+        }
+      },
+      "notes": "Caminho do Manual Trigger — janela de 2 dias é um valor razoável pra teste manual, ajustável. O gatilho automático de verdade é o Gmail Trigger abaixo."
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "simple": false,
+        "filters": {
+          "q": "has:attachment"
+        }
+      },
+      "id": "f2r-03-gmail-trigger",
+      "name": "Gmail Trigger — Novo e-mail com anexo",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        220,
+        160
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "REPLACE",
+          "name": "Gmail account"
+        }
+      },
+      "notes": "Gatilho automático (seção 13.2: além do agendamento, todo workflow tem gatilho manual). Polling a cada minuto — ajustável conforme volume real."
+    },
+    {
+      "parameters": {
+        "numberInputs": 2
+      },
+      "id": "f2r-04-merge-emails",
+      "name": "Merge — e-mails (manual + automático)",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        440,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "fileSelector": "/config/config_execucao.json",
+        "options": {}
+      },
+      "id": "f2r-05-ler-config",
+      "name": "Ler config_execucao.json",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        660,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "fileSelector": "/config/cobrancas.json",
+        "options": {}
+      },
+      "id": "f2r-06-ler-cobrancas",
+      "name": "Ler cobrancas.json",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        660,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "fileSelector": "/config/pendencias_identificacao.json",
+        "options": {}
+      },
+      "id": "f2r-07-ler-pendencias",
+      "name": "Ler pendencias_identificacao.json",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        660,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "numberInputs": 3
+      },
+      "id": "f2r-08-merge-config",
+      "name": "Merge — arquivos de config",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        880,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Consolida config + cobrancas + pendencias (binario -> JSON) e embute os perfis\n// (mesma cópia usada na Fase 1 — seção 6 do spec.md).\nfunction parseBinaryJson(item) {\n  if (!item || !item.binary || !item.binary.data) return {};\n  return JSON.parse(Buffer.from(item.binary.data.data, 'base64').toString('utf8'));\n}\nconst config = parseBinaryJson($('Ler config_execucao.json').first());\nconst cobrancas = parseBinaryJson($('Ler cobrancas.json').first());\nconst pendencias = parseBinaryJson($('Ler pendencias_identificacao.json').first());\n\nconst perfis = {\n  AREP: { projeto: 'AREP (S01 antigo)', texto_ref: 'SMTC', retranca: 'S01' },\n  REUNION: { projeto: 'Reunion (S01)', texto_ref: 'SMTC - REUNION', retranca: 'REUNION_S01' },\n  SOFT_PRE: { projeto: 'Soft Pré (S02)', texto_ref: 'SMTC - SOFT PRE', retranca: 'SOFT PRE_S02' },\n};\n\nreturn [{ json: { config, cobrancas, pendencias, perfis, dominioEmpresa: 'novorealitybox.com' } }];"
+      },
+      "id": "f2r-09-carregar-config",
+      "name": "Carregar config + perfis",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "download",
+        "fileId": "REPLACE_WITH_FILE_ID_COST_REPORT_S01"
+      },
+      "id": "f2r-10-box-s01",
+      "name": "Box — Download Cost Report S01",
+      "type": "n8n-nodes-base.box",
+      "typeVersion": 1,
+      "position": [
+        1100,
+        140
+      ],
+      "credentials": {
+        "boxOAuth2Api": {
+          "id": "REPLACE",
+          "name": "Box account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "download",
+        "fileId": "REPLACE_WITH_FILE_ID_COST_REPORT_S02"
+      },
+      "id": "f2r-11-box-s02",
+      "name": "Box — Download Cost Report S02 (Soft Pré)",
+      "type": "n8n-nodes-base.box",
+      "typeVersion": 1,
+      "position": [
+        1100,
+        260
+      ],
+      "credentials": {
+        "boxOAuth2Api": {
+          "id": "REPLACE",
+          "name": "Box account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "numberInputs": 3
+      },
+      "id": "f2r-12-merge-downloads",
+      "name": "Merge — downloads + config",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        1320,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Le a aba Notas dos 2 Cost Reports (exceljs), separando AREP/Reunion por cor\n// (mesma lógica da Fase 1). Produz a \"roster\" de nomes/razões sociais + linha,\n// usada tanto pra localizar a linha de uma thread conhecida (via chaveCobranca)\n// quanto pra casar um caso avulso via IA.\nconst ExcelJS = require('exceljs');\n\nfunction normalizar(texto) {\n  if (!texto) return '';\n  return String(texto).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim().replace(/\\s+/g, ' ');\n}\nfunction linhaTemPreenchimento(cell) {\n  const fill = cell && cell.fill;\n  if (!fill || fill.type !== 'pattern' || fill.pattern !== 'solid') return false;\n  const argb = fill.fgColor && fill.fgColor.argb;\n  if (!argb) return false;\n  return argb !== 'FFFFFFFF' && argb !== '00000000';\n}\nasync function lerAbaNotas(nodeName, projetoFixo) {\n  const item = $(nodeName).first();\n  const buffer = Buffer.from(item.binary.data.data, 'base64');\n  const wb = new ExcelJS.Workbook();\n  await wb.xlsx.load(buffer);\n  const ws = wb.getWorksheet('Notas') || wb.worksheets[0];\n  const linhas = [];\n  ws.eachRow({ includeEmpty: false }, (row, rowNumber) => {\n    if (rowNumber === 1) return;\n    const projetoId = projetoFixo || (linhaTemPreenchimento(row.getCell('L')) ? 'REUNION' : 'AREP');\n    linhas.push({\n      linha: rowNumber, projetoId,\n      colunaB: row.getCell('B').text, colunaC: row.getCell('C').text,\n      colunaG: row.getCell('G').text, colunaH: row.getCell('H').text, colunaJ: row.getCell('J').text,\n      colunaK: Number(row.getCell('K').value) || 0, colunaL: row.getCell('L').text,\n    });\n  });\n  return linhas;\n}\n\nconst linhasS01 = await lerAbaNotas('Box — Download Cost Report S01', null);\nconst linhasS02 = await lerAbaNotas('Box — Download Cost Report S02 (Soft Pré)', 'SOFT_PRE');\nconst todasAsLinhas = [...linhasS01, ...linhasS02];\n\nconst cfg = $('Carregar config + perfis').first().json;\n\nreturn [{\n  json: {\n    config: cfg.config, cobrancas: cfg.cobrancas, pendencias: cfg.pendencias, perfis: cfg.perfis,\n    dominioEmpresa: cfg.dominioEmpresa,\n    roster: todasAsLinhas.map((n) => ({ chave: n.projetoId + '_L' + n.linha, nome: (n.colunaJ.split(' - ')[1] || n.colunaH), fornecedor: n.colunaH, projetoId: n.projetoId, linha: n.linha, codigo: n.colunaB, cargo: n.colunaC, statusBox: n.colunaL })),\n  },\n}];"
+      },
+      "id": "f2r-13-parse-planilhas",
+      "name": "Parsear planilhas (exceljs) — montar roster",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        80
+      ],
+      "notes": "Pré-requisito de infra: NODE_FUNCTION_ALLOW_EXTERNAL=exceljs na VM (mesmo da Fase 1)."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Filtra e-mails com anexo PDF/imagem (ignora os sem anexo relevante), aplica\n// limite_linhas_execucao (modo assistido, seção 7.4 — vale pras 3 fases) e\n// anexa o contexto (config/roster/etc.) a cada item.\nconst ctx = $('Parsear planilhas (exceljs) — montar roster').first().json;\nconst emails = $input.all().filter((item) => {\n  const partes = (item.json.payload && item.json.payload.parts) || [];\n  return partes.some((p) => p.filename && /\\.(pdf|png|jpe?g)$/i.test(p.filename));\n});\n\nconst limite = ctx.config && ctx.config.limite_linhas_execucao;\nconst cortados = (!limite || limite <= 0) ? emails : emails.slice(0, limite);\n\nreturn cortados.map((item) => ({\n  json: {\n    email: { id: item.json.id, threadId: item.json.threadId, subject: item.json.payload && (item.json.payload.headers || []).find((h) => h.name === 'Subject') && (item.json.payload.headers.find((h) => h.name === 'Subject').value), from: item.json.payload && (item.json.payload.headers || []).find((h) => h.name === 'From') && (item.json.payload.headers.find((h) => h.name === 'From').value) },\n    ...ctx,\n  },\n}));"
+      },
+      "id": "f2r-14-filtrar",
+      "name": "Filtrar anexos válidos + limite de execução",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        80
+      ],
+      "notes": "ASSUNÇÃO sobre o formato exato de payload.parts/headers do node Gmail — confirmar contra a resposta real em homolog."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Thread conhecida ou avulso? (seção 4) — checagem determinística via threadId\n// gravado em cobrancas.json na Fase 1 (seção 3.1.1).\nfunction identificarThreadConhecida(threadIdRecebido, cobrancas) {\n  if (!threadIdRecebido || !cobrancas) return { ehConhecida: false };\n  const chave = Object.keys(cobrancas).find((k) => cobrancas[k].threadId === threadIdRecebido);\n  if (!chave) return { ehConhecida: false };\n  return { ehConhecida: true, chaveCobranca: chave, entrada: cobrancas[chave] };\n}\n\nreturn $input.all().map((item) => {\n  const d = item.json;\n  const resultado = identificarThreadConhecida(d.email.threadId, d.cobrancas);\n  return { json: { ...d, ...resultado } };\n});"
+      },
+      "id": "f2r-15-identificar-thread",
+      "name": "Identificar thread conhecida",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1980,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "get",
+        "messageId": "={{ $json.email.id }}",
+        "options": {
+          "downloadAttachments": true
+        }
+      },
+      "id": "f2r-16-baixar-anexo",
+      "name": "Gmail — Baixar anexo",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        2200,
+        80
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "REPLACE",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "anthropicApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  model: 'claude-haiku-4-5', max_tokens: 1024,\n  system: \"Voce extrai dados de identificacao de uma nota fiscal ou recibo (PDF ou imagem) recebido por e-mail de um colaborador/fornecedor da produtora Box Fish.\\n\\nResponda SOMENTE com um objeto JSON (sem markdown, sem texto fora do JSON):\\n{\\\"nomeOuRazaoSocial\\\": string|null, \\\"projetoRef\\\": string|null, \\\"valor\\\": number|null, \\\"competencia\\\": string|null, \\\"numeroNota\\\": string|null, \\\"dataEmissao\\\": \\\"DD/MM/AAAA\\\"|null, \\\"tipoDocumento\\\": \\\"NF\\\"|\\\"RECIBO\\\"|\\\"FATURA\\\"|null, \\\"situacaoNaoMapeada\\\": string|null}\\n\\nRegras: nomeOuRazaoSocial e o nome do colaborador OU a razao social do fornecedor EMISSOR do documento (quem esta emitindo, nao a Box Fish, que e sempre a tomadora). projetoRef e o texto \\\"Ref.\\\" do documento, se houver. numeroNota so os digitos. Se nao conseguir ler algum campo com confianca, deixe null nesse campo especifico - nunca invente. Se o documento for ilegivel ou nao reconhecivel como nota/recibo, preencha situacaoNaoMapeada.\",\n  messages: [{ role: 'user', content: [\n    { type: $binary.data.mimeType === 'application/pdf' ? 'document' : 'image', source: { type: 'base64', media_type: $binary.data.mimeType, data: $binary.data.data } },\n    { type: 'text', text: 'Extraia os dados desta nota fiscal/recibo conforme as instruções do system prompt.' }\n  ] }]\n}) }}"
+      },
+      "id": "f2r-17-ia-extracao",
+      "name": "IA — Extrair dados do anexo (Claude, produção)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2420,
+        80
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "REPLACE",
+          "name": "Claude account (produção)"
+        }
+      },
+      "notes": "PRODUÇÃO. Ambiente homolog troca a credencial pra 'Claude account (dev)' — não há mais arquivo .homolog.json separado (mesma decisão da Fase 1); ajustar via um par de nodes com IF de ambiente igual fizemos lá, se quiser branch dev/produção aqui também (simplificado nesta 1ª entrega: só produção, dev é TODO)."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Interpreta a resposta da IA de extração (nunca lança exceção — regra geral\n// de segurança, seção 3.2 item 6 / seção 4: nunca adivinhar).\nfunction parseRespostaIA(t) {\n  try { const o = JSON.parse(t); if (!o) return { situacaoNaoMapeada: 'Resposta vazia' }; return o; }\n  catch (e) { return { situacaoNaoMapeada: 'Resposta da IA não é JSON válido: ' + String(t).slice(0,300) }; }\n}\nreturn $input.all().map((item) => {\n  const texto = item.json.content && item.json.content[0] ? item.json.content[0].text : '';\n  return { json: { ...item.json, extracao: parseRespostaIA(texto) } };\n});"
+      },
+      "id": "f2r-18-interpretar-extracao",
+      "name": "Interpretar extração da IA",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2640,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $json.ehConhecida }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      },
+      "id": "f2r-19-if-thread-conhecida",
+      "name": "IF — Thread conhecida?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2860,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "anthropicApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  model: 'claude-haiku-4-5', max_tokens: 512,\n  system: \"Voce recebe um nome de colaborador ou razao social extraido de uma nota fiscal, e uma lista de nomes/razoes sociais candidatos vindos de uma planilha (cada um com um identificador de linha).\\n\\nResponda SOMENTE com um objeto JSON (sem markdown, sem texto fora do JSON):\\n{\\\"linhaEncontrada\\\": <identificador da linha, do jeito que veio na lista>|null, \\\"confiavel\\\": boolean, \\\"situacaoNaoMapeada\\\": string|null}\\n\\nRegras: considere variacoes de acentuacao, maiusculas/minusculas, abreviacoes e pequena diferenca de escrita como o MESMO nome. confiavel so e true se voce tiver certeza razoavel - se houver ambiguidade real entre 2+ candidatos parecidos, ou nenhum candidato parecido, use confiavel=false e linhaEncontrada=null. Nunca invente uma linha que nao esteja na lista de candidatos.\",\n  messages: [{ role: 'user', content: JSON.stringify({ nomeExtraido: $json.extracao.nomeOuRazaoSocial, candidatos: $json.roster.filter(r => r.statusBox && r.statusBox.indexOf('SOLICITADA') === 0 === false ? true : true).map(r => ({chave: r.chave, nome: r.nome, fornecedor: r.fornecedor})) }) }]\n}) }}"
+      },
+      "id": "f2r-20-ia-casar",
+      "name": "IA — Casar com a planilha (Claude, produção)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3080,
+        -60
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "REPLACE",
+          "name": "Claude account (produção)"
+        }
+      },
+      "notes": "Candidatos = roster inteiro (todos os projetos) nesta 1ª versão — poderia ser restrito pelo projetoRef extraído (seção 4), simplificado aqui. Ambiente dev/homolog: mesma observação do node de extração."
+    },
+    {
+      "parameters": {
+        "jsCode": "function parseRespostaIA(t) {\n  try { const o = JSON.parse(t); if (!o) return { situacaoNaoMapeada: 'Resposta vazia' }; return o; }\n  catch (e) { return { situacaoNaoMapeada: 'Resposta da IA não é JSON válido: ' + String(t).slice(0,300) }; }\n}\nreturn $input.all().map((item) => {\n  const texto = item.json.content && item.json.content[0] ? item.json.content[0].text : '';\n  return { json: { ...item.json, match: parseRespostaIA(texto) } };\n});"
+      },
+      "id": "f2r-21-interpretar-casar",
+      "name": "Interpretar match da IA",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3300,
+        -60
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $json.match.confiavel }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      },
+      "id": "f2r-22-if-match-confiavel",
+      "name": "IF — Match confiável?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        3520,
+        -60
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Sem match confiável (seção 4) — registra pendência e prepara a pergunta\n// pro Telegram. NÃO decide nada sozinho.\nconst d = $input.first().json;\nconst chave = 'PEND_' + d.email.id;\nconst pendenciasAtualizadas = { ...(d.pendencias || {}) };\npendenciasAtualizadas[chave] = {\n  emailId: d.email.id,\n  threadId: d.email.threadId,\n  dadosReferencia: d.extracao,\n  primeiraPerguntaEm: new Date().toISOString(),\n  lembreteEnviado: false,\n  resolvida: false,\n  mensagemIdOriginal: null, // preenchido depois de enviar a pergunta no Telegram (node seguinte)\n};\nreturn [{ json: { ...d, chavePendencia: chave, pendenciasAtualizadas } }];"
+      },
+      "id": "f2r-23-registrar-pendencia",
+      "name": "Registrar pendência de identificação",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3740,
+        40
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "REPLACE_WITH_MICHELLE_TELEGRAM_CHAT_ID",
+        "text": "={{ '❓ Não consegui identificar essa nota (Fase 2)\\n\\nNome/razão social: ' + ($json.extracao.nomeOuRazaoSocial || '?') + '\\nProjeto (Ref.): ' + ($json.extracao.projetoRef || '?') + '\\nValor: ' + ($json.extracao.valor || '?') + '\\nCompetência: ' + ($json.extracao.competencia || '?') + '\\n\\nResponda a ESTA mensagem (usando \"responder\") com a linha/colaborador correta.' }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "f2r-24-telegram-perguntar",
+      "name": "Telegram — Perguntar identificação",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        3960,
+        40
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE",
+          "name": "Telegram account"
+        }
+      },
+      "notes": "Pede explicitamente 'responder' (reply) — seção 4, correção: correlação de resposta NUNCA adivinha, sempre exige reply quando há ambiguidade."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Grava mensagemIdOriginal (retornado pelo Telegram) na pendência recém-criada.\nconst enviado = $input.first().json;\nconst anterior = $('Registrar pendência de identificação').first().json;\nconst pendenciasAtualizadas = { ...anterior.pendenciasAtualizadas };\npendenciasAtualizadas[anterior.chavePendencia].mensagemIdOriginal = enviado.message_id || enviado.result?.message_id || null;\nreturn [{ json: {}, binary: { data: { data: Buffer.from(JSON.stringify(pendenciasAtualizadas, null, 2)).toString('base64'), mimeType: 'application/json', fileName: 'pendencias_identificacao.json' } } }];"
+      },
+      "id": "f2r-25-preparar-grava-pendencias",
+      "name": "Preparar pendencias_identificacao.json atualizado",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4180,
+        40
+      ],
+      "notes": "ASSUNÇÃO sobre o campo exato do id da mensagem enviada na resposta do node Telegram — confirmar em homolog."
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "/config/pendencias_identificacao.json",
+        "dataPropertyName": "data"
+      },
+      "id": "f2r-26-gravar-pendencias",
+      "name": "Gravar pendencias_identificacao.json",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        4400,
+        40
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Monta o payload pro sub-workflow fase2_finalizar_nota.json — mesmo pra\n// thread conhecida (projetoId/linha já sabidos) ou avulso com match confiável.\nconst d = $input.first().json;\n\nlet projetoId, linha, chaveCobranca;\nif (d.ehConhecida) {\n  chaveCobranca = d.chaveCobranca;\n  const partes = chaveCobranca.split('_L');\n  // chaveCobranca = perfil.retranca + '_L' + linha — o retranca pode conter '_' também,\n  // então pegamos o ÚLTIMO '_L' como separador (linha é sempre numérica no final).\n  const m = /_L(\\d+)$/.exec(chaveCobranca);\n  linha = m ? parseInt(m[1], 10) : null;\n  // projetoId: procura no roster pela combinação retranca+linha (roster tem projetoId+linha diretamente).\n  const linhaRoster = d.roster.find((r) => r.linha === linha && d.perfis[r.projetoId] && chaveCobranca.startsWith(d.perfis[r.projetoId].retranca));\n  projetoId = linhaRoster ? linhaRoster.projetoId : null;\n} else {\n  const linhaRoster = d.roster.find((r) => r.chave === d.match.linhaEncontrada);\n  if (linhaRoster) { projetoId = linhaRoster.projetoId; linha = linhaRoster.linha; }\n  chaveCobranca = linhaRoster ? (d.perfis[projetoId].retranca + '_L' + linha) : null;\n}\n\nconst linhaInfo = d.roster.find((r) => r.projetoId === projetoId && r.linha === linha);\n\nreturn [{\n  json: {\n    projetoId, linha, chaveCobranca,\n    tipoDocumento: d.extracao.tipoDocumento || 'NF',\n    numeroNota: d.extracao.numeroNota || '000000',\n    dataEmissao: d.extracao.dataEmissao,\n    dataVencimento: linhaInfo ? linhaInfo.colunaG : null,\n    razaoSocialOuNome: d.extracao.nomeOuRazaoSocial || (linhaInfo && (linhaInfo.nome || linhaInfo.fornecedor)),\n    codigo: linhaInfo ? linhaInfo.codigo : null,\n    cargo: linhaInfo ? linhaInfo.cargo : null,\n    perfilRetranca: projetoId ? d.perfis[projetoId].retranca : null,\n  },\n  binary: d.binary,\n}];"
+      },
+      "id": "f2r-27-preparar-finalizar",
+      "name": "Preparar dados pra finalizar nota",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3080,
+        200
+      ],
+      "notes": "ASSUNÇÃO: chaveCobranca é decomposta assumindo o formato '<retranca>_L<linha>' definido na Fase 1 — funciona mas é frágil; próxima iteração deveria gravar projetoId/linha diretamente em cobrancas.json em vez de só a chave composta."
+    },
+    {
+      "parameters": {
+        "workflowId": "REPLACE_WITH_fase2_finalizar_nota_WORKFLOW_ID",
+        "mode": "each"
+      },
+      "id": "f2r-28-executar-finalizar",
+      "name": "Execute Workflow — Finalizar nota",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        3300,
+        200
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "f2r-29-noop-fim",
+      "name": "NoOp — fim (nota finalizada)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        3520,
+        200
+      ]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Gmail — Buscar e-mails recentes com anexo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail — Buscar e-mails recentes com anexo": {
+      "main": [
+        [
+          {
+            "node": "Merge — e-mails (manual + automático)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail Trigger — Novo e-mail com anexo": {
+      "main": [
+        [
+          {
+            "node": "Merge — e-mails (manual + automático)",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge — e-mails (manual + automático)": {
+      "main": [
+        [
+          {
+            "node": "Ler config_execucao.json",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Ler cobrancas.json",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Ler pendencias_identificacao.json",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ler config_execucao.json": {
+      "main": [
+        [
+          {
+            "node": "Merge — arquivos de config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ler cobrancas.json": {
+      "main": [
+        [
+          {
+            "node": "Merge — arquivos de config",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Ler pendencias_identificacao.json": {
+      "main": [
+        [
+          {
+            "node": "Merge — arquivos de config",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Merge — arquivos de config": {
+      "main": [
+        [
+          {
+            "node": "Carregar config + perfis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Carregar config + perfis": {
+      "main": [
+        [
+          {
+            "node": "Box — Download Cost Report S01",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Box — Download Cost Report S02 (Soft Pré)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge — downloads + config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Box — Download Cost Report S01": {
+      "main": [
+        [
+          {
+            "node": "Merge — downloads + config",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Box — Download Cost Report S02 (Soft Pré)": {
+      "main": [
+        [
+          {
+            "node": "Merge — downloads + config",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Merge — downloads + config": {
+      "main": [
+        [
+          {
+            "node": "Parsear planilhas (exceljs) — montar roster",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parsear planilhas (exceljs) — montar roster": {
+      "main": [
+        [
+          {
+            "node": "Filtrar anexos válidos + limite de execução",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filtrar anexos válidos + limite de execução": {
+      "main": [
+        [
+          {
+            "node": "Identificar thread conhecida",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Identificar thread conhecida": {
+      "main": [
+        [
+          {
+            "node": "Gmail — Baixar anexo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail — Baixar anexo": {
+      "main": [
+        [
+          {
+            "node": "IA — Extrair dados do anexo (Claude, produção)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IA — Extrair dados do anexo (Claude, produção)": {
+      "main": [
+        [
+          {
+            "node": "Interpretar extração da IA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Interpretar extração da IA": {
+      "main": [
+        [
+          {
+            "node": "IF — Thread conhecida?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — Thread conhecida?": {
+      "main": [
+        [
+          {
+            "node": "Preparar dados pra finalizar nota",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "IA — Casar com a planilha (Claude, produção)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IA — Casar com a planilha (Claude, produção)": {
+      "main": [
+        [
+          {
+            "node": "Interpretar match da IA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Interpretar match da IA": {
+      "main": [
+        [
+          {
+            "node": "IF — Match confiável?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — Match confiável?": {
+      "main": [
+        [
+          {
+            "node": "Preparar dados pra finalizar nota",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Registrar pendência de identificação",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Registrar pendência de identificação": {
+      "main": [
+        [
+          {
+            "node": "Telegram — Perguntar identificação",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram — Perguntar identificação": {
+      "main": [
+        [
+          {
+            "node": "Preparar pendencias_identificacao.json atualizado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar pendencias_identificacao.json atualizado": {
+      "main": [
+        [
+          {
+            "node": "Gravar pendencias_identificacao.json",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar dados pra finalizar nota": {
+      "main": [
+        [
+          {
+            "node": "Execute Workflow — Finalizar nota",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Workflow — Finalizar nota": {
+      "main": [
+        [
+          {
+            "node": "NoOp — fim (nota finalizada)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "REPLACE_WITH_error_handler_WORKFLOW_ID"
+  },
+  "staticData": null
+}

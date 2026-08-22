@@ -1,0 +1,731 @@
+{
+  "name": "Fase 2 — Finalizar nota (sub-workflow compartilhado)",
+  "meta": {
+    "description": "Chamado via Execute Workflow por fase2_recebimento_validacao.json (match confiável) e fase2_verificar_pendencias.json (Michelle resolveu via Telegram). Atualiza a planilha do Box e faz os 2 salvamentos em paralelo (spec.md seção 4/4.1/4.2)."
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "projetoId"
+            },
+            {
+              "name": "linha"
+            },
+            {
+              "name": "tipoDocumento"
+            },
+            {
+              "name": "numeroNota"
+            },
+            {
+              "name": "dataEmissao"
+            },
+            {
+              "name": "dataVencimento"
+            },
+            {
+              "name": "razaoSocialOuNome"
+            },
+            {
+              "name": "codigo"
+            },
+            {
+              "name": "cargo"
+            },
+            {
+              "name": "perfilRetranca"
+            },
+            {
+              "name": "chaveCobranca"
+            }
+          ]
+        }
+      },
+      "id": "f2f-01-trigger",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "notes": "Chamado por fase2_recebimento_validacao.json (match confiável) e fase2_verificar_pendencias.json (Michelle resolveu via Telegram). Espera o anexo da NF vir como binário 'data' junto com os campos json acima (seção 4/4.1/4.2 do spec.md)."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Gera retranca (secao 4.1), nome da pasta de vencimento (secao 4.4) e nome\n// da pasta por função (secao 4.2 - coluna B \"CONTA NETFLIX\" = codigo, coluna C\n// \"ÍTEM\" = cargo, confirmado).\nfunction formatarDataCurta(d) { return String(d.getDate()).padStart(2,'0') + '.' + String(d.getMonth()+1).padStart(2,'0'); }\nfunction formatarNumeroNota(numero) { const digitos = String(numero).replace(/\\D/g, ''); return digitos.padStart(6, '0').slice(-6); }\nconst MESES_ABREV_PT_MAIUSC = ['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ'];\nfunction montarNomePastaVencimento(d) { return 'VENC_' + MESES_ABREV_PT_MAIUSC[d.getMonth()] + '_' + formatarDataCurta(d); }\nfunction montarNomePastaFuncao(codigo, cargo, projetoId) {\n  const sufixo = projetoId === 'REUNION' ? '.R' : '';\n  return codigo + sufixo + ' - ' + cargo;\n}\n\nconst d = $input.first().json;\nconst dataVencimento = new Date(d.dataVencimento);\nconst numeroFormatado = formatarNumeroNota(d.numeroNota);\nconst retranca = formatarDataCurta(dataVencimento) + '_BR_SMTC_' + d.perfilRetranca + '_' + d.razaoSocialOuNome + '_#' + numeroFormatado;\nconst pastaVencimento = montarNomePastaVencimento(dataVencimento);\nconst pastaFuncao = montarNomePastaFuncao(d.codigo, d.cargo, d.projetoId);\n\nreturn [{ json: { ...d, dataVencimento: dataVencimento.toISOString(), numeroFormatado, retranca, pastaVencimento, pastaFuncao } }];"
+      },
+      "id": "f2f-02-gerar-retranca",
+      "name": "Gerar retranca e nomes de pasta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "operation": "search",
+        "queryString": "={{ $json.pastaVencimento }}",
+        "filter": {
+          "folderId": "REPLACE_WITH_FOLDER_ID_CONTAS_A_PAGAR_",
+          "whatToSearch": "folders"
+        }
+      },
+      "id": "f2f-03-buscar-pasta-venc",
+      "name": "Drive particular — Buscar pasta VENC",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        440,
+        -120
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "REPLACE",
+          "name": "Google Drive - Particular Michelle"
+        }
+      },
+      "notes": "filter.folderId precisa ser o ID real da pasta CONTAS A PAGAR do projeto (SMTC/[projeto]/CONTAS A PAGAR) — varia por projetoId, resolver com uma tabela de IDs por projeto antes de importar (seção 4.4). Pastas de vencimento já existem pré-criadas pra boa parte do ano — isso é só fallback."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $json.files ? $json.files.length : 0 }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ]
+        }
+      },
+      "id": "f2f-04-if-pasta-venc-existe",
+      "name": "IF — Pasta VENC já existe?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        660,
+        -120
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "folder",
+        "name": "={{ $('Gerar retranca e nomes de pasta').item.json.pastaVencimento }}",
+        "options": {
+          "parentId": "REPLACE_WITH_FOLDER_ID_CONTAS_A_PAGAR"
+        }
+      },
+      "id": "f2f-05-criar-pasta-venc",
+      "name": "Drive particular — Criar pasta VENC",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        880,
+        -60
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "REPLACE",
+          "name": "Google Drive - Particular Michelle"
+        }
+      },
+      "notes": "Seção 4.4: 'o workflow deve checar se a pasta do vencimento existe e criar automaticamente se não existir, nunca assumir que ela sempre estará lá.'"
+    },
+    {
+      "parameters": {
+        "numberInputs": 2
+      },
+      "id": "f2f-06-merge-pasta-venc",
+      "name": "Merge — ID da pasta VENC",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        1100,
+        -120
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "upload",
+        "name": "={{ $('Gerar retranca e nomes de pasta').item.json.retranca }}",
+        "options": {
+          "parentId": "={{ $json.id || ($json.files && $json.files[0].id) }}"
+        },
+        "binaryPropertyName": "data"
+      },
+      "id": "f2f-07-upload-particular",
+      "name": "Drive particular — Upload da nota (retranca)",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1320,
+        -120
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "REPLACE",
+          "name": "Google Drive - Particular Michelle"
+        }
+      },
+      "notes": "Salvamento 1 (seção 4.2) — pousa DIRETO na pasta de vencimento, sem pasta de remessa (Ordem de escrita Opção A, seção 4.4)."
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "operation": "search",
+        "queryString": "={{ $('Gerar retranca e nomes de pasta').item.json.pastaFuncao }}",
+        "filter": {
+          "folderId": "REPLACE_WITH_FOLDER_ID_ARQUIVO_DE_NOTAS_",
+          "whatToSearch": "folders"
+        }
+      },
+      "id": "f2f-08-buscar-pasta-funcao",
+      "name": "Drive trabalho — Buscar pasta por função",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        440,
+        120
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "REPLACE",
+          "name": "Google Drive account"
+        }
+      },
+      "notes": "filter.folderId = ID da pasta 'ARQUIVO DE NOTAS [PROJETO]' dentro de FINANCEIRO > 08. NOTAS ARQUIVADAS — varia por projetoId (seção 4.2)."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $json.files ? $json.files.length : 0 }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ]
+        }
+      },
+      "id": "f2f-09-if-pasta-funcao-existe",
+      "name": "IF — Pasta da função já existe?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        660,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "folder",
+        "name": "={{ $('Gerar retranca e nomes de pasta').item.json.pastaFuncao }}",
+        "options": {
+          "parentId": "REPLACE_WITH_FOLDER_ID_ARQUIVO_DE_NOTAS"
+        }
+      },
+      "id": "f2f-10-criar-pasta-funcao",
+      "name": "Drive trabalho — Criar pasta da função",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        880,
+        180
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "REPLACE",
+          "name": "Google Drive account"
+        }
+      },
+      "notes": "Seção 4.2: 'Se a pasta daquele código ainda não existir, criar seguindo a mesma nomenclatura das pastas já existentes.'"
+    },
+    {
+      "parameters": {
+        "numberInputs": 2
+      },
+      "id": "f2f-11-merge-pasta-funcao",
+      "name": "Merge — ID da pasta da função",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        1100,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "upload",
+        "name": "={{ $('Gerar retranca e nomes de pasta').item.json.retranca }}",
+        "options": {
+          "parentId": "={{ $json.id || ($json.files && $json.files[0].id) }}"
+        },
+        "binaryPropertyName": "data"
+      },
+      "id": "f2f-12-upload-funcao",
+      "name": "Drive trabalho — Upload da nota (arquivamento por função)",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1320,
+        120
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "REPLACE",
+          "name": "Google Drive account"
+        }
+      },
+      "notes": "Salvamento 2 (seção 4.2, ANTECIPADO da Fase 3+4 pra cá) — cópia da mesma nota, arquivamento definitivo por função. Roda em PARALELO ao Salvamento 1, não depende dele."
+    },
+    {
+      "parameters": {
+        "numberInputs": 2
+      },
+      "id": "f2f-13-merge-salvamentos",
+      "name": "Merge — os 2 salvamentos concluídos",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        1540,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://api.box.com/2.0/files/{{ $json.boxFileId }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "boxOAuth2Api",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "lock",
+              "value": "={{ { type: 'lock', is_download_prevented: false } }}"
+            }
+          ]
+        }
+      },
+      "id": "f2f-14-box-lock",
+      "name": "Box — Lock",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1760,
+        0
+      ],
+      "notes": "boxFileId precisa vir resolvido a partir do projetoId (Cost Report S01 ou S02) — mesmo mapeamento usado na Fase 1."
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "download",
+        "fileId": "={{ $json.boxFileId }}"
+      },
+      "id": "f2f-15-box-download",
+      "name": "Box — Download planilha",
+      "type": "n8n-nodes-base.box",
+      "typeVersion": 1,
+      "position": [
+        1980,
+        0
+      ],
+      "credentials": {
+        "boxOAuth2Api": {
+          "id": "REPLACE",
+          "name": "Box account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Aplica colunas D (tipo doc), E (nº nota 6 dígitos), F (data emissão) e\n// Status Box (coluna L) = \"RECEBIDA MI\" na linha identificada (seção 4).\n// SEMPRE automático, mesmo no MVP (MODO_EXECUCAO não bloqueia isso — seção 3.1.3/4).\nconst ExcelJS = require('exceljs');\n\nconst d = $('Gerar retranca e nomes de pasta').first().json;\nconst item = $input.first();\nconst buffer = Buffer.from(item.binary.data.data, 'base64');\nconst wb = new ExcelJS.Workbook();\nawait wb.xlsx.load(buffer);\nconst ws = wb.getWorksheet('Notas') || wb.worksheets[0];\n\nws.getCell('D' + d.linha).value = d.tipoDocumento;\nws.getCell('E' + d.linha).value = d.numeroFormatado;\nws.getCell('F' + d.linha).value = d.dataEmissao;\nws.getCell('L' + d.linha).value = 'RECEBIDA MI';\n\nconst novoBuffer = await wb.xlsx.writeBuffer();\nreturn [{\n  json: { ...d },\n  binary: { data: { data: Buffer.from(novoBuffer).toString('base64'), mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', fileName: 'cost_report_atualizado.xlsx' } },\n}];"
+      },
+      "id": "f2f-16-atualizar-planilha",
+      "name": "Atualizar colunas D/E/F e Status Box (exceljs)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2200,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "uploadVersion",
+        "fileId": "={{ $json.boxFileId }}",
+        "binaryPropertyName": "data"
+      },
+      "id": "f2f-17-box-upload",
+      "name": "Box — Upload nova versão",
+      "type": "n8n-nodes-base.box",
+      "typeVersion": 1,
+      "position": [
+        2420,
+        0
+      ],
+      "credentials": {
+        "boxOAuth2Api": {
+          "id": "REPLACE",
+          "name": "Box account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://api.box.com/2.0/files/{{ $json.boxFileId }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "boxOAuth2Api",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "lock",
+              "value": "={{ null }}"
+            }
+          ]
+        },
+        "onError": "continueRegularOutput"
+      },
+      "id": "f2f-18-box-unlock",
+      "name": "Box — Unlock (sempre, mesmo em erro)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2640,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "fileSelector": "/config/cobrancas.json",
+        "options": {}
+      },
+      "id": "f2f-19-ler-cobrancas",
+      "name": "Ler cobrancas.json",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        2200,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Marca a nota como recebida em cobrancas.json (status_ciclo='recebido') — a\n// Fase 1 (Avaliar cobrança) para de monitorar/cobrar assim que vir esse status.\nfunction parseBinaryJson(item) {\n  if (!item || !item.binary || !item.binary.data) return {};\n  return JSON.parse(Buffer.from(item.binary.data.data, 'base64').toString('utf8'));\n}\nconst item = $('Ler cobrancas.json').first();\nconst cobrancas = parseBinaryJson(item);\nconst chave = $('Gerar retranca e nomes de pasta').first().json.chaveCobranca;\nif (chave && cobrancas[chave]) {\n  cobrancas[chave].status_ciclo = 'recebido';\n}\nreturn [{ json: {}, binary: { data: { data: Buffer.from(JSON.stringify(cobrancas, null, 2)).toString('base64'), mimeType: 'application/json', fileName: 'cobrancas.json' } } }];"
+      },
+      "id": "f2f-20-atualizar-cobrancas",
+      "name": "Marcar cobrancas.json como recebido",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2420,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "/config/cobrancas.json",
+        "dataPropertyName": "data"
+      },
+      "id": "f2f-21-gravar-cobrancas",
+      "name": "Gravar cobrancas.json",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        2640,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "numberInputs": 2
+      },
+      "id": "f2f-22-merge-final",
+      "name": "Merge — finalização completa",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        2860,
+        100
+      ]
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Gerar retranca e nomes de pasta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gerar retranca e nomes de pasta": {
+      "main": [
+        [
+          {
+            "node": "Drive particular — Buscar pasta VENC",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Drive trabalho — Buscar pasta por função",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Box — Lock",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Ler cobrancas.json",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Drive particular — Buscar pasta VENC": {
+      "main": [
+        [
+          {
+            "node": "IF — Pasta VENC já existe?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — Pasta VENC já existe?": {
+      "main": [
+        [
+          {
+            "node": "Merge — ID da pasta VENC",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Drive particular — Criar pasta VENC",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Drive particular — Criar pasta VENC": {
+      "main": [
+        [
+          {
+            "node": "Merge — ID da pasta VENC",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge — ID da pasta VENC": {
+      "main": [
+        [
+          {
+            "node": "Drive particular — Upload da nota (retranca)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Drive particular — Upload da nota (retranca)": {
+      "main": [
+        [
+          {
+            "node": "Merge — os 2 salvamentos concluídos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Drive trabalho — Buscar pasta por função": {
+      "main": [
+        [
+          {
+            "node": "IF — Pasta da função já existe?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — Pasta da função já existe?": {
+      "main": [
+        [
+          {
+            "node": "Merge — ID da pasta da função",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Drive trabalho — Criar pasta da função",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Drive trabalho — Criar pasta da função": {
+      "main": [
+        [
+          {
+            "node": "Merge — ID da pasta da função",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge — ID da pasta da função": {
+      "main": [
+        [
+          {
+            "node": "Drive trabalho — Upload da nota (arquivamento por função)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Drive trabalho — Upload da nota (arquivamento por função)": {
+      "main": [
+        [
+          {
+            "node": "Merge — os 2 salvamentos concluídos",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge — os 2 salvamentos concluídos": {
+      "main": [
+        [
+          {
+            "node": "Merge — finalização completa",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Box — Lock": {
+      "main": [
+        [
+          {
+            "node": "Box — Download planilha",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Box — Download planilha": {
+      "main": [
+        [
+          {
+            "node": "Atualizar colunas D/E/F e Status Box (exceljs)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Atualizar colunas D/E/F e Status Box (exceljs)": {
+      "main": [
+        [
+          {
+            "node": "Box — Upload nova versão",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Box — Upload nova versão": {
+      "main": [
+        [
+          {
+            "node": "Box — Unlock (sempre, mesmo em erro)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Box — Unlock (sempre, mesmo em erro)": {
+      "main": [
+        [
+          {
+            "node": "Merge — finalização completa",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Ler cobrancas.json": {
+      "main": [
+        [
+          {
+            "node": "Marcar cobrancas.json como recebido",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Marcar cobrancas.json como recebido": {
+      "main": [
+        [
+          {
+            "node": "Gravar cobrancas.json",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "REPLACE_WITH_error_handler_WORKFLOW_ID"
+  },
+  "staticData": null
+}
