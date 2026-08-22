@@ -27,7 +27,7 @@ As Fases 3 e 4 acontecem juntas, não uma depois da outra — confirmado por Cla
   - Se a coluna N contém "PENDENTE" ou está vazia/"N/A": NÃO pula mais direto — tenta resolver ativamente. Aplica o marcador de e-mail "CONTRATAÇÃO" (seção 3.1.2) e busca no Gmail, pelo nome do colaborador, se já existe uma thread de "ficha cadastral" preenchida e enviada.
     - Se encontrar e validar a ficha cadastral enviada: segue o fluxo normal de solicitação E atualiza a coluna N (Status do Contrato) para "OK - ASSINADO".
     - Se não encontrar/validar: não dispara o e-mail de pedido (linha fica pendente, sem alteração na coluna N).
-  - Busca de ficha cadastral SEM IA (decisão deliberada), com critério CORRIGIDO: a checagem é feita por regra determinística no Gmail — mas o sinal de validação NÃO é "existe um anexo de ficha cadastral na thread" (isso pode ser só o modelo em branco que foi enviado ao colaborador no pedido). O sinal correto é: o colaborador (ou representante dele) RESPONDEU na thread marcada "CONTRATAÇÃO" enviando de volta a documentação — ou seja, existe uma mensagem NA THREAD cujo remetente é de FORA do domínio da empresa (o colaborador/representante, não a Michelle/equipe) e que contém pelo menos 1 anexo. Exemplo real confirmado: thread com marcador "CONTRATAÇÃO" onde a Michelle/equipe manda o pedido com o modelo de ficha, e o colaborador (ou representante, de e-mail pessoal) responde na mesma thread anexando contrato social, alterações contratuais etc. — essa resposta é o que conta como "documentação enviada", não o anexo do pedido original. Essa busca não usa a API da Claude. A IA fica reservada só para a Fase 2 (extração de dados do PDF da nota, onde o layout varia e não dá pra usar uma regra fixa de texto); aqui a busca já é um padrão bem definido, então a regra fixa é mais barata, previsível e fácil de auditar do que uma chamada de IA.
+  - Busca de ficha cadastral SEM IA (decisão deliberada), com critério CORRIGIDO: a checagem é feita por regra determinística no Gmail — mas o sinal de validação NÃO é "existe um anexo de ficha cadastral na thread" (isso pode ser só o modelo em branco que foi enviado ao colaborador no pedido). O sinal correto é: o colaborador (ou representante dele) RESPONDEU na thread marcada "CONTRATAÇÃO" enviando de volta a documentação — ou seja, existe uma mensagem NA THREAD cujo remetente é de FORA do domínio da empresa (o colaborador/representante, não a Michelle/equipe) e que contém pelo menos 1 anexo. Exemplo real confirmado: thread com marcador "CONTRATAÇÃO" onde a Michelle/equipe manda o pedido com o modelo de ficha, e o colaborador (ou representante, de e-mail pessoal) responde na mesma thread anexando contrato social, alterações contratuais etc. — essa resposta é o que conta como "documentação enviada", não o anexo do pedido original. Essa busca específica não usa a API da Claude, porque já é um padrão bem definido (remetente + anexo) que uma regra fixa resolve sem ambiguidade — mais barata, previsível e fácil de auditar do que uma chamada de IA. Isso NÃO significa que a Fase 1 inteira seja sem IA: a Fase 1 usa IA em outros pontos (parsing da coluna J — seção 3.2, e identificação de linha REC/NF — seção 3.2.1); só esta checagem específica de ficha cadastral que continua determinística.
   - IMPORTANTE — a escrita na coluna N (Status do Contrato) NÃO é bloqueada pelo `MODO_EXECUCAO` (seção 3.1.3): mesmo em modo "rascunho", se o agente encontrar e validar a ficha cadastral, a coluna N é atualizada para "OK - ASSINADO" normalmente. O gate de `MODO_EXECUCAO` (rascunho vs. automático) vale SOMENTE para a coluna L (Status Box) e para o disparo do e-mail (rascunho vs. envio direto) — nunca para a coluna N. Motivo: a coluna N é um dado de cadastro que precisa estar correto para o e-mail de pedido sair com o Ref./assunto certo, e o rascunho só pode ser revisado pela Michelle se já tiver essa informação resolvida; diferente da coluna L, que fica manual no MVP justamente porque mudar o Status Box antes do e-mail realmente ser enviado confundiria quem acompanha a planilha (ex.: a Danielle vendo "SOLICITADA MI" e procurando um e-mail que ainda não foi disparado).
   - Cruzamento auxiliar com a planilha de Controle de Contratos (por projeto — seção 6), por Razão Social ou nome do colaborador, ignorando diferença de maiúsculas/minúsculas e espaços a mais ou a menos, continua válido como fonte adicional de checagem quando a coluna N não tiver a informação.
 - 2º Filtrar Status Box = "PROGRAMAR ATÉ [data]" (texto exato). Se a checagem de contrato acima liberar → monta e programa o e-mail de pedido, informando prazo de envio até data+5 dias, e deixa em RASCUNHO no Gmail (modo MVP) ou envia direto (modo automático — ver seção 3.1.3). Status Box deste passo: ver regra de MVP abaixo.
@@ -42,6 +42,19 @@ As Fases 3 e 4 acontecem juntas, não uma depois da outra — confirmado por Cla
 - Exemplo: Status Box = "PROGRAMAR ATÉ 20/08" e vencimento da NF em 10/09 → monitorar/cobrar a cada 5 dias entre 20/08 e ~05/09.
 - Se chegar ao fim desse ciclo sem resposta: alertar a Michelle via Telegram e ENCERRAR o fluxo automático para aquela nota — nenhuma cobrança adicional é enviada. Ação manual fica a critério da Michelle (é comum o colaborador mandar a NF com valor duplicado no ciclo do mês seguinte).
 - Armazenamento do controle de cobrança (data da última cobrança + contagem): NÃO fica na planilha (editada por terceiros, seria frágil). Fica num arquivo `cobrancas.json` no disco da VM do n8n, lido/escrito pelos nodes nativos de arquivo do n8n (não precisa de configuração extra de infra, diferente do exceljs) — uma entrada por nota, com data da última cobrança e contagem de ciclos.
+
+Estrutura de `cobrancas.json` (uma entrada por nota, chave sugerida = projeto + colaborador + vencimento):
+```json
+{
+  "<chave_da_nota>": {
+    "threadId": "<id da thread do Gmail — usado pela Fase 2 para monitorar respostas>",
+    "data_ultima_cobranca": "<data ISO>",
+    "contagem_cobrancas": <número inteiro>,
+    "status_ciclo": "em_andamento" | "encerrado_sem_resposta" | "recebido"
+  }
+}
+```
+O `threadId` é gravado assim que o e-mail de pedido é criado (rascunho ou enviado) — é o dado que a Fase 2 vai usar para saber em qual thread monitorar a resposta do colaborador, sem precisar buscar por texto toda vez.
 - Inicialização dos arquivos JSON (`cobrancas.json`, `apelidos.json`, `config_execucao.json`): a entrega da Fase 1 inclui esses 3 arquivos já criados com valores iniciais sensatos, para a primeira execução funcionar sem passo manual extra — `config_execucao.json` iniciando em `"rascunho"`, `apelidos.json` com o apelido atual de cada um dos 3 projetos (AREP, Reunion, Soft Pré/PNS), `cobrancas.json` vazio. Os workflows de comando via Telegram (`/modo`, `/apelido`) para escrever nesses arquivos depois de criados ficam para uma entrega separada — não fazem parte do escopo desta Fase 1.
 
 ### 3.1.2 Marcadores de e-mail (labels do Gmail)
@@ -73,17 +86,133 @@ Nova variável de ambiente **`MODO_EXECUCAO`**, além das já existentes de homo
 - Alterável via comando no Telegram (ex.: `/modo automatico`), do mesmo jeito que o comando de apelidos (seção 6.1).
 
 ### 3.2 Dados de origem e tipos de emissão
-Usar apenas as colunas: G (Vencimento), J (Descrição), K (Valor a pagar), L (Status Box), R (E-mail do colaborador).
+Usar apenas as colunas: G (Vencimento), H (Fornecedor), J (Descrição), K (Valor a pagar), L (Status Box), R (E-mail do colaborador).
 A coluna J se separa em 3 partes: [CARGO] - [NOME DO COLABORADOR] - [DE "DATA" A "DATA"]. O nome vem daqui; se não achar, cai para a coluna H (Fornecedor).
+
+**CORREÇÃO IMPORTANTE — esta etapa USA IA (API da Claude), não é 100% determinística.** A tentativa anterior de resolver isso só com regex (posição dos blocos) não é suficiente: nomes de cargo (ex.: "AGENCIAMENTO DE FIGURAÇÃO") e nomes de colaborador (ex.: "LARISSA CRISTIANE DO AMARAL GOMES") não têm um padrão de formato que os diferencie — só o conteúdo semântico do texto permite distinguir um do outro. Por isso, a IA é usada para interpretar o texto da coluna J e:
+1. Localizar o Período (padrão de data, ex.: "DD/MM A DD/MM").
+2. Localizar a palavra-chave de tipo de emissão, se houver, em qualquer posição do texto: **JOB, DIÁRIA/DIÁRIAS, PACOTE, REC, REC+NF**. No corpo do e-mail, ela SEMPRE aparece entre parênteses logo após o período (ex.: "Período de 25/08 A 27/08 (JOB)"). Ausência de palavra-chave = NF normal (não escreve nada entre parênteses).
+3. Dos blocos restantes (excluindo data e a palavra-chave de tipo): identificar semanticamente qual é o Cargo e qual é o Nome do colaborador (não por posição fixa — casos como "AGENCIAMENTO DE FIGURAÇÃO" mostram que a ordem pode não ser confiável).
+4. Reconhecer e REMOVER do texto qualquer menção ao nome do projeto (REUNION, AREP, SOFT PRE, PNS/PNL etc.) antes de montar o corpo do e-mail — esse nome não deve ser replicado no corpo, pois já aparece no assunto.
+5. Se a coluna J não tiver informação suficiente pra preencher Cargo e/ou Nome do colaborador com confiança: marca a lacuna como **"FALTA INFORMAÇÃO"** no campo correspondente do corpo (Serviço Prestado como / Colaborador), monta o e-mail mesmo assim, e envia um alerta via Telegram para a Michelle avisando que existe e-mail em rascunho (ou já enviado, no modo automático) com dado faltante no corpo — ela interage manualmente depois. Vale tanto para modo rascunho quanto automático.
+6. **Regra geral de segurança**: sempre que a IA encontrar uma situação que não está mapeada nesta especificação, ela NUNCA pode inventar ou adivinhar um valor. Para o processamento daquela linha, envia um alerta via Telegram para a Michelle descrevendo o ponto de indecisão, onde foi encontrado (projeto/linha da planilha) e o que já foi feito até ali — ela resolve manualmente.
+
 | Tipo | Quando usar | Assunto |
 |---|---|---|
 | NF normal | Cachê mensal | REF. [MÊS ABREV. 3 LETRAS] |
 | JOB | Período pontual de job | REF. JOB (com parcela "P.X/Y" se houver) |
 | DIÁRIA | Diária avulsa | REF. DIÁRIA |
 | PACOTE | Caso raro e específico do AREP (diárias agrupadas em pacote fechado); não deve se repetir fora do AREP | REF. PACOTE (sem mês) |
-| REC + NF | Locação (equipamento, estúdio, mesas etc.) faturada em parte recibo/fatura + parte nota — mais comum com fornecedores do que colaboradores | EMISSÃO DE NF E REC | REF. [MÊS] |
+| REC | Recibo/Fatura puro — locação (equipamento, estúdio, gerador etc.), nunca "serviço prestado" (recibo/fatura é o documento correto para locação, questão fiscal) | "[retranca] \| EMISSÃO DE RECIBO (ou FATURA — a palavra varia, tanto faz) \| REF. LOCAÇÃO - [MÊS] (ou "- P.X/Y" se for locação parcelada) \| (ENVIAR ATÉ DD.MM) \| [FORNECEDOR]" — NUNCA leva "E SERVIÇOS" no Ref. |
+| REC + NF | Fornecedor que fatura em parte recibo (locação) + parte nota fiscal (serviço) — corpo do e-mail numerado 1, 2 (e mais, se houver mais linhas), um bloco pra cada documento (seção 3.2.1) | "[retranca] \| EMISSÃO DE FATURA \| REF. LOCAÇÃO E SERVIÇOS - [MÊS] \| (ENVIAR ATÉ DD.MM) \| [FORNECEDOR]" — SEMPRE usa a palavra "FATURA" (nunca "RECIBO" sozinho) e SEMPRE leva "E SERVIÇOS" no Ref. |
 
-Regra crítica: em casos de locação, o e-mail NUNCA pode usar a expressão "serviço prestado" — sempre "locação" (questão fiscal). Colaboradores normalmente são só JOB ou mensal; a distinção PACOTE/REC+NF é mais comum entre fornecedores.
+Regra crítica: em casos de locação/recibo, o e-mail NUNCA pode usar a expressão "serviço prestado" em nenhuma hipótese — a frase é exclusiva de nota fiscal de serviço. Colaboradores normalmente são só JOB ou mensal; a distinção PACOTE/REC/REC+NF é mais comum entre fornecedores.
+
+### 3.2.1 Caso especial — Fornecedor/Locação (REC e REC+NF)
+Esses casos aparecem no filtro Status Box = "PROGRAMAR ATÉ" como UMA OU MAIS linhas separadas na planilha para o mesmo fornecedor/vencimento — pode ser só REC (uma ou mais linhas, ex.: locação parcelada), só NF, ou a combinação REC+NF. NÃO existe nome de colaborador nesses casos, pois é uma empresa fazendo locação, não uma pessoa prestando serviço.
+
+Exemplo real confirmado (planilha, aba Notas — seção 3.2, colunas H/I/J/K):
+- Linha 1 — Descrição (coluna J): "(REC) LOCAÇÃO DE GERADOR - 23/08 A 27/08 - REUNION" | Fornecedor (coluna H): "POWER BRASIL LOCAÇÃO E COMERCIO DE GRUPOS GERADORES LTDA" | Valor: R$ 12.856,00
+- Linha 2 — Descrição (coluna J): "(NF) SERVIÇOS DE GERADORISTA - 23/08 A 27/08 - REUNION" | mesmo Fornecedor | Valor: R$ 3.214,00
+
+Segundo exemplo real confirmado (WTECH EVENTOS LTDA, mesma estrutura REC+NF): Linha 1 = RECIBO de "LOCAÇÃO DE ESTRUTURA E MAQUINÁRIA REUNION" (22/08 A 27/08); Linha 2 = NOTA FISCAL de "SERVIÇOS DE GAFFER REUNION" (22/08 A 27/08).
+
+Terceiro exemplo real confirmado (MEDIA ARTS ENTERTAINMENT & FILM PRODUCTIONS LTDA, caso REC PURO — só uma linha, sem NF): RECIBO de "LOCAÇÃO DE EQUIPAMENTOS DE INGEST" (24/08 A 28/08).
+
+Regras de montagem:
+- Dados vêm da coluna H (Fornecedor) + do período/serviço extraídos da coluna J (data primeiro, depois a descrição do serviço quando é NF, ou a menção à locação quando é REC).
+- A IA precisa identificar, quando não houver uma marcação inequívoca (como o prefixo "(REC)"/"(NF)" do exemplo acima), qual das linhas é NF e qual é REC — sem isso estar explícito, NÃO adivinhar (regra geral de segurança do item 6 acima: alerta via Telegram).
+- **Ordem dos blocos CONFIRMADA por 2 exemplos reais (POWER BRASIL e WTECH)**: quando há REC+NF, o bloco 1 é SEMPRE o RECIBO, o bloco 2 é SEMPRE a NOTA FISCAL — ordem fixa, não varia caso a caso.
+- **Número de blocos acompanha o número de linhas encontradas** na planilha para aquele fornecedor/vencimento — não é sempre 2. Pode ser 1 linha só (REC puro, como o exemplo da Media Arts), 2 linhas (REC+NF, como Power Brasil/WTECH), ou mais de 2 (ex.: locação parcelada em várias linhas — indício real: assunto com "REF. LOCAÇÃO - P. 2/3", sugerindo parcelamento em 3 partes). Numerar os blocos na ordem em que aparecem na planilha.
+- O corpo do bloco de RECIBO NUNCA contém a frase "Serviço Prestado" — usa "Fornecedor:" e o texto da locação; o corpo do bloco de NOTA FISCAL usa "Serviço Prestado:" normalmente. Não pode inverter isso.
+- O nome do projeto (ex.: "REUNION", presente na coluna J no exemplo) NÃO é replicado no corpo do e-mail — só aparece no "Ref." e no assunto.
+- **Regra do assunto (diferencia REC puro de REC+NF pelo texto do "Ref.", não pela palavra RECIBO/FATURA)**:
+  - REC puro (só locação, 1 ou mais linhas): `REF. LOCAÇÃO - [MÊS]` (ou `- P.X/Y` se parcelado) — NUNCA leva "E SERVIÇOS". A palavra "EMISSÃO DE RECIBO" ou "EMISSÃO DE FATURA" pode variar livremente, é indiferente.
+  - REC + NF (locação + serviço): `REF. LOCAÇÃO E SERVIÇOS - [MÊS]` — SEMPRE leva "E SERVIÇOS", e SEMPRE usa a palavra "EMISSÃO DE FATURA" (nunca "EMISSÃO DE RECIBO" sozinho nesse caso, por padrão observado em todos os exemplos reais).
+
+Corpo do e-mail modelo (exemplo real, REC + NF juntos):
+```
+Olá! Tudo bem?
+
+Seguem as instruções para a emissão do RECIBO e da NOTA FISCAL que deverão ser enviadas até o dia 25/08 (TERÇA-FEIRA) com VENCIMENTO para 20/09/26:
+
+Tomador
+BOXFISH PRODUTORA DE PROGRAMAS TELEVISIVOS, INTERNET E FILMES PUBLICITÁRIOS LTDA.
+Endereço: Rua Butantã, 194, sala 24, Pinheiros.
+CEP 05.424-000 - São Paulo, SP
+CNPJ: 14.788.649/0001-23
+IM: 4.436.095-9
+IE: ISENTA
+
+1- Emitir RECIBO no valor de R$ 12.856,00 com os dados abaixo no corpo do recibo:
+Ref. "SMTC - REUNION"
+Fornecedor: POWER BRASIL LOCAÇÃO E COMERCIO DE GRUPOS GERADORES LTDA
+Período de 23/08 A 27/08 - LOCAÇÃO DE GERADOR
+Dados bancários:
+chave pix:
+---------------------------------------------------------------------
+2 - Emitir NOTA FISCAL no valor de R$ 3.214,00 com os dados abaixo no corpo da nota:
+Ref. "SMTC - REUNION"
+Fornecedor: POWER BRASIL LOCAÇÃO E COMERCIO DE GRUPOS GERADORES LTDA
+Serviço Prestado: SERVIÇOS DE GERADORISTA
+Período de 23/08 A 27/08
+Dados bancários:
+chave pix:
+---------------------------------------------------------------------
+Importante: Peço a gentileza de enviar a sua nota nestes e-mails:
+financeiro@novorealitybox.com
+financeiro1@novorealitybox.com
+
+"Os dados bancários considerados para pagamento são os que estão cadastrados..."
+
+Beijos e Muito Obrigada! 🌷
+```
+
+Corpo do e-mail modelo (exemplo real, REC puro — só locação, sem NF na mesma remessa; assunto real: "SMTC - S01 | REUNION | EMISSÃO DE RECIBO | REF. LOCAÇÃO - AGO | (ENVIAR ATÉ 25.08) | MEDIA ARTS"):
+```
+Olá! Tudo bem?
+
+Seguem as instruções para a emissão da sua FATURA que deverá ser enviada até o dia 25/08 com vencimento em 20/09/2026
+
+Tomador
+
+BOXFISH PRODUTORA DE PROGRAMAS TELEVISIVOS, INTERNET E FILMES PUBLICITÁRIOS LTDA.
+
+Endereço: Rua Butantã, 194, sala 24, Pinheiros.
+
+CEP 05.424-000 - São Paulo, SP
+
+CNPJ: 14.788.649/0001-23
+
+IM: 4.436.095-9
+
+IE: ISENTA
+
+1- Emitir RECIBO no valor de R$ 5.000,00 com os dados abaixo:
+
+Ref. "SMTC - REUNION"
+
+Fornecedor: MEDIA ARTS ENTERTAINMENT & FILM PRODUCTIONS LTDA
+
+Período:  24/08 A 28/08 - LOCAÇÃO DE EQUIPAMENTOS DE INGEST
+
+Dados bancários:
+
+Chave pix:
+
+---------------------------------------------------------------------
+
+Importante: Peço a gentileza de enviar a sua nota nestes e-mails:
+financeiro@novorealitybox.com
+financeiro1@novorealitybox.com
+
+"Os dados bancários considerados para pagamento são os que estão cadastrados..."
+
+Muito obrigada!
+
+Beijo, 🌷
+```
+Note que quando é REC puro (sem NF), o corpo do e-mail refere-se ao documento como "FATURA" na frase de abertura ("emissão da sua FATURA"), mesmo o bloco numerado dizendo "Emitir RECIBO" — não há inconsistência, é assim mesmo no modelo real.
 
 ### 3.3 Exemplo real — e-mail de pedido de nota (Reunion)
 Réplica linha a linha do modelo enviado pela Michelle — mesmo espaçamento (linha em branco entre cada campo, mas sem espaço extra dentro do bloco do Tomador e dentro do aviso de dados bancários), mesmo negrito, grifo amarelo, cor do aviso e emoji.
@@ -257,7 +386,12 @@ Valores iniciais de `apelidos.json` (seed da primeira entrega, seção 3.1.1):
 Tudo roda em nuvem, dentro do próprio n8n — sem script separado rodando por fora (cron), e sem depender de nenhuma máquina/notebook ligado.
 - Orquestração: n8n Community Edition (self-hosted, gratuito), com nodes nativos de Box, Google Drive e Gmail.
 - Regras determinísticas (datas, zero-padding, cálculo de lotes por janela de tempo — seção 5.0): node de Code do n8n, roda dentro da execução do workflow.
-- Extração de dados do PDF/imagem da nota fiscal: node de IA do n8n chamando a API da Claude com o anexo, devolvendo os dados em JSON.
+- Extração de dados do PDF/imagem da nota fiscal (Fase 2): node de IA do n8n chamando a API da Claude com o anexo, devolvendo os dados em JSON.
+- CORREÇÃO IMPORTANTE: a Fase 1 também usa IA (API da Claude), não é 100% determinística como definido anteriormente. Os pontos que precisam de IA na Fase 1 (seção 3.2):
+  - Distinguir, dentro da coluna J (Descrição), o que é Cargo e o que é Nome do colaborador, quando a posição/composição do texto é ambígua (ex.: "AGENCIAMENTO DE FIGURAÇÃO" vs. "LARISSA CRISTIANE DO AMARAL GOMES" — não dá pra saber qual é qual só por posição ou regex).
+  - Nos casos de locação/fornecedor (REC / REC+NF — seção 3.2.1), identificar qual linha da planilha corresponde a NOTA FISCAL e qual corresponde a RECIBO, quando isso não estiver marcado de forma inequívoca na Descrição.
+  - Reconhecer e remover menções ao nome do projeto (REUNION, AREP, SOFT PRE, PNS/PNL etc.) de dentro do texto da coluna J antes de montar o corpo do e-mail — esse nome não deve ser replicado no corpo, pois já aparece no assunto.
+  - Regra geral de segurança (vale para toda a Fase 1, não só estes 3 pontos): sempre que o agente encontrar uma situação que não foi mapeada nesta especificação, ele NUNCA pode inventar ou adivinhar. Ele para o processamento daquela linha, envia um alerta via Telegram para a Michelle descrevendo o ponto de indecisão, onde foi encontrado (planilha/linha/projeto) e o que ele já fez até ali, para que ela resolva manualmente.
 - Hospedagem: instância e2-micro do Google Cloud Free Tier (gratuita para sempre, região EUA), rodando o n8n 24/7 sem custo nem dependência de notebook.
 - Erros: "Error Workflow" nativo do n8n — qualquer falha dispara aviso automático no Telegram.
 - Credencial de IA: no Claude Console, o cartão de pagamento fica no nível da conta/organização (não por chave nem por workspace) — todas as chaves de uma mesma conta são cobradas no mesmo cartão. Por isso o projeto usa **duas contas Anthropic separadas**: (1) chave de dev/homologação `n8n-boxfish-notas-hml`, criada na conta pessoal do Claudio, cartão dele; (2) chave de produção, a criar numa conta nova aberta com o e-mail da Michelle (michelle.mimiaguia@gmail.com), cartão dela — contas e cobranças 100% independentes. No n8n isso vira duas credenciais separadas ("Claude account (dev)" e "Claude account (produção)"), trocadas conforme o perfil ativo (homolog/produção), do mesmo jeito que já é feito com os e-mails de teste (seção 7.4). Recomendado usar o modelo **Claude Haiku 4.5** para a extração de dados do PDF (tarefa estruturada e repetitiva, custo bem menor que Sonnet/Opus, com qualidade suficiente para esse tipo de extração).
@@ -285,8 +419,24 @@ PENDENTE: Confirmar com teste real, na implementação, se o campo "lock" da API
 - Alertas de cobrança disparada automaticamente.
 - Relatório ao final de cada execução: rascunhos criados/atualizados, notas processadas, itens pendentes de revisão manual.
 
-### 7.4 Ambiente de homologação
-Um perfil extra ("homolog") usa os e-mails de teste do Claudio no lugar dos destinatários reais. Enquanto o ambiente de produção mantiver os e-mails em rascunho, essa é a política padrão — nada é enviado automaticamente sem revisão humana.
+### 7.4 Ambiente vs. modo de execução (dois eixos independentes)
+São duas variáveis SEPARADAS, que não devem ser confundidas nem amarradas uma à outra:
+
+**Eixo 1 — AMBIENTE (`homolog` / `produção`)**: define PRA QUEM vai o e-mail e QUAL credencial de API é usada.
+- `homolog`: destinatários trocados pelos e-mails de teste do Claudio (`dinhoolhosazuis@gmail.com`, `grandesnegocioseoportunidades@gmail.com` — seção 6.1), usa a credencial "Claude account (dev)".
+- `produção`: destinatários reais (Danielle, Vanessa, colaboradores de verdade), usa a credencial "Claude account (produção)".
+
+**Eixo 2 — `MODO_EXECUCAO` (`rascunho` / `automatico`)** (seção 3.1.3): define COMO a automação age, independente de pra quem está mandando.
+- `rascunho`: e-mail fica em RASCUNHO no Gmail; Status Box (coluna L) fica manual (Michelle muda à mão).
+- `automatico`: e-mail é enviado direto (ou a data de disparo é programada); Status Box fica 100% automático.
+
+Por serem independentes, existem 4 combinações possíveis:
+| | rascunho | automático |
+|---|---|---|
+| **homolog** | testar o fluxo com segurança, nada real envolvido | testar o ciclo completo de envio automático, mas só com destinatários fake |
+| **produção** | dados reais, mas ainda em rascunho/manual, para a Michelle acompanhar de perto | fluxo 100% real e automatizado (objetivo final, só depois de validar tudo) |
+
+**Ordem de inicialização definida por Claudio**: a primeira execução, e toda a validação inicial da Fase 1, deve rodar em **`homolog` + `rascunho`** — nenhuma execução em `produção` (mesmo em modo rascunho) antes de validar completamente em homologação. A progressão esperada é: `homolog`+`rascunho` → (opcional: `homolog`+`automatico`, pra validar o ciclo completo com segurança) → `produção`+`rascunho` (estado atual do MVP, uma vez liberado) → `produção`+`automatico` (só depois de aprovado rodar 100% automatizado).
 
 ## 8. Acessos validados
 | Item | Status |
@@ -327,7 +477,7 @@ PENDENTE: Escopo de Recibos de Reembolso (RDP'S) — fora desta automação por 
 | 4.1 | Criar chave de API de dev/homologação (`n8n-boxfish-notas-hml`) no Claude Console — CONCLUÍDO | Claudio |
 | 4.2 | Criar conta separada no Claude Console com o e-mail da Michelle, cadastrar o cartão dela e gerar a chave de API de produção — CONCLUÍDO | Michelle |
 | 5 | Claude Code monta os workflows completos (JSON) das 4 fases + perfis de projeto | Claude Code |
-| 6 | Importar os workflows no n8n e validar em ambiente de homologação | Claudio |
+| 6 | Importar os workflows no n8n e validar em `homolog` + `rascunho` (seção 7.4) — nenhuma execução em `produção` antes disso | Claudio |
 | 7 | Resolver as pendências da seção 9 antes de cada fase entrar em produção | Claudio + Michelle |
 
 
