@@ -245,6 +245,7 @@ Confirmado: o link no e-mail do Danilo também leva o mesmo grifo azul-claro usa
   - Se ela responder dentro de 8h: executar a ação que ela indicou.
   - Se não responder em 8h: reenviar o lembrete pelo Telegram.
   - Se não responder em mais 18h (26h no total, desde a 1ª pergunta): encerrar o ciclo para aquela nota, sem ação automática — fica pendente.
+  - **Correlação da resposta quando há mais de uma pergunta pendente ao mesmo tempo**: usar o "responder" (reply) da mensagem do Telegram como forma de identificar a qual pergunta a resposta se refere. Se a Michelle responder SEM usar essa função (mensagem solta, sem reply a nenhuma pergunta específica) e houver mais de uma pendência aberta: **NÃO adivinhar** qual pergunta ela quis responder (nunca assumir a mais antiga por padrão) — reenviar a pergunta, pedindo explicitamente que ela use a função "responder" da mensagem correspondente àquela nota específica antes de prosseguir.
 - Atualizar a planilha do Box: coluna D = tipo de documento, coluna E = número da nota (6 dígitos), coluna F = data de emissão.
 - Atualizar Status Box → "RECEBIDA MI".
 - Salvar a nota no Drive particular da Michelle (substitui o salvamento local), na pasta do projeto, com a retranca abaixo.
