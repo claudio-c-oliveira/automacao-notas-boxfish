@@ -1,0 +1,124 @@
+{
+  "name": "Resumo Diário — Notas Fiscais Box Fish",
+  "meta": {
+    "description": "Resumo diário consolidado (spec.md seção 7.3, commit 460aa40): enviado automaticamente ao fim do dia via Telegram, e disponível sob demanda via comando /resumo. Lê /config/log_diario.json, alimentado por cada execução das fases (ver 'Preparar log_diario.json atualizado' em workflows/fase1_solicitacao_nota.json)."
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "rule": { "interval": [{ "field": "days", "daysInterval": 1, "triggerAtHour": 23 }] }
+      },
+      "id": "r01-schedule-fim-dia",
+      "name": "Schedule Trigger (fim do dia, 23h)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "updates": ["message"]
+      },
+      "id": "r02-telegram-trigger",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.1,
+      "position": [0, 200],
+      "credentials": { "telegramApi": { "id": "REPLACE", "name": "Telegram account" } },
+      "notes": "Escuta todas as mensagens do bot — filtradas pro comando /resumo no node seguinte."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            { "leftValue": "={{ ($json.message && $json.message.text || '').trim().toLowerCase() }}", "rightValue": "/resumo", "operator": { "type": "string", "operation": "equals" } }
+          ]
+        }
+      },
+      "id": "r03-if-comando-resumo",
+      "name": "IF — Comando é /resumo?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [220, 200]
+    },
+    {
+      "parameters": {},
+      "id": "r04-noop-ignorar",
+      "name": "NoOp — Ignorar (não é /resumo)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [440, 320]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Normaliza a origem do disparo: agendado (fim do dia, chat fixo da Michelle) ou\n// sob demanda (/resumo, responde no mesmo chat de onde veio o comando).\nconst viaComando = $input.first().json.message !== undefined;\nconst chatId = viaComando ? $input.first().json.message.chat.id : 'REPLACE_WITH_MICHELLE_TELEGRAM_CHAT_ID';\nreturn [{ json: { chatId } }];"
+      },
+      "id": "r05-resolver-chat",
+      "name": "Resolver chat de destino",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 100]
+    },
+    {
+      "parameters": { "operation": "read", "fileSelector": "/config/log_diario.json", "options": {} },
+      "id": "r07-ler-log",
+      "name": "Ler log_diario.json",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [880, 100],
+      "notes": "Mesmo arquivo alimentado por 'Preparar log_diario.json atualizado' em fase1_solicitacao_nota.json (e, no futuro, pelas Fases 2 e 3+4)."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Monta o resumo do dia corrente a partir do log de eventos (seção 7.3).\n// Cada entrada do log tem { timestamp, fase, resumo }. Soma os campos numéricos\n// e concatena os arrays (ex.: alertasEncerramento) de todas as execuções de hoje.\n\nfunction parseBinaryJson(item) {\n  if (!item || !item.binary || !item.binary.data) return [];\n  try {\n    return JSON.parse(Buffer.from(item.binary.data.data, 'base64').toString('utf8'));\n  } catch (e) {\n    return [];\n  }\n}\n\nconst log = parseBinaryJson($('Ler log_diario.json').first());\nconst chatId = $('Resolver chat de destino').first().json.chatId;\n\nconst hojeISO = new Date().toISOString().slice(0, 10);\nconst entradasHoje = log.filter((e) => (e.timestamp || '').slice(0, 10) === hojeISO);\n\nif (entradasHoje.length === 0) {\n  return [{ json: { chatId, texto: '📅 Resumo do dia (' + hojeISO.split('-').reverse().join('/') + ')\\n\\nNenhuma execução registrada hoje ainda.' } }];\n}\n\nconst total = {};\nconst alertasEncerramento = [];\nconst porFase = {};\n\nfor (const entrada of entradasHoje) {\n  const fase = entrada.fase || 'desconhecida';\n  porFase[fase] = (porFase[fase] || 0) + 1;\n  const r = entrada.resumo || {};\n  for (const chave of Object.keys(r)) {\n    if (typeof r[chave] === 'number') {\n      total[chave] = (total[chave] || 0) + r[chave];\n    } else if (Array.isArray(r[chave]) && chave === 'alertasEncerramento') {\n      alertasEncerramento.push(...r[chave]);\n    }\n  }\n}\n\nconst linhas = [\n  '📅 *Resumo do dia* (' + hojeISO.split('-').reverse().join('/') + ')',\n  '',\n  '*Execuções rodadas:* ' + entradasHoje.length + ' (' + Object.entries(porFase).map(([f, n]) => f + ': ' + n).join(', ') + ')',\n  '',\n  '*Pedidos/cobranças*',\n  '• Rascunhos criados: ' + (total.rascunhosCriados || 0),\n  '• Envios diretos: ' + (total.enviosDiretos || 0),\n  '',\n  '*Pendências*',\n  '• Pendentes de contrato: ' + (total.pendentesContrato || 0),\n  '• Com lacuna de informação (FALTA INFORMAÇÃO): ' + (total.comLacunaInformacao || 0),\n  '• Situações não mapeadas (alertadas): ' + (total.alertasSituacaoNaoMapeada || 0),\n  '• Correções de contrato aplicadas: ' + (total.correcoesContrato || 0),\n  '',\n  '*Ciclos encerrados sem resposta:* ' + alertasEncerramento.length,\n];\nif (alertasEncerramento.length > 0) {\n  linhas.push(...alertasEncerramento.map((a) => '  - ' + (a.colaboradorOuFornecedor || '?') + ' (' + (a.projetoId || '?') + ')'));\n}\n\nreturn [{ json: { chatId, texto: linhas.join('\\n') } }];"
+      },
+      "id": "r08-montar-resumo",
+      "name": "Montar resumo do dia",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1100, 100],
+      "notes": "Formato é ponto de partida, não definitivo (seção 7.3) — ajustar categorias/detalhe se a Michelle sentir falta de algo. Hoje só reflete a Fase 1; ganha mais categorias (notas recebidas/arquivadas etc.) quando as Fases 2 e 3+4 passarem a gravar no mesmo log_diario.json."
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "={{ $json.texto }}",
+        "additionalFields": { "parse_mode": "Markdown" }
+      },
+      "id": "r09-telegram-enviar",
+      "name": "Telegram — Enviar resumo",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1320, 100],
+      "credentials": { "telegramApi": { "id": "REPLACE", "name": "Telegram account" } }
+    }
+  ],
+  "connections": {
+    "Schedule Trigger (fim do dia, 23h)": {
+      "main": [[{ "node": "Resolver chat de destino", "type": "main", "index": 0 }]]
+    },
+    "Telegram Trigger": {
+      "main": [[{ "node": "IF — Comando é /resumo?", "type": "main", "index": 0 }]]
+    },
+    "IF — Comando é /resumo?": {
+      "main": [
+        [{ "node": "Resolver chat de destino", "type": "main", "index": 0 }],
+        [{ "node": "NoOp — Ignorar (não é /resumo)", "type": "main", "index": 0 }]
+      ]
+    },
+    "Resolver chat de destino": {
+      "main": [[{ "node": "Ler log_diario.json", "type": "main", "index": 0 }]]
+    },
+    "Ler log_diario.json": {
+      "main": [[{ "node": "Montar resumo do dia", "type": "main", "index": 0 }]]
+    },
+    "Montar resumo do dia": {
+      "main": [[{ "node": "Telegram — Enviar resumo", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "REPLACE_WITH_error_handler_WORKFLOW_ID"
+  },
+  "staticData": null
+}

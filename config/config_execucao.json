@@ -1,3 +1,5 @@
 {
-  "modo": "rascunho"
+  "ambiente": "homolog",
+  "modo": "rascunho",
+  "limite_linhas_execucao": null
 }
