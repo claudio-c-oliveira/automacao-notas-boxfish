@@ -1,7 +1,7 @@
 {
   "name": "Fase 2 — Recebimento e validação da nota",
   "meta": {
-    "description": "Monitora e-mails com NF/recibo anexado (spec.md seção 4): thread conhecida (via threadId em cobrancas.json) ou avulso (extração + match via IA). Chama fase2_finalizar_nota.json (Execute Workflow) pra atualizar a planilha e fazer os 2 salvamentos em paralelo. Sem match confiável: registra pendência e pergunta no Telegram (seção 4, ciclo 8h/18h tratado em fase2_verificar_pendencias.json)."
+    "description": "Monitora e-mails com NF/recibo anexado (spec.md seção 4): thread conhecida (via threadId em cobrancas.json) ou avulso (extração + match via IA). Chama fase2_finalizar_nota.json (Execute Workflow) pra atualizar a planilha e fazer os 2 salvamentos em paralelo. Sem match confiável: registra pendência e pergunta no Telegram (seção 4, ciclo 8h/18h tratado em fase2_verificar_pendencias.json). Branch dev/homolog x produção completado nos 2 pontos de chamada de IA (extração do anexo e casamento com a planilha) — espelha o padrão já usado na Fase 1 (seção 7.4)."
   },
   "nodes": [
     {
@@ -274,41 +274,6 @@
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "https://api.anthropic.com/v1/messages",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "anthropicApi",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "anthropic-version",
-              "value": "2023-06-01"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({\n  model: 'claude-haiku-4-5', max_tokens: 1024,\n  system: \"Voce extrai dados de identificacao de uma nota fiscal ou recibo (PDF ou imagem) recebido por e-mail de um colaborador/fornecedor da produtora Box Fish.\\n\\nResponda SOMENTE com um objeto JSON (sem markdown, sem texto fora do JSON):\\n{\\\"nomeOuRazaoSocial\\\": string|null, \\\"projetoRef\\\": string|null, \\\"valor\\\": number|null, \\\"competencia\\\": string|null, \\\"numeroNota\\\": string|null, \\\"dataEmissao\\\": \\\"DD/MM/AAAA\\\"|null, \\\"tipoDocumento\\\": \\\"NF\\\"|\\\"RECIBO\\\"|\\\"FATURA\\\"|null, \\\"situacaoNaoMapeada\\\": string|null}\\n\\nRegras: nomeOuRazaoSocial e o nome do colaborador OU a razao social do fornecedor EMISSOR do documento (quem esta emitindo, nao a Box Fish, que e sempre a tomadora). projetoRef e o texto \\\"Ref.\\\" do documento, se houver. numeroNota so os digitos. Se nao conseguir ler algum campo com confianca, deixe null nesse campo especifico - nunca invente. Se o documento for ilegivel ou nao reconhecivel como nota/recibo, preencha situacaoNaoMapeada.\",\n  messages: [{ role: 'user', content: [\n    { type: $binary.data.mimeType === 'application/pdf' ? 'document' : 'image', source: { type: 'base64', media_type: $binary.data.mimeType, data: $binary.data.data } },\n    { type: 'text', text: 'Extraia os dados desta nota fiscal/recibo conforme as instruções do system prompt.' }\n  ] }]\n}) }}"
-      },
-      "id": "f2r-17-ia-extracao",
-      "name": "IA — Extrair dados do anexo (Claude, produção)",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        2420,
-        80
-      ],
-      "credentials": {
-        "anthropicApi": {
-          "id": "REPLACE",
-          "name": "Claude account (produção)"
-        }
-      },
-      "notes": "PRODUÇÃO. Ambiente homolog troca a credencial pra 'Claude account (dev)' — não há mais arquivo .homolog.json separado (mesma decisão da Fase 1); ajustar via um par de nodes com IF de ambiente igual fizemos lá, se quiser branch dev/produção aqui também (simplificado nesta 1ª entrega: só produção, dev é TODO)."
-    },
-    {
-      "parameters": {
         "jsCode": "// Interpreta a resposta da IA de extração (nunca lança exceção — regra geral\n// de segurança, seção 3.2 item 6 / seção 4: nunca adivinhar).\nfunction parseRespostaIA(t) {\n  try { const o = JSON.parse(t); if (!o) return { situacaoNaoMapeada: 'Resposta vazia' }; return o; }\n  catch (e) { return { situacaoNaoMapeada: 'Resposta da IA não é JSON válido: ' + String(t).slice(0,300) }; }\n}\nreturn $input.all().map((item) => {\n  const texto = item.json.content && item.json.content[0] ? item.json.content[0].text : '';\n  return { json: { ...item.json, extracao: parseRespostaIA(texto) } };\n});"
       },
       "id": "f2r-18-interpretar-extracao",
@@ -316,7 +281,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2640,
+        2900,
         80
       ]
     },
@@ -340,44 +305,9 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
-        2860,
+        3120,
         80
       ]
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "https://api.anthropic.com/v1/messages",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "anthropicApi",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "anthropic-version",
-              "value": "2023-06-01"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({\n  model: 'claude-haiku-4-5', max_tokens: 512,\n  system: \"Voce recebe um nome de colaborador ou razao social extraido de uma nota fiscal, e uma lista de nomes/razoes sociais candidatos vindos de uma planilha (cada um com um identificador de linha).\\n\\nResponda SOMENTE com um objeto JSON (sem markdown, sem texto fora do JSON):\\n{\\\"linhaEncontrada\\\": <identificador da linha, do jeito que veio na lista>|null, \\\"confiavel\\\": boolean, \\\"situacaoNaoMapeada\\\": string|null}\\n\\nRegras: considere variacoes de acentuacao, maiusculas/minusculas, abreviacoes e pequena diferenca de escrita como o MESMO nome. confiavel so e true se voce tiver certeza razoavel - se houver ambiguidade real entre 2+ candidatos parecidos, ou nenhum candidato parecido, use confiavel=false e linhaEncontrada=null. Nunca invente uma linha que nao esteja na lista de candidatos.\",\n  messages: [{ role: 'user', content: JSON.stringify({ nomeExtraido: $json.extracao.nomeOuRazaoSocial, candidatos: $json.roster.filter(r => r.statusBox && r.statusBox.indexOf('SOLICITADA') === 0 === false ? true : true).map(r => ({chave: r.chave, nome: r.nome, fornecedor: r.fornecedor})) }) }]\n}) }}"
-      },
-      "id": "f2r-20-ia-casar",
-      "name": "IA — Casar com a planilha (Claude, produção)",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        3080,
-        -60
-      ],
-      "credentials": {
-        "anthropicApi": {
-          "id": "REPLACE",
-          "name": "Claude account (produção)"
-        }
-      },
-      "notes": "Candidatos = roster inteiro (todos os projetos) nesta 1ª versão — poderia ser restrito pelo projetoRef extraído (seção 4), simplificado aqui. Ambiente dev/homolog: mesma observação do node de extração."
     },
     {
       "parameters": {
@@ -519,6 +449,218 @@
       "position": [
         3520,
         200
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $json.config.ambiente }}",
+              "rightValue": "homolog",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      },
+      "id": "f2r-17a-if-ambiente-extracao",
+      "name": "IF — Ambiente = homolog? (extração)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2420,
+        80
+      ],
+      "notes": "Eixo 1 (spec.md seção 7.4) — decide qual credencial de IA usar. homolog usa 'Claude account (dev)', produção usa 'Claude account (produção)'."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "anthropicApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  model: 'claude-haiku-4-5', max_tokens: 1024,\n  system: \"Voce extrai dados de identificacao de uma nota fiscal ou recibo (PDF ou imagem) recebido por e-mail de um colaborador/fornecedor da produtora Box Fish.\\n\\nResponda SOMENTE com um objeto JSON (sem markdown, sem texto fora do JSON):\\n{\\\"nomeOuRazaoSocial\\\": string|null, \\\"projetoRef\\\": string|null, \\\"valor\\\": number|null, \\\"competencia\\\": string|null, \\\"numeroNota\\\": string|null, \\\"dataEmissao\\\": \\\"DD/MM/AAAA\\\"|null, \\\"tipoDocumento\\\": \\\"NF\\\"|\\\"RECIBO\\\"|\\\"FATURA\\\"|null, \\\"situacaoNaoMapeada\\\": string|null}\\n\\nRegras: nomeOuRazaoSocial e o nome do colaborador OU a razao social do fornecedor EMISSOR do documento (quem esta emitindo, nao a Box Fish, que e sempre a tomadora). projetoRef e o texto \\\"Ref.\\\" do documento, se houver. numeroNota so os digitos. Se nao conseguir ler algum campo com confianca, deixe null nesse campo especifico - nunca invente. Se o documento for ilegivel ou nao reconhecivel como nota/recibo, preencha situacaoNaoMapeada.\",\n  messages: [{ role: 'user', content: [\n    { type: $binary.data.mimeType === 'application/pdf' ? 'document' : 'image', source: { type: 'base64', media_type: $binary.data.mimeType, data: $binary.data.data } },\n    { type: 'text', text: 'Extraia os dados desta nota fiscal/recibo conforme as instruções do system prompt.' }\n  ] }]\n}) }}"
+      },
+      "id": "f2r-17b-ia-extracao-dev",
+      "name": "IA — Extrair dados do anexo (Claude, dev/homolog)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2640,
+        20
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "REPLACE",
+          "name": "Claude account (dev)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "anthropicApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  model: 'claude-haiku-4-5', max_tokens: 1024,\n  system: \"Voce extrai dados de identificacao de uma nota fiscal ou recibo (PDF ou imagem) recebido por e-mail de um colaborador/fornecedor da produtora Box Fish.\\n\\nResponda SOMENTE com um objeto JSON (sem markdown, sem texto fora do JSON):\\n{\\\"nomeOuRazaoSocial\\\": string|null, \\\"projetoRef\\\": string|null, \\\"valor\\\": number|null, \\\"competencia\\\": string|null, \\\"numeroNota\\\": string|null, \\\"dataEmissao\\\": \\\"DD/MM/AAAA\\\"|null, \\\"tipoDocumento\\\": \\\"NF\\\"|\\\"RECIBO\\\"|\\\"FATURA\\\"|null, \\\"situacaoNaoMapeada\\\": string|null}\\n\\nRegras: nomeOuRazaoSocial e o nome do colaborador OU a razao social do fornecedor EMISSOR do documento (quem esta emitindo, nao a Box Fish, que e sempre a tomadora). projetoRef e o texto \\\"Ref.\\\" do documento, se houver. numeroNota so os digitos. Se nao conseguir ler algum campo com confianca, deixe null nesse campo especifico - nunca invente. Se o documento for ilegivel ou nao reconhecivel como nota/recibo, preencha situacaoNaoMapeada.\",\n  messages: [{ role: 'user', content: [\n    { type: $binary.data.mimeType === 'application/pdf' ? 'document' : 'image', source: { type: 'base64', media_type: $binary.data.mimeType, data: $binary.data.data } },\n    { type: 'text', text: 'Extraia os dados desta nota fiscal/recibo conforme as instruções do system prompt.' }\n  ] }]\n}) }}"
+      },
+      "id": "f2r-17c-ia-extracao-prod",
+      "name": "IA — Extrair dados do anexo (Claude, produção)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2640,
+        140
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "REPLACE",
+          "name": "Claude account (produção)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "numberInputs": 2
+      },
+      "id": "f2r-17d-merge-extracao",
+      "name": "Merge — resposta IA (extração)",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        2860,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $json.config.ambiente }}",
+              "rightValue": "homolog",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      },
+      "id": "f2r-20a-if-ambiente-casar",
+      "name": "IF — Ambiente = homolog? (casar)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        3080,
+        -60
+      ],
+      "notes": "Eixo 1 (spec.md seção 7.4) — decide qual credencial de IA usar. homolog usa 'Claude account (dev)', produção usa 'Claude account (produção)'."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "anthropicApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  model: 'claude-haiku-4-5', max_tokens: 512,\n  system: \"Voce recebe um nome de colaborador ou razao social extraido de uma nota fiscal, e uma lista de nomes/razoes sociais candidatos vindos de uma planilha (cada um com um identificador de linha).\\n\\nResponda SOMENTE com um objeto JSON (sem markdown, sem texto fora do JSON):\\n{\\\"linhaEncontrada\\\": <identificador da linha, do jeito que veio na lista>|null, \\\"confiavel\\\": boolean, \\\"situacaoNaoMapeada\\\": string|null}\\n\\nRegras: considere variacoes de acentuacao, maiusculas/minusculas, abreviacoes e pequena diferenca de escrita como o MESMO nome. confiavel so e true se voce tiver certeza razoavel - se houver ambiguidade real entre 2+ candidatos parecidos, ou nenhum candidato parecido, use confiavel=false e linhaEncontrada=null. Nunca invente uma linha que nao esteja na lista de candidatos.\",\n  messages: [{ role: 'user', content: JSON.stringify({ nomeExtraido: $json.extracao.nomeOuRazaoSocial, candidatos: $json.roster.map(r => ({chave: r.chave, nome: r.nome, fornecedor: r.fornecedor})) }) }]\n}) }}"
+      },
+      "id": "f2r-20b-ia-casar-dev",
+      "name": "IA — Casar com a planilha (Claude, dev/homolog)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3300,
+        -120
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "REPLACE",
+          "name": "Claude account (dev)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "anthropicApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  model: 'claude-haiku-4-5', max_tokens: 512,\n  system: \"Voce recebe um nome de colaborador ou razao social extraido de uma nota fiscal, e uma lista de nomes/razoes sociais candidatos vindos de uma planilha (cada um com um identificador de linha).\\n\\nResponda SOMENTE com um objeto JSON (sem markdown, sem texto fora do JSON):\\n{\\\"linhaEncontrada\\\": <identificador da linha, do jeito que veio na lista>|null, \\\"confiavel\\\": boolean, \\\"situacaoNaoMapeada\\\": string|null}\\n\\nRegras: considere variacoes de acentuacao, maiusculas/minusculas, abreviacoes e pequena diferenca de escrita como o MESMO nome. confiavel so e true se voce tiver certeza razoavel - se houver ambiguidade real entre 2+ candidatos parecidos, ou nenhum candidato parecido, use confiavel=false e linhaEncontrada=null. Nunca invente uma linha que nao esteja na lista de candidatos.\",\n  messages: [{ role: 'user', content: JSON.stringify({ nomeExtraido: $json.extracao.nomeOuRazaoSocial, candidatos: $json.roster.map(r => ({chave: r.chave, nome: r.nome, fornecedor: r.fornecedor})) }) }]\n}) }}"
+      },
+      "id": "f2r-20c-ia-casar-prod",
+      "name": "IA — Casar com a planilha (Claude, produção)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3300,
+        0
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "REPLACE",
+          "name": "Claude account (produção)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "numberInputs": 2
+      },
+      "id": "f2r-20d-merge-casar",
+      "name": "Merge — resposta IA (casar)",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        3520,
+        -60
       ]
     }
   ],
@@ -712,7 +854,7 @@
       "main": [
         [
           {
-            "node": "IA — Extrair dados do anexo (Claude, produção)",
+            "node": "IF — Ambiente = homolog? (extração)",
             "type": "main",
             "index": 0
           }
@@ -723,9 +865,9 @@
       "main": [
         [
           {
-            "node": "Interpretar extração da IA",
+            "node": "Merge — resposta IA (extração)",
             "type": "main",
-            "index": 0
+            "index": 1
           }
         ]
       ]
@@ -752,7 +894,7 @@
         ],
         [
           {
-            "node": "IA — Casar com a planilha (Claude, produção)",
+            "node": "IF — Ambiente = homolog? (casar)",
             "type": "main",
             "index": 0
           }
@@ -763,9 +905,9 @@
       "main": [
         [
           {
-            "node": "Interpretar match da IA",
+            "node": "Merge — resposta IA (casar)",
             "type": "main",
-            "index": 0
+            "index": 1
           }
         ]
       ]
@@ -848,6 +990,86 @@
         [
           {
             "node": "NoOp — fim (nota finalizada)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — Ambiente = homolog? (extração)": {
+      "main": [
+        [
+          {
+            "node": "IA — Extrair dados do anexo (Claude, dev/homolog)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "IA — Extrair dados do anexo (Claude, produção)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IA — Extrair dados do anexo (Claude, dev/homolog)": {
+      "main": [
+        [
+          {
+            "node": "Merge — resposta IA (extração)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge — resposta IA (extração)": {
+      "main": [
+        [
+          {
+            "node": "Interpretar extração da IA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — Ambiente = homolog? (casar)": {
+      "main": [
+        [
+          {
+            "node": "IA — Casar com a planilha (Claude, dev/homolog)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "IA — Casar com a planilha (Claude, produção)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IA — Casar com a planilha (Claude, dev/homolog)": {
+      "main": [
+        [
+          {
+            "node": "Merge — resposta IA (casar)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge — resposta IA (casar)": {
+      "main": [
+        [
+          {
+            "node": "Interpretar match da IA",
             "type": "main",
             "index": 0
           }
