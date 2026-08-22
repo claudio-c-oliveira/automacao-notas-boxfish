@@ -272,7 +272,7 @@ Salvar a nota com a retranca certa no **Drive particular da Michelle**. Importan
 **Salvamento 2 — arquivamento por função (oficial, definitivo):**
 Mover/copiar a nota desse pouso para dentro do Drive de trabalho (financeiro1@novorealitybox.com ou compartilhado da empresa), na estrutura já documentada: `FINANCEIRO > 08. NOTAS ARQUIVADAS > ARQUIVO DE NOTAS [PROJETO] > [código] - [CARGO]`.
 
-- Identificar a pasta: código vem da coluna correspondente, nome da função/cargo também. Se a pasta daquele código ainda não existir, criar seguindo a mesma nomenclatura das pastas já existentes.
+- Identificar a pasta: código vem da **coluna B ("CONTA NETFLIX")**, nome da função/cargo vem da **coluna C ("ÍTEM")**. O nome da coluna é literal — o código vem do próprio sistema de codificação de cargos da Netflix, usado porque os 3 projetos (AREP, Reunion, Soft Pré) são produções/reality shows da Netflix. Se a pasta daquele código ainda não existir, criar seguindo a mesma nomenclatura das pastas já existentes.
 - Padrão de nome de pasta por função — confirmado com exemplos reais: AREP usa "[código] - [CARGO]" (ex.: "1301 - DIRETOR GERAL"); Reunion usa "[código].R - [CARGO]" (ex.: "1301.R- DIRETOR GERAL", "7007.R - ACESSORIA JURÍDICA"); Soft Pré vai seguir o mesmo padrão do AREP ("[código] - [CARGO]") assim que surgirem os primeiros casos.
 - Credencial já configurada no n8n: **"Google Drive account"** (Google Drive OAuth2 API, conectada como financeiro1@novorealitybox.com)
 
@@ -485,7 +485,7 @@ PENDENTE: Escopo de Recibos de Reembolso (RDP'S) — fora desta automação por 
 - Cruzamento entre a aba Notas e as planilhas de Contratos (Razão Social / nome do colaborador): comparar ignorando diferença de maiúsculas/minúsculas e espaços a mais ou a menos — não precisa de comparação fonética/aproximada mais complexa.
 - Acesso ao Drive S02 via conector: será testado ao vivo durante a montagem do n8n, quando a própria Michelle autenticar — não é mais tratado como bloqueio.
 - Fase 4 (Arquivamento): revalidada e fundida com a Fase 3 (seção 5.3) — acontecem em paralelo, com estrutura de pastas e nomenclatura confirmadas por prints reais dos Drives S01 e S02.
-- Estrutura completa de pastas por função: confirmada por prints reais (não é mais uma lista a levantar do zero — os padrões "[código] - [CARGO]" e "[código].R - [CARGO]" já estão documentados na seção 5.3).
+- Estrutura completa de pastas por função: confirmada por prints reais (não é mais uma lista a levantar do zero — os padrões "[código] - [CARGO]" e "[código].R - [CARGO]" já estão documentados na seção 4.2).
 - Detalhamento de PACOTE e REC + NF: esclarecido — PACOTE é caso raro específico do AREP; REC + NF ocorre em locação, sobretudo com fornecedores, por motivo fiscal (nunca usar "serviço prestado" nesses casos).
 - Numeração de remessa no Status Box interno: substituída a contagem fixa de 30 por uma regra de lotes por janela de tempo em relação ao vencimento da NF (seção 5.0) — "ENTREGUE MI R1", "ENTREGUE MI R2"... contando por pasta de vencimento, não mais por quantidade fixa de notas.
 - Corte para o Danilo: Status Box = "ENTREGUE" (não "ENTREGA MI" — nomenclatura definitiva confirmada).
