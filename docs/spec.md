@@ -14,10 +14,14 @@ Fora de escopo por enquanto: processo de Recibos de Reembolso (RDP'S) — reembo
 | Fase | O que faz | Onde processa |
 |---|---|---|
 | 1. Solicitação de nota | Filtra planilha, valida contrato, monta e programa e-mail de pedido em rascunho | n8n (nuvem) |
-| 2. Recebimento e validação | Monitora respostas com NF anexada, extrai dados, atualiza planilha, salva a nota | n8n + IA (extração de PDF) |
-| 3. Remessa para o Danilo + 4. Arquivamento | Agrupa recebidas em lotes por janela de tempo (seção 5.0), formata cópia da planilha, sobe no Drive, monta e-mail, arquiva a nota na pasta por função — tudo em paralelo, na mesma execução | n8n + IA (formatação) |
+| 2. Recebimento e validação | Monitora respostas com NF anexada, extrai dados, atualiza planilha, salva a nota no pouso pessoal da Michelle E no arquivamento por função — os dois salvamentos acontecem aqui, em paralelo (seção 4.2) | n8n + IA (extração de PDF) |
+| 3. Remessa para o Danilo + 4. Arquivamento da remessa | Agrupa recebidas em lotes por janela de tempo (seção 5.0), formata cópia da planilha, sobe no Drive na pasta de Contas a Pagar, monta e-mail — tudo em paralelo, na mesma execução. O arquivamento POR FUNÇÃO (08. NOTAS ARQUIVADAS) NÃO está mais aqui — foi antecipado pra Fase 2 (seção 4.2), pois a Michelle confirmou que pode ser feito assim que a nota é recebida/validada, sem esperar a remessa ao Danilo. | n8n + IA (formatação) |
 
-As Fases 3 e 4 acontecem juntas, não uma depois da outra — confirmado por Claudio: no momento em que o e-mail do Danilo é preparado, a nota já é arquivada na pasta correta.
+As Fases 3 e 4 acontecem juntas, não uma depois da outra — confirmado por Claudio: no momento em que o e-mail do Danilo é preparado, a nota já foi arquivada (na Fase 2, por função) e a pasta de remessa/Contas a Pagar é montada em paralelo à entrega.
+
+**IMPORTANTE — dois arquivamentos DIFERENTES, não confundir (detalhado na seção 4.2):**
+- **Arquivamento por função** (`FINANCEIRO > 08. NOTAS ARQUIVADAS > ARQUIVO DE NOTAS [PROJETO] > [código] - [CARGO]`): roda na Fase 2, assim que a nota é baixada e validada.
+- **Arquivamento da remessa/Danilo** (`09. CONTAS À PAGAR` / `11. CONTAS À PAGAR - [PROJETO]`, pasta de remessa com sufixo "_MI"): continua na Fase 3+4, só no momento da entrega.
 
 ## 3. Fase 1 — Solicitação de nota ao colaborador
 
@@ -255,19 +259,23 @@ Formato: [dia.mês do vencimento]_BR_SMTC_[IDENTIFICADOR DO PROJETO]_[RAZÃO SOC
 
 ## 4.2 Os dois salvamentos de nota fiscal (não confundir)
 
-Existem dois destinos de salvamento distintos e separados no tempo — não devem ser misturados:
+Existem dois destinos de salvamento distintos — **CORREÇÃO: os dois agora acontecem na Fase 2, em paralelo, assim que a nota é baixada e validada** (antes o Salvamento 2 esperava a Fase 3+4; a Michelle confirmou que pode ser antecipado, pois esse arquivamento por função independe do momento da entrega ao Danilo):
 
-**Salvamento 1 — ao receber a nota (Fase 2, pouso de trabalho):**
+**Salvamento 1 — pouso de trabalho, no Drive particular da Michelle:**
 Salvar a nota com a retranca certa no **Drive particular da Michelle**. Importante: essa é uma conta Google **separada** da conta de trabalho (financeiro1@novorealitybox.com) — tem Drive próprio, e-mail e credencial OAuth independentes. Substitui o antigo salvamento em pasta local (Downloads).
 
 - E-mail da conta: `michelle.mimiaguia@gmail.com`
 - Pasta raiz: `SMTC` (link: https://drive.google.com/drive/folders/13sbk5QKW_srcopi5HMCMLbUdAbksniBo)
 - Credencial já configurada no n8n: **"Google Drive - Particular Michelle"** (Google Drive OAuth2 API, conectada e autorizada)
 
-**Salvamento 2 — arquivamento oficial (Fase 3+4, em paralelo à entrega ao Danilo):**
+**Salvamento 2 — arquivamento por função (oficial, definitivo):**
 Mover/copiar a nota desse pouso para dentro do Drive de trabalho (financeiro1@novorealitybox.com ou compartilhado da empresa), na estrutura já documentada: `FINANCEIRO > 08. NOTAS ARQUIVADAS > ARQUIVO DE NOTAS [PROJETO] > [código] - [CARGO]`.
 
+- Identificar a pasta: código vem da coluna correspondente, nome da função/cargo também. Se a pasta daquele código ainda não existir, criar seguindo a mesma nomenclatura das pastas já existentes.
+- Padrão de nome de pasta por função — confirmado com exemplos reais: AREP usa "[código] - [CARGO]" (ex.: "1301 - DIRETOR GERAL"); Reunion usa "[código].R - [CARGO]" (ex.: "1301.R- DIRETOR GERAL", "7007.R - ACESSORIA JURÍDICA"); Soft Pré vai seguir o mesmo padrão do AREP ("[código] - [CARGO]") assim que surgirem os primeiros casos.
 - Credencial já configurada no n8n: **"Google Drive account"** (Google Drive OAuth2 API, conectada como financeiro1@novorealitybox.com)
+
+**IMPORTANTE — este NÃO é o mesmo arquivamento da remessa/Danilo** (pasta `09. CONTAS À PAGAR` / `11. CONTAS À PAGAR - [PROJETO]`, com a pasta de remessa levando sufixo "_MI") — esse outro continua acontecendo só na Fase 3+4, no momento da entrega (seção 5.3). São dois destinos e dois momentos diferentes.
 
 ## 4.3 Credenciais já configuradas no n8n (status atual)
 
@@ -342,15 +350,14 @@ NUNCA incluir Status Cost nem Status Contrato neste recorte, em nenhum projeto.
 
 Fonte Verdana em todo o e-mail. Cabeçalho: fundo preto/texto branco negrito. Valor a Pagar: número com 2 casas decimais (sem "R$"), vermelho, linha a linha — só a linha de total (fundo preto) leva "R$". Status Box: destaque verde, texto exatamente "ENTREGUE" (só nesta cópia — ver variações na planilha interna, seção 5.3).
 
-### 5.3 Arquivamento (em paralelo à entrega)
-- Mover a nota fiscal individual (retranca) e a imagem da planilha formatada (seção 5.2) para a pasta correspondente à função/cargo do colaborador.
-- Identificar a pasta: código da Conta Netflix vem da coluna B, nome da função/cargo vem da coluna C. Se a pasta daquele código ainda não existir, criar seguindo a mesma nomenclatura das pastas já existentes.
-- Caminho: "FINANCEIRO > 08. NOTAS ARQUIVADAS > ARQUIVO DE NOTAS [PROJETO]" — pastas separadas por projeto ("ARQUIVO DE NOTAS S01" para AREP, "ARQUIVO DE NOTAS REUNION" para Reunion).
-- Padrão de nome de pasta por função — confirmado com exemplos reais: AREP usa "[código] - [CARGO]" (ex.: "1301 - DIRETOR GERAL"); Reunion usa "[código].R - [CARGO]" (ex.: "1301.R- DIRETOR GERAL", "7007.R - ACESSORIA JURÍDICA"); Soft Pré vai seguir o mesmo padrão do AREP ("[código] - [CARGO]") assim que surgirem os primeiros casos.
-- Atualizar a coluna "Check arquivo drive" da planilha para "OK" depois de arquivar cada nota.
+### 5.3 Arquivamento da remessa (Contas a Pagar / Danilo — em paralelo à entrega)
+**Este é o arquivamento da REMESSA/entrega, diferente do arquivamento por função (que já acontece na Fase 2 — seção 4.2). Não confundir os dois.**
+- Caminho: pasta de Contas a Pagar por projeto (`09. CONTAS À PAGAR` / `11. CONTAS À PAGAR - [PROJETO]` — ver seção 5.1), organizada por mês e data de vencimento/remessa.
+- Subir a imagem da planilha recortada e formatada (seção 5.2) e o link de aprovação nessa pasta de remessa, conforme o e-mail modelo do Danilo (seção 5.1).
+- Atualizar a coluna "Check arquivo drive" da planilha para "OK" depois de confirmar que a nota já foi arquivada por função na Fase 2.
 - Atualizar Status Box da planilha interna com "ENTREGUE MI R{n}", onde `n` é o número do lote/remessa calculado pela regra de janela de tempo (seção 5.0) — não mais por contagem fixa de 30. A cópia enviada ao Danilo usa sempre só "ENTREGUE", nunca "MI" nem número de remessa.
 Vencimentos no dia 10 costumam ser os que mais acumulam notas (podendo passar de 30 num único lote e precisar de R1, R2 dentro do mesmo lote); as demais datas dificilmente ultrapassam 30 por lote.
-- Nomenclatura de pasta de arquivamento (a partir de agora): todas as pastas de remessa criadas no último nível levam o sufixo "_MI". Exemplo: "10.08_BR_SMTC_S01_ARQUIVO_NF_REMESSA_1" vira "10.08_BR_SMTC_S01_ARQUIVO_NF_REMESSA_1_MI". Vale para REUNION e SOFT PRE (e qualquer novo projeto daqui pra frente).
+- Nomenclatura de pasta de remessa (a partir de agora): todas as pastas de remessa criadas no último nível levam o sufixo "_MI". Exemplo: "10.08_BR_SMTC_S01_ARQUIVO_NF_REMESSA_1" vira "10.08_BR_SMTC_S01_ARQUIVO_NF_REMESSA_1_MI". Vale para REUNION e SOFT PRE (e qualquer novo projeto daqui pra frente).
 
 ## 6. Perfis de projeto (parametrização)
 
@@ -419,6 +426,11 @@ PENDENTE: Confirmar com teste real, na implementação, se o campo "lock" da API
 - Alertas de cobrança disparada automaticamente.
 - Relatório ao final de cada execução: rascunhos criados/atualizados, notas processadas, itens pendentes de revisão manual.
 
+**Resumo diário (decisão desta rodada)**: em vez de só um relatório por execução (que pode rodar várias vezes ao dia e virar difícil de acompanhar), a automação também gera um **resumo diário consolidado e curto**, em bullet points agrupados por categoria (ex.: rascunhos criados, cobranças disparadas, notas recebidas/arquivadas, alertas pendentes). Duas formas de acesso, mesma lógica de resumo:
+- **Agendado**: enviado automaticamente ao fim do dia via Telegram.
+- **Sob demanda**: comando `/resumo` que a Michelle pode digitar a qualquer momento pra puxar o resumo do dia corrente, sem esperar o horário agendado.
+Se, na prática, a Michelle sentir falta de mais detalhe ou de outro formato, ela sinaliza e o formato é ajustado depois — não é definitivo, é o ponto de partida.
+
 ### 7.4 Ambiente vs. modo de execução (dois eixos independentes)
 São duas variáveis SEPARADAS, que não devem ser confundidas nem amarradas uma à outra:
 
@@ -437,6 +449,20 @@ Por serem independentes, existem 4 combinações possíveis:
 | **produção** | dados reais, mas ainda em rascunho/manual, para a Michelle acompanhar de perto | fluxo 100% real e automatizado (objetivo final, só depois de validar tudo) |
 
 **Ordem de inicialização definida por Claudio**: a primeira execução, e toda a validação inicial da Fase 1, deve rodar em **`homolog` + `rascunho`** — nenhuma execução em `produção` (mesmo em modo rascunho) antes de validar completamente em homologação. A progressão esperada é: `homolog`+`rascunho` → (opcional: `homolog`+`automatico`, pra validar o ciclo completo com segurança) → `produção`+`rascunho` (estado atual do MVP, uma vez liberado) → `produção`+`automatico` (só depois de aprovado rodar 100% automatizado).
+
+**Terceiro controle, independente dos dois eixos acima — limite de execução ("modo assistido")**: para acompanhar a validação em produção com mais controle, Claudio pode limitar quantas linhas são processadas numa única execução, em qualquer fase. Ex.: se o filtro "PROGRAMAR ATÉ" bater 20 linhas, mas o limite estiver setado em 5, o workflow processa só as 5 primeiras linhas que bateram no filtro (na ordem em que aparecem na planilha) e ignora o restante naquela execução — as demais entram na próxima.
+- Implementação: campo `limite_linhas_execucao` no `config_execucao.json` (número inteiro; `null` ou `0` = sem limite, processa tudo que bateu no filtro).
+- Funciona em conjunto com o **disparo manual** (o n8n já tem um "Manual Trigger" em cada workflow, além do agendado — seção 7.1): durante a fase de testes em produção, Claudio dispara manualmente quando quiser, em vez de esperar o horário agendado, combinando isso com o limite de linhas pra validar aos poucos junto com a Michelle.
+- Esse limite vale igualmente para as 3 fases (não é exclusivo da Fase 1) — cada workflow lê o mesmo `config_execucao.json` e aplica o corte antes de processar.
+
+Estrutura de `config_execucao.json`:
+```json
+{
+  "ambiente": "homolog" | "producao",
+  "modo": "rascunho" | "automatico",
+  "limite_linhas_execucao": null
+}
+```
 
 ## 8. Acessos validados
 | Item | Status |
