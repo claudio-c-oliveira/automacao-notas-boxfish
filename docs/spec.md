@@ -354,7 +354,9 @@ Fonte Verdana em todo o e-mail. Cabeçalho: fundo preto/texto branco negrito. Va
 
 ### 5.3 Arquivamento da remessa (Contas a Pagar / Danilo — em paralelo à entrega)
 **Este é o arquivamento da REMESSA/entrega, diferente do arquivamento por função (que já acontece na Fase 2 — seção 4.2). Não confundir os dois.**
-- Caminho: pasta de Contas a Pagar por projeto (`09. CONTAS À PAGAR` / `11. CONTAS À PAGAR - [PROJETO]` — ver seção 5.1), organizada por mês e data de vencimento/remessa.
+- Caminho: pasta de Contas a Pagar por projeto (`09. CONTAS À PAGAR` / `11. CONTAS À PAGAR - [PROJETO]` — ver seção 5.1), organizada por mês e data de vencimento/remessa. **Atenção na navegação por nome**: confirmado por teste real que a grafia varia entre projetos — S01 usa "09. CONTAS À PAGAR" (com acento), S02 usa "09. CONTAS A PAGAR" (sem acento). Não confiar em correspondência exata de string; normalizar (ignorar acento) ao localizar essa pasta por nome.
+
+**Estrutura de homologação validada (22/08)**: a estrutura de teste em `HOMOLOG_BOX-FISH` (Drive pessoal do Claudio) foi conferida via conector do Google Drive e bate 1:1 com a estrutura de produção documentada nesta seção e na 4.2 — `FINANCEIRO` (S01) e `FINANCEIRO S02` replicam corretamente `08. NOTAS ARQUIVADAS` (com as pastas de função já existentes pro Reunion) e `09. CONTAS À/A PAGAR` (com um mês e vencimento de exemplo). Sem inconsistências relevantes encontradas.
 - Subir a imagem da planilha recortada e formatada (seção 5.2) e o link de aprovação nessa pasta de remessa, conforme o e-mail modelo do Danilo (seção 5.1).
 - Atualizar a coluna "Check arquivo drive" da planilha para "OK" depois de confirmar que a nota já foi arquivada por função na Fase 2.
 - Atualizar Status Box da planilha interna com "ENTREGUE MI R{n}", onde `n` é o número do lote/remessa calculado pela regra de janela de tempo (seção 5.0) — não mais por contagem fixa de 30. A cópia enviada ao Danilo usa sempre só "ENTREGUE", nunca "MI" nem número de remessa.
