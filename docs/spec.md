@@ -390,8 +390,8 @@ Valores iniciais de `apelidos.json` (seed da primeira entrega, seção 3.1.1):
 
 | Papel | Produção | Homologação |
 |---|---|---|
-| Colaborador (Fase 1, pedido de nota) | e-mail pessoal do colaborador | `grandesnegocioseoportunidades@gmail.com` |
-| Danilo (Fase 3+4, entrega/pagamento) | e-mail real do Danilo | `imperialdiamondlead@gmail.com` |
+| Colaborador (Fase 1, pedido de nota) | e-mail pessoal do colaborador | `grandesnegocioseoportunidades+colaborador@gmail.com` |
+| Danilo (Fase 3+4, entrega/pagamento) | e-mail real do Danilo | `imperialdiamondlead+danilo@gmail.com` |
 | Vanessa (aprovação, cc) | executiva@novorealitybox.com | `imperialdiamondlead+van@gmail.com` (mesma caixa do Danilo, distinguível pela tag) |
 | Danielle (aprovação, cc) | financeiro@novorealitybox.com | `imperialdiamondlead+danielle@gmail.com` (mesma caixa, distinguível pela tag) |
 
