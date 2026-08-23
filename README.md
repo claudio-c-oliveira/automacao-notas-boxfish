@@ -19,8 +19,11 @@ tomadas) está em [`docs/spec.md`](docs/spec.md) — fonte da verdade do projeto
   não documentados por nome no spec.md, são detalhe de implementação). Não faziam
   parte da estrutura original do repositório; foram adicionados quando essas regras
   passaram a existir. Em runtime, o n8n lê/escreve esses arquivos direto do disco da
-  VM — o conteúdo aqui é só o ponto de partida versionado, não é sincronizado
-  automaticamente com o disco depois do deploy inicial.
+  VM, no caminho ABSOLUTO `/home/node/.n8n/box-fish-config/` (spec.md seção 7.5 —
+  nunca `/home/node/.n8n/config` sozinho, que é um arquivo interno do próprio n8n
+  com a chave de criptografia das credenciais) — o conteúdo aqui em `/config/` é só
+  o ponto de partida versionado, não é sincronizado automaticamente com a VM depois
+  do deploy inicial.
 
 Nenhuma credencial (token, senha, chave de API) deve ir para o Git — essas ficam só
 dentro do n8n (credenciais/variáveis de ambiente).
