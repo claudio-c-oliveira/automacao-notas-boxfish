@@ -778,7 +778,7 @@
       "parameters": {
         "resource": "draft",
         "operation": "create",
-        "to": "={{ $json.emailDestino }}",
+        "sendTo": "={{ $json.emailDestino }}",
         "subject": "={{ $json.assunto }}",
         "message": "={{ $json.corpoHtml }}",
         "options": {
@@ -805,7 +805,7 @@
       "parameters": {
         "resource": "message",
         "operation": "send",
-        "to": "={{ $json.emailDestino }}",
+        "sendTo": "={{ $json.emailDestino }}",
         "subject": "={{ $json.assunto }}",
         "message": "={{ $json.corpoHtml }}",
         "options": {
@@ -1234,7 +1234,7 @@
       "parameters": {
         "resource": "draft",
         "operation": "create",
-        "to": "={{ $json.emailDestino }}",
+        "sendTo": "={{ $json.emailDestino }}",
         "subject": "={{ $json.assunto }}",
         "message": "={{ $json.corpoHtml }}",
         "options": {
@@ -1285,7 +1285,7 @@
       "parameters": {
         "resource": "message",
         "operation": "send",
-        "to": "={{ $json.emailDestino }}",
+        "sendTo": "={{ $json.emailDestino }}",
         "subject": "={{ $json.assunto }}",
         "message": "={{ $json.corpoHtml }}",
         "options": {
