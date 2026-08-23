@@ -124,7 +124,7 @@
       ],
       "credentials": {
         "boxOAuth2Api": {
-          "id": "REPLACE",
+          "id": "cred-box-account",
           "name": "Box account"
         }
       },
@@ -146,7 +146,7 @@
       ],
       "credentials": {
         "boxOAuth2Api": {
-          "id": "REPLACE",
+          "id": "cred-box-account",
           "name": "Box account"
         }
       }
@@ -267,9 +267,11 @@
     {
       "parameters": {
         "resource": "message",
-        "operation": "search",
-        "q": "={{ 'label:CONTRATAÇÃO ' + ($json.nota.colunaJ.split(' - ')[1] || $json.nota.colunaH) }}",
-        "returnAll": true
+        "operation": "getAll",
+        "returnAll": true,
+        "filters": {
+          "q": "={{ 'label:CONTRATAÇÃO ' + ($json.nota.colunaJ.split(' - ')[1] || $json.nota.colunaH) }}"
+        }
       },
       "id": "n17-gmail-buscar-ficha",
       "name": "Gmail — Buscar thread CONTRATAÇÃO [produção]",
@@ -281,7 +283,7 @@
       ],
       "credentials": {
         "gmailOAuth2": {
-          "id": "REPLACE",
+          "id": "cred-gmail-producao",
           "name": "Gmail account"
         }
       },
@@ -392,7 +394,7 @@
       ],
       "credentials": {
         "anthropicApi": {
-          "id": "REPLACE",
+          "id": "cred-claude-dev",
           "name": "Claude account (dev)"
         }
       },
@@ -427,7 +429,7 @@
       ],
       "credentials": {
         "anthropicApi": {
-          "id": "REPLACE",
+          "id": "cred-claude-producao",
           "name": "Claude account (produção)"
         }
       },
@@ -569,7 +571,7 @@
       ],
       "credentials": {
         "telegramApi": {
-          "id": "REPLACE",
+          "id": "cred-telegram-account",
           "name": "Telegram account"
         }
       },
@@ -593,7 +595,7 @@
       ],
       "credentials": {
         "telegramApi": {
-          "id": "REPLACE",
+          "id": "cred-telegram-account",
           "name": "Telegram account"
         }
       },
@@ -793,7 +795,7 @@
       ],
       "credentials": {
         "gmailOAuth2": {
-          "id": "REPLACE",
+          "id": "cred-gmail-producao",
           "name": "Gmail account"
         }
       },
@@ -820,7 +822,7 @@
       ],
       "credentials": {
         "gmailOAuth2": {
-          "id": "REPLACE",
+          "id": "cred-gmail-producao",
           "name": "Gmail account"
         }
       },
@@ -858,7 +860,7 @@
       ],
       "credentials": {
         "gmailOAuth2": {
-          "id": "REPLACE",
+          "id": "cred-gmail-producao",
           "name": "Gmail account"
         }
       },
@@ -885,7 +887,7 @@
       ],
       "credentials": {
         "gmailOAuth2": {
-          "id": "REPLACE",
+          "id": "cred-gmail-producao",
           "name": "Gmail account"
         }
       }
@@ -993,7 +995,7 @@
       ],
       "credentials": {
         "boxOAuth2Api": {
-          "id": "REPLACE",
+          "id": "cred-box-account",
           "name": "Box account"
         }
       }
@@ -1028,7 +1030,7 @@
       ],
       "credentials": {
         "boxOAuth2Api": {
-          "id": "REPLACE",
+          "id": "cred-box-account",
           "name": "Box account"
         }
       }
@@ -1094,7 +1096,7 @@
       ],
       "credentials": {
         "telegramApi": {
-          "id": "REPLACE",
+          "id": "cred-telegram-account",
           "name": "Telegram account"
         }
       }
@@ -1182,9 +1184,11 @@
     {
       "parameters": {
         "resource": "message",
-        "operation": "search",
-        "q": "={{ 'label:CONTRATAÇÃO ' + ($json.nota.colunaJ.split(' - ')[1] || $json.nota.colunaH) }}",
-        "returnAll": true
+        "operation": "getAll",
+        "returnAll": true,
+        "filters": {
+          "q": "={{ 'label:CONTRATAÇÃO ' + ($json.nota.colunaJ.split(' - ')[1] || $json.nota.colunaH) }}"
+        }
       },
       "id": "n17-gmail-buscar-ficha-dev",
       "name": "Gmail — Buscar thread CONTRATAÇÃO [dev/homolog]",
@@ -1196,7 +1200,7 @@
       ],
       "credentials": {
         "gmailOAuth2": {
-          "id": "REPLACE",
+          "id": "cred-gmail-homolog",
           "name": "Gmail - Homolog (Claudio pessoal)"
         }
       },
@@ -1247,7 +1251,7 @@
       ],
       "credentials": {
         "gmailOAuth2": {
-          "id": "REPLACE",
+          "id": "cred-gmail-homolog",
           "name": "Gmail - Homolog (Claudio pessoal)"
         }
       },
@@ -1298,7 +1302,7 @@
       ],
       "credentials": {
         "gmailOAuth2": {
-          "id": "REPLACE",
+          "id": "cred-gmail-homolog",
           "name": "Gmail - Homolog (Claudio pessoal)"
         }
       },
@@ -1348,7 +1352,7 @@
       ],
       "credentials": {
         "gmailOAuth2": {
-          "id": "REPLACE",
+          "id": "cred-gmail-homolog",
           "name": "Gmail - Homolog (Claudio pessoal)"
         }
       },
@@ -1399,7 +1403,7 @@
       ],
       "credentials": {
         "gmailOAuth2": {
-          "id": "REPLACE",
+          "id": "cred-gmail-homolog",
           "name": "Gmail - Homolog (Claudio pessoal)"
         }
       }
@@ -1449,7 +1453,7 @@
       ],
       "credentials": {
         "googleDriveOAuth2Api": {
-          "id": "REPLACE",
+          "id": "cred-gdrive-particular-michelle",
           "name": "Google Drive - Particular Michelle"
         }
       },
@@ -1485,7 +1489,7 @@
       ],
       "credentials": {
         "googleDriveOAuth2Api": {
-          "id": "REPLACE",
+          "id": "cred-gdrive-particular-michelle",
           "name": "Google Drive - Particular Michelle"
         }
       }
@@ -1510,7 +1514,7 @@
       ],
       "credentials": {
         "googleDriveOAuth2Api": {
-          "id": "REPLACE",
+          "id": "cred-gdrive-particular-michelle",
           "name": "Google Drive - Particular Michelle"
         }
       },
@@ -1546,7 +1550,7 @@
       ],
       "credentials": {
         "googleDriveOAuth2Api": {
-          "id": "REPLACE",
+          "id": "cred-gdrive-particular-michelle",
           "name": "Google Drive - Particular Michelle"
         }
       }
@@ -1608,7 +1612,7 @@
       ],
       "credentials": {
         "googleDriveOAuth2Api": {
-          "id": "REPLACE",
+          "id": "cred-gdrive-particular-michelle",
           "name": "Google Drive - Particular Michelle"
         }
       }
@@ -1642,7 +1646,7 @@
       ],
       "credentials": {
         "googleDriveOAuth2Api": {
-          "id": "REPLACE",
+          "id": "cred-gdrive-particular-michelle",
           "name": "Google Drive - Particular Michelle"
         }
       },
@@ -1689,7 +1693,7 @@
       ],
       "credentials": {
         "googleDriveOAuth2Api": {
-          "id": "REPLACE",
+          "id": "cred-gdrive-particular-michelle",
           "name": "Google Drive - Particular Michelle"
         }
       }
@@ -1713,7 +1717,7 @@
       ],
       "credentials": {
         "googleDriveOAuth2Api": {
-          "id": "REPLACE",
+          "id": "cred-gdrive-trabalho",
           "name": "Google Drive account"
         }
       }
@@ -1751,7 +1755,7 @@
       ],
       "credentials": {
         "googleDriveOAuth2Api": {
-          "id": "REPLACE",
+          "id": "cred-gdrive-trabalho",
           "name": "Google Drive account"
         }
       }
@@ -1785,7 +1789,7 @@
       ],
       "credentials": {
         "googleDriveOAuth2Api": {
-          "id": "REPLACE",
+          "id": "cred-gdrive-trabalho",
           "name": "Google Drive account"
         }
       },
@@ -1811,7 +1815,7 @@
       ],
       "credentials": {
         "googleDriveOAuth2Api": {
-          "id": "REPLACE",
+          "id": "cred-gdrive-trabalho",
           "name": "Google Drive account"
         }
       }
@@ -1845,7 +1849,7 @@
       ],
       "credentials": {
         "googleDriveOAuth2Api": {
-          "id": "REPLACE",
+          "id": "cred-gdrive-trabalho",
           "name": "Google Drive account"
         }
       },
@@ -1870,7 +1874,7 @@
       ],
       "credentials": {
         "googleDriveOAuth2Api": {
-          "id": "REPLACE",
+          "id": "cred-gdrive-trabalho",
           "name": "Google Drive account"
         }
       }
@@ -1908,7 +1912,7 @@
       ],
       "credentials": {
         "googleDriveOAuth2Api": {
-          "id": "REPLACE",
+          "id": "cred-gdrive-trabalho",
           "name": "Google Drive account"
         }
       }
@@ -1946,7 +1950,7 @@
       ],
       "credentials": {
         "googleDriveOAuth2Api": {
-          "id": "REPLACE",
+          "id": "cred-gdrive-trabalho",
           "name": "Google Drive account"
         }
       }
@@ -1980,7 +1984,7 @@
       ],
       "credentials": {
         "googleDriveOAuth2Api": {
-          "id": "REPLACE",
+          "id": "cred-gdrive-trabalho",
           "name": "Google Drive account"
         }
       },
