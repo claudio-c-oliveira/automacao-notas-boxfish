@@ -1,5 +1,10 @@
 {
   "ambiente": "homolog",
   "modo": "rascunho",
-  "limite_linhas_execucao": null
+  "limite_linhas_execucao": 2,
+  "homolog": {
+    "drive_michelle_pasta_raiz": "1hgUYWVPNFOi2BWTKVlWENQ8nomIBCWtz",
+    "credencial_drive_arquivamento_funcao": "Google Drive - Homolog (Claudio pessoal)",
+    "drive_financeiro_pasta_raiz": "16KAGjffE-ZibN3doOosQH9U-TH0q95_F"
+  }
 }
