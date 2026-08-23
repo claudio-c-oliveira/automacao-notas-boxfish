@@ -485,6 +485,75 @@ Estrutura de `config_execucao.json`:
 
 **Cópia de teste do Cost Report**: as cópias das planilhas de teste (`BR_SMTC_S01__COST REPORT_VS_EXECUÇÃO_1201.xlsx` e `BR_SMTC_S02_SOFTPRE_PROVISÓRIO.xlsx`) ficam na raiz de `HOMOLOG_BOX-FISH` (Drive da Michelle) — não dentro do Box de produção.
 
+### 7.5 Infraestrutura da VM do n8n (referência fixa — não perguntar de novo)
+
+**Google Cloud**
+- Projeto: `automacao-notas-boxfish`
+- Instância: `n8n-boxfish`, zona `us-east1-c`
+- Tipo de máquina: e2-small (upgrade do e2-micro original, por saturação de CPU)
+- SO: Ubuntu 22.04
+- IP externo: pode mudar se a instância for parada/reiniciada — sempre conferir no Console antes de assumir
+
+**Domínio e HTTPS**
+- Domínio: `n8n.carvalhodeoliveira.com`
+- DNS: Cloudflare, registro A, modo "DNS only" (nuvem cinza, NÃO proxied)
+- Proxy reverso: Caddy, rodando direto na VM (fora do Docker) — config em `/etc/caddy/Caddyfile`:
+  ```
+  n8n.carvalhodeoliveira.com {
+      reverse_proxy localhost:5678
+  }
+  ```
+- Certificado HTTPS: gerado/renovado automaticamente pelo Caddy (Let's Encrypt)
+- Firewall GCP: regra "allow-http-https" libera portas 80/443 via tags de rede (http-server, https-server)
+
+**Como o n8n está instalado**
+- NÃO usa docker-compose — é Docker "puro" (`docker run` direto)
+- Nome do container: `n8n`
+- Imagem: `n8n-custom:latest` (customizada, não é a `n8nio/n8n` oficial pura — ver exceljs abaixo)
+- Volume nomeado `n8n_data`, montado em `/home/node/.n8n` dentro do container (workflows, credenciais e os arquivos de config do projeto — tudo sobrevive se o container for recriado)
+- Comando completo usado pra subir o container (referência caso precise recriar):
+  ```
+  docker run -d --restart unless-stopped --name n8n -p 5678:5678 \
+    -e N8N_HOST=n8n.carvalhodeoliveira.com \
+    -e N8N_PROTOCOL=https \
+    -e WEBHOOK_URL=https://n8n.carvalhodeoliveira.com/ \
+    -e N8N_EDITOR_BASE_URL=https://n8n.carvalhodeoliveira.com/ \
+    -e NODE_FUNCTION_ALLOW_EXTERNAL=exceljs \
+    -e NODE_PATH=/usr/local/lib/node_modules_extra/node_modules \
+    -v n8n_data:/home/node/.n8n \
+    n8n-custom:latest
+  ```
+
+**exceljs (leitura de cor de célula, AREP/Reunion — confirmado funcionando)**
+- Instalado numa pasta ISOLADA dentro da imagem customizada (`/usr/local/lib/node_modules_extra/`), não dentro da pasta do n8n (o `package.json` do n8n usa formato `catalog:` do pnpm, incompatível com npm comum)
+- Dockerfile da imagem customizada, em `~/n8n-custom/Dockerfile` no host:
+  ```
+  FROM n8nio/n8n:latest
+  USER root
+  RUN mkdir -p /usr/local/lib/node_modules_extra
+  WORKDIR /usr/local/lib/node_modules_extra
+  RUN npm init -y
+  RUN npm install exceljs
+  USER node
+  ```
+
+**Arquivos de configuração do projeto (`config_execucao.json`, `apelidos.json`, `cobrancas.json`)**
+- Caminho ABSOLUTO real dentro do container (usar esse caminho nos nodes "Read/Write File from Disk" dos workflows — não o caminho relativo `config/` do repositório Git, que é só para versionamento/referência):
+  - `/home/node/.n8n/box-fish-config/config_execucao.json`
+  - `/home/node/.n8n/box-fish-config/apelidos.json`
+  - `/home/node/.n8n/box-fish-config/cobrancas.json`
+
+**⚠️ ATENÇÃO CRÍTICA — nunca usar o nome "config" sozinho**: existe um ARQUIVO (não pasta) em `/home/node/.n8n/config` que pertence ao PRÓPRIO n8n — arquivo interno de configuração que contém a chave de criptografia usada para proteger as credenciais salvas (Gmail, Drive, Box, Claude API). NUNCA criar pasta/arquivo chamado "config" direto dentro de `/home/node/.n8n/`, nem apagar/sobrescrever esse arquivo — quebraria o acesso a TODAS as credenciais já configuradas. Por isso o projeto usa o nome `box-fish-config` (com prefixo), evitando colisão.
+
+**Procedimento seguro pra mexer no container** (variável de ambiente nova, rebuild de imagem etc.):
+1. Editar o Dockerfile em `~/n8n-custom/` se precisar mudar a imagem
+2. `docker build -t n8n-custom:latest ~/n8n-custom`
+3. `docker stop n8n && docker rm n8n`
+4. Rodar o `docker run` completo de novo (comando acima), com as variáveis atualizadas — o volume `n8n_data` preserva tudo automaticamente
+NUNCA apagar o volume `n8n_data`.
+
+**Aviso sobre o terminal SSH**: o terminal SSH pelo navegador (Google Cloud Console) às vezes gruda várias linhas coladas de uma vez, causando erros. Sempre colar comandos em blocos de uma linha só (usar `printf` com `\n` literal para conteúdo multi-linha dentro de um arquivo), ou colar comando por comando.
+
 ## 8. Acessos validados
 | Item | Status |
 |---|---|
@@ -511,7 +580,7 @@ PENDENTE: Escopo de Recibos de Reembolso (RDP'S) — fora desta automação por 
 - Corte para o Danilo: Status Box = "ENTREGUE" (não "ENTREGA MI" — nomenclatura definitiva confirmada).
 - Marcadores de e-mail (labels do Gmail): confirmados — "IA" + marcador do projeto em toda interação com e-mail (seção 3.1.2).
 - MVP: Status Box do pedido/cobrança ao colaborador e da entrega ao Danilo ficam manuais (Michelle) enquanto o modo de execução for "rascunho"; "RECEBIDA MI" continua automático mesmo no MVP (seção 3.1.3).
-- Armazenamento de controle de cobrança, apelidos de projeto e modo de execução: NÃO ficam na planilha — ficam em arquivos JSON no disco da VM do n8n (`cobrancas.json`, `apelidos.json`, `config_execucao.json`), lidos/escritos pelos nodes nativos de arquivo do n8n (seções 3.1.1, 3.1.3, 6.1).
+- Armazenamento de controle de cobrança, apelidos de projeto e modo de execução: NÃO ficam na planilha — ficam em arquivos JSON no disco da VM do n8n (`cobrancas.json`, `apelidos.json`, `config_execucao.json`), lidos/escritos pelos nodes nativos de arquivo do n8n (seções 3.1.1, 3.1.3, 6.1). Caminho absoluto real na VM: `/home/node/.n8n/box-fish-config/` — seção 7.5.
 - Nome do projeto confirmado como "AREP" (uma letra R) em todo o documento — confirmado por Claudio junto com a Michelle; a grafia "ARREP" usada temporariamente numa rodada anterior foi revertida.
 
 ## 11. Checklist de próximos passos
