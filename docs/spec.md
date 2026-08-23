@@ -462,9 +462,20 @@ Estrutura de `config_execucao.json`:
 {
   "ambiente": "homolog" | "producao",
   "modo": "rascunho" | "automatico",
-  "limite_linhas_execucao": null
+  "limite_linhas_execucao": null,
+  "homolog": {
+    "drive_michelle_pasta_raiz": "1hgUYWVPNFOi2BWTKVlWENQ8nomIBCWtz",
+    "credencial_drive_arquivamento_funcao": "Google Drive - Homolog (Claudio pessoal)",
+    "drive_financeiro_pasta_raiz": "16KAGjffE-ZibN3doOosQH9U-TH0q95_F"
+  }
 }
 ```
+
+**Decisão de arquitetura — pasta-raiz-por-ambiente em vez de credencial-por-ambiente, no caso do Drive particular (Salvamento 1)**: diferente do que se imaginava inicialmente, o Drive de homologação da Michelle (`HOMOLOG_BOX-FISH`) está dentro da MESMA conta Google (michelle.mimiaguia@gmail.com) já conectada como credencial "Google Drive - Particular Michelle". Por isso, o `AMBIENTE` não troca de credencial nesse caso — troca só o **ID da pasta raiz** que o workflow usa (`drive_michelle_pasta_raiz` acima), lida do `config_execucao.json`. Em produção, usa a pasta raiz real (`SMTC`, seção 4.2); em homolog, usa `HOMOLOG_BOX-FISH`.
+
+**Arquivamento por função (Salvamento 2) em homolog usa credencial NOVA**: como o Drive de trabalho de produção (financeiro1@novorealitybox.com) não pode ser tocado nos testes, foi criada uma pasta de teste na conta PESSOAL do Claudio (`16KAGjffE-ZibN3doOosQH9U-TH0q95_F`), simulando a estrutura `FINANCEIRO` (S01 — AREP+Reunion) e `FINANCEIRO S02` (Soft Pré). Isso exigiu uma credencial nova no n8n — **"Google Drive - Homolog (Claudio pessoal)"** — usada SOMENTE quando `ambiente = homolog`, no lugar da credencial "Google Drive account" (financeiro1) usada em produção. O workflow deve navegar dentro dessa pasta raiz procurando as subpastas pelo NOME ("FINANCEIRO" ou "FINANCEIRO S02", conforme o projeto), em vez de depender de IDs de subpasta fixos — mais robusto a mudanças de estrutura.
+
+**Cópia de teste do Cost Report**: as cópias das planilhas de teste (`BR_SMTC_S01__COST REPORT_VS_EXECUÇÃO_1201.xlsx` e `BR_SMTC_S02_SOFTPRE_PROVISÓRIO.xlsx`) ficam na raiz de `HOMOLOG_BOX-FISH` (Drive da Michelle) — não dentro do Box de produção.
 
 ## 8. Acessos validados
 | Item | Status |
