@@ -1,7 +1,7 @@
 {
   "name": "Fase 1 — Solicitação de nota (Produção)",
   "meta": {
-    "description": "Automação de solicitação de nota fiscal aos colaboradores (docs/spec.md seção 3). Cobre os 3 projetos (AREP, Reunion, Soft Pré) num único workflow parametrizado. Ver /home/.../.claude/plans (histórico de planejamento) e docs/spec.md como fonte da verdade — não editar a lógica de negócio aqui sem antes atualizar o spec.md. Fechamento REC/REC+NF (spec.md secao 3.2/3.2.1, commit 1ca83a7): Fase 1 agora usa IA (Claude) pra interpretar a coluna J e classificar RECIBO/NOTA_FISCAL em casos de fornecedor/locacao; linhas de fornecedor com mesmo vencimento sao agrupadas num unico e-mail multi-bloco. Fechamento REC/REC+NF (spec.md secao 3.2/3.2.1, commit 1ca83a7): Fase 1 agora usa IA (Claude) pra interpretar a coluna J e classificar RECIBO/NOTA_FISCAL em casos de fornecedor/locacao; linhas de fornecedor com mesmo vencimento sao agrupadas num unico e-mail multi-bloco. Fechamento REC/REC+NF (spec.md secao 3.2/3.2.1, commit 1ca83a7): Fase 1 agora usa IA (Claude) pra interpretar a coluna J e classificar RECIBO/NOTA_FISCAL em casos de fornecedor/locacao; linhas de fornecedor com mesmo vencimento sao agrupadas num unico e-mail multi-bloco. Rodada de ajustes (spec.md commits 460aa40, 0738814): (1) gate de contrato para fornecedor agora é por GRUPO (corrige divergência entre linhas do mesmo fornecedor/vencimento, seção 3.2.1); (2) ambiente (homolog/produção) e limite_linhas_execucao (modo assistido) agora são lidos de config_execucao.json por este ÚNICO workflow — não existe mais arquivo .homolog.json separado (seção 7.4); (3) log diário alimentado aqui para o workflow resumo_diario.json (seção 7.3). Rodada de ajustes (spec.md commits 460aa40, 0738814): (1) gate de contrato para fornecedor agora é por GRUPO (corrige divergência entre linhas do mesmo fornecedor/vencimento, seção 3.2.1); (2) ambiente (homolog/produção) e limite_linhas_execucao (modo assistido) agora são lidos de config_execucao.json por este ÚNICO workflow — não existe mais arquivo .homolog.json separado (seção 7.4); (3) log diário alimentado aqui para o workflow resumo_diario.json (seção 7.3). Correção (pré-requisito da Fase 2): threadId agora é capturado após criar o rascunho/enviar o pedido e gravado em cobrancas.json com o schema exato do spec.md seção 3.1.1 (threadId, data_ultima_cobranca, contagem_cobrancas, status_ciclo). Fonte do Cost Report ramificada por ambiente (spec.md seção 7.4, linha 486): Box em produção, Google Drive (HOMOLOG_BOX-FISH) em homolog — planilhas de Contratos continuam no Box em qualquer ambiente (só leitura, assunção flagada). Ciclo de escrita (coluna N/L) ramificado por ambiente: Drive (sem lock, pasta pessoal de teste) em homolog, Box (lock/unlock) em produção — 2 IFs (reler e upload) garantem que só o ramo certo executa. LIMITAÇÃO CONHECIDA: resolve só 1 arquivo-alvo por execução (S01 OU S02), não os dois ao mesmo tempo."
+    "description": "Automação de solicitação de nota fiscal aos colaboradores (docs/spec.md seção 3). Cobre os 3 projetos (AREP, Reunion, Soft Pré) num único workflow parametrizado. Ver /home/.../.claude/plans (histórico de planejamento) e docs/spec.md como fonte da verdade — não editar a lógica de negócio aqui sem antes atualizar o spec.md. Fechamento REC/REC+NF (spec.md secao 3.2/3.2.1, commit 1ca83a7): Fase 1 agora usa IA (Claude) pra interpretar a coluna J e classificar RECIBO/NOTA_FISCAL em casos de fornecedor/locacao; linhas de fornecedor com mesmo vencimento sao agrupadas num unico e-mail multi-bloco. Fechamento REC/REC+NF (spec.md secao 3.2/3.2.1, commit 1ca83a7): Fase 1 agora usa IA (Claude) pra interpretar a coluna J e classificar RECIBO/NOTA_FISCAL em casos de fornecedor/locacao; linhas de fornecedor com mesmo vencimento sao agrupadas num unico e-mail multi-bloco. Fechamento REC/REC+NF (spec.md secao 3.2/3.2.1, commit 1ca83a7): Fase 1 agora usa IA (Claude) pra interpretar a coluna J e classificar RECIBO/NOTA_FISCAL em casos de fornecedor/locacao; linhas de fornecedor com mesmo vencimento sao agrupadas num unico e-mail multi-bloco. Rodada de ajustes (spec.md commits 460aa40, 0738814): (1) gate de contrato para fornecedor agora é por GRUPO (corrige divergência entre linhas do mesmo fornecedor/vencimento, seção 3.2.1); (2) ambiente (homolog/produção) e limite_linhas_execucao (modo assistido) agora são lidos de config_execucao.json por este ÚNICO workflow — não existe mais arquivo .homolog.json separado (seção 7.4); (3) log diário alimentado aqui para o workflow resumo_diario.json (seção 7.3). Rodada de ajustes (spec.md commits 460aa40, 0738814): (1) gate de contrato para fornecedor agora é por GRUPO (corrige divergência entre linhas do mesmo fornecedor/vencimento, seção 3.2.1); (2) ambiente (homolog/produção) e limite_linhas_execucao (modo assistido) agora são lidos de config_execucao.json por este ÚNICO workflow — não existe mais arquivo .homolog.json separado (seção 7.4); (3) log diário alimentado aqui para o workflow resumo_diario.json (seção 7.3). Correção (pré-requisito da Fase 2): threadId agora é capturado após criar o rascunho/enviar o pedido e gravado em cobrancas.json com o schema exato do spec.md seção 3.1.1 (threadId, data_ultima_cobranca, contagem_cobrancas, status_ciclo). Fonte do Cost Report ramificada por ambiente (spec.md seção 7.4, linha 486): Box em produção, Google Drive (HOMOLOG_BOX-FISH) em homolog — planilhas de Contratos continuam no Box em qualquer ambiente (só leitura, assunção flagada). Ciclo de escrita (coluna N/L) ramificado por ambiente: Drive (sem lock, pasta pessoal de teste) em homolog, Box (lock/unlock) em produção — 2 IFs (reler e upload) garantem que só o ramo certo executa. LIMITAÇÃO CONHECIDA: resolve só 1 arquivo-alvo por execução (S01 OU S02), não os dois ao mesmo tempo. Planilhas de Contratos movidas do Box pro Google Drive (spec.md seção 6, commit 7da28a2): pasta \"JURIDICO\" (AREP+Reunion) e \"SMTC_S02_EXECUTIVA > JURIDICO S02\" (Soft Pré), credencial \"Google Drive account\", busca por nome (pastas compartilhadas, sem ID fixo conhecido) — só leitura, sem lock/upload."
   },
   "nodes": [
     {
@@ -153,69 +153,6 @@
     },
     {
       "parameters": {
-        "resource": "file",
-        "operation": "download",
-        "fileId": "REPLACE_WITH_FILE_ID_CONTRATOS_AREP"
-      },
-      "id": "n10-box-download-contratos-arep",
-      "name": "Box — Download Contratos AREP",
-      "type": "n8n-nodes-base.box",
-      "typeVersion": 1,
-      "position": [
-        700,
-        440
-      ],
-      "credentials": {
-        "boxOAuth2Api": {
-          "id": "REPLACE",
-          "name": "Box account"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "resource": "file",
-        "operation": "download",
-        "fileId": "REPLACE_WITH_FILE_ID_CONTRATOS_REUNION"
-      },
-      "id": "n11-box-download-contratos-reunion",
-      "name": "Box — Download Contratos Reunion",
-      "type": "n8n-nodes-base.box",
-      "typeVersion": 1,
-      "position": [
-        700,
-        560
-      ],
-      "credentials": {
-        "boxOAuth2Api": {
-          "id": "REPLACE",
-          "name": "Box account"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "resource": "file",
-        "operation": "download",
-        "fileId": "REPLACE_WITH_FILE_ID_CONTRATOS_SOFTPRE"
-      },
-      "id": "n12-box-download-contratos-softpre",
-      "name": "Box — Download Contratos Soft Pré",
-      "type": "n8n-nodes-base.box",
-      "typeVersion": 1,
-      "position": [
-        700,
-        680
-      ],
-      "credentials": {
-        "boxOAuth2Api": {
-          "id": "REPLACE",
-          "name": "Box account"
-        }
-      }
-    },
-    {
-      "parameters": {
         "numberInputs": 6
       },
       "id": "n12b-merge-downloads",
@@ -230,7 +167,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Requer NODE_FUNCTION_ALLOW_EXTERNAL=exceljs configurado na VM (spec.md seção 5, decisão técnica).\nconst ExcelJS = require('exceljs');\n\nfunction normalizar(texto) {\n  if (!texto) return '';\n  return String(texto).normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toLowerCase().trim().replace(/\\s+/g, ' ');\n}\n\nfunction linhaTemPreenchimento(cell) {\n  const fill = cell && cell.fill;\n  if (!fill || fill.type !== 'pattern' || fill.pattern !== 'solid') return false;\n  const argb = fill.fgColor && fill.fgColor.argb;\n  if (!argb) return false;\n  return argb !== 'FFFFFFFF' && argb !== '00000000';\n}\n\nasync function lerAbaNotas(binaryPropertyName, nodeName, projetoFixo) {\n  const item = $(nodeName).first();\n  const buffer = Buffer.from(item.binary.data.data, 'base64');\n  const wb = new ExcelJS.Workbook();\n  await wb.xlsx.load(buffer);\n  const ws = wb.getWorksheet('Notas') || wb.worksheets[0];\n  const linhas = [];\n  ws.eachRow({ includeEmpty: false }, (row, rowNumber) => {\n    if (rowNumber === 1) return; // cabeçalho\n    const projetoId = projetoFixo || (linhaTemPreenchimento(row.getCell('L')) ? 'REUNION' : 'AREP');\n    linhas.push({\n      linha: rowNumber,\n      projetoId,\n      colunaB: row.getCell('B').text,\n      colunaC: row.getCell('C').text,\n      colunaG: row.getCell('G').text,\n      colunaH: row.getCell('H').text,\n      colunaJ: row.getCell('J').text,\n      colunaK: Number(row.getCell('K').value) || 0,\n      colunaL: row.getCell('L').text,\n      colunaN: row.getCell('N').text,\n      colunaR: row.getCell('R').text,\n    });\n  });\n  return linhas;\n}\n\nasync function lerPlanilhaContratos(nodeName) {\n  const item = $(nodeName).first();\n  const buffer = Buffer.from(item.binary.data.data, 'base64');\n  const wb = new ExcelJS.Workbook();\n  await wb.xlsx.load(buffer);\n  const ws = wb.worksheets[0];\n  const linhas = [];\n  ws.eachRow({ includeEmpty: false }, (row, rowNumber) => {\n    if (rowNumber === 1) return;\n    linhas.push({\n      razaoSocial: row.getCell('A').text,\n      nomeColaborador: row.getCell('B').text,\n      status: row.getCell('C').text,\n    });\n  });\n  return linhas;\n}\n\nconst linhasS01 = await lerAbaNotas(null, 'Box — Download Cost Report S01', null); // cor decide AREP/REUNION\nconst linhasS02 = await lerAbaNotas(null, 'Box — Download Cost Report S02 (Soft Pré)', 'SOFT_PRE');\n\nconst contratos = {\n  AREP: await lerPlanilhaContratos('Box — Download Contratos AREP'),\n  REUNION: await lerPlanilhaContratos('Box — Download Contratos Reunion'),\n  SOFT_PRE: await lerPlanilhaContratos('Box — Download Contratos Soft Pré'),\n};\n\nconst cfg = $('Carregar config + perfis').first().json;\n\nconst todasAsLinhas = [...linhasS01, ...linhasS02];\n\nreturn todasAsLinhas.map((nota) => ({\n  json: {\n    nota,\n    contratosDoProjeto: contratos[nota.projetoId],\n    config: cfg.config,\n    cobrancas: cfg.cobrancas,\n    apelidos: cfg.apelidos,\n    perfil: cfg.perfis[nota.projetoId],\n    dominioEmpresa: cfg.dominioEmpresa,\n  },\n}));"
+        "jsCode": "// Requer NODE_FUNCTION_ALLOW_EXTERNAL=exceljs configurado na VM (spec.md seção 5, decisão técnica).\nconst ExcelJS = require('exceljs');\n\nfunction normalizar(texto) {\n  if (!texto) return '';\n  return String(texto).normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toLowerCase().trim().replace(/\\s+/g, ' ');\n}\n\nfunction linhaTemPreenchimento(cell) {\n  const fill = cell && cell.fill;\n  if (!fill || fill.type !== 'pattern' || fill.pattern !== 'solid') return false;\n  const argb = fill.fgColor && fill.fgColor.argb;\n  if (!argb) return false;\n  return argb !== 'FFFFFFFF' && argb !== '00000000';\n}\n\nasync function lerAbaNotas(binaryPropertyName, nodeName, projetoFixo) {\n  const item = $(nodeName).first();\n  const buffer = Buffer.from(item.binary.data.data, 'base64');\n  const wb = new ExcelJS.Workbook();\n  await wb.xlsx.load(buffer);\n  const ws = wb.getWorksheet('Notas') || wb.worksheets[0];\n  const linhas = [];\n  ws.eachRow({ includeEmpty: false }, (row, rowNumber) => {\n    if (rowNumber === 1) return; // cabeçalho\n    const projetoId = projetoFixo || (linhaTemPreenchimento(row.getCell('L')) ? 'REUNION' : 'AREP');\n    linhas.push({\n      linha: rowNumber,\n      projetoId,\n      colunaB: row.getCell('B').text,\n      colunaC: row.getCell('C').text,\n      colunaG: row.getCell('G').text,\n      colunaH: row.getCell('H').text,\n      colunaJ: row.getCell('J').text,\n      colunaK: Number(row.getCell('K').value) || 0,\n      colunaL: row.getCell('L').text,\n      colunaN: row.getCell('N').text,\n      colunaR: row.getCell('R').text,\n    });\n  });\n  return linhas;\n}\n\nasync function lerPlanilhaContratos(nodeName) {\n  const item = $(nodeName).first();\n  const buffer = Buffer.from(item.binary.data.data, 'base64');\n  const wb = new ExcelJS.Workbook();\n  await wb.xlsx.load(buffer);\n  const ws = wb.worksheets[0];\n  const linhas = [];\n  ws.eachRow({ includeEmpty: false }, (row, rowNumber) => {\n    if (rowNumber === 1) return;\n    linhas.push({\n      razaoSocial: row.getCell('A').text,\n      nomeColaborador: row.getCell('B').text,\n      status: row.getCell('C').text,\n    });\n  });\n  return linhas;\n}\n\nconst linhasS01 = await lerAbaNotas(null, 'Box — Download Cost Report S01', null); // cor decide AREP/REUNION\nconst linhasS02 = await lerAbaNotas(null, 'Box — Download Cost Report S02 (Soft Pré)', 'SOFT_PRE');\n\nconst contratos = {\n  AREP: await lerPlanilhaContratos('Drive — Download Contratos AREP'),\n  REUNION: await lerPlanilhaContratos('Drive — Download Contratos Reunion'),\n  SOFT_PRE: await lerPlanilhaContratos('Drive — Download Contratos Soft Pré'),\n};\n\nconst cfg = $('Carregar config + perfis').first().json;\n\nconst todasAsLinhas = [...linhasS01, ...linhasS02];\n\nreturn todasAsLinhas.map((nota) => ({\n  json: {\n    nota,\n    contratosDoProjeto: contratos[nota.projetoId],\n    config: cfg.config,\n    cobrancas: cfg.cobrancas,\n    apelidos: cfg.apelidos,\n    perfil: cfg.perfis[nota.projetoId],\n    dominioEmpresa: cfg.dominioEmpresa,\n  },\n}));"
       },
       "id": "n13-parse-planilhas",
       "name": "Parsear planilhas (exceljs) e separar AREP/Reunion por cor",
@@ -1756,6 +1693,298 @@
           "name": "Google Drive - Particular Michelle"
         }
       }
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "operation": "search",
+        "queryString": "JURIDICO",
+        "filter": {
+          "whatToSearch": "fileFolder"
+        }
+      },
+      "id": "drive-buscar-juridico",
+      "name": "Drive — Buscar pasta JURIDICO (AREP+Reunion)",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        700,
+        440
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "REPLACE",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const r = $input.first().json; const item = (r.files && r.files[0]) || r; return [{ json: { fileId: item && item.id } }];"
+      },
+      "id": "drive-pick-juridico",
+      "name": "Escolher pasta JURIDICO",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        440
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "operation": "search",
+        "queryString": "BR_AREP_S01_CONTROLE DE CONTRATOS.xlsb",
+        "filter": {
+          "whatToSearch": "files",
+          "folderId": "={{ $json.fileId }}"
+        }
+      },
+      "id": "drive-buscar-arep-xlsb",
+      "name": "Drive — Buscar Contratos AREP (.xlsb)",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1100,
+        380
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "REPLACE",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const r = $input.first().json; const item = (r.files && r.files[0]) || r; return [{ json: { fileId: item && item.id } }];"
+      },
+      "id": "drive-pick-arep-xlsb",
+      "name": "Escolher arquivo Contratos AREP",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1300,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "download",
+        "fileId": "={{ $json.fileId }}"
+      },
+      "id": "drive-baixar-arep-xlsb",
+      "name": "Drive — Download Contratos AREP",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1500,
+        380
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "REPLACE",
+          "name": "Google Drive account"
+        }
+      },
+      "notes": "Só leitura, sem lock/upload (spec.md seção 6, commit 7da28a2) — .xlsb não abre em preview no Drive mas download_file_content funciona normalmente."
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "operation": "search",
+        "queryString": "BR_AREP_S01_REUNION_CONTROLE DE CONTRATOS.xlsb",
+        "filter": {
+          "whatToSearch": "files",
+          "folderId": "={{ $('Escolher pasta JURIDICO').first().json.fileId }}"
+        }
+      },
+      "id": "drive-buscar-reunion-xlsb",
+      "name": "Drive — Buscar Contratos Reunion (.xlsb)",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1100,
+        500
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "REPLACE",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const r = $input.first().json; const item = (r.files && r.files[0]) || r; return [{ json: { fileId: item && item.id } }];"
+      },
+      "id": "drive-pick-reunion-xlsb",
+      "name": "Escolher arquivo Contratos Reunion",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1300,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "download",
+        "fileId": "={{ $json.fileId }}"
+      },
+      "id": "drive-baixar-reunion-xlsb",
+      "name": "Drive — Download Contratos Reunion",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1500,
+        500
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "REPLACE",
+          "name": "Google Drive account"
+        }
+      },
+      "notes": "Só leitura, sem lock/upload (spec.md seção 6, commit 7da28a2) — .xlsb não abre em preview no Drive mas download_file_content funciona normalmente."
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "operation": "search",
+        "queryString": "SMTC_S02_EXECUTIVA",
+        "filter": {
+          "whatToSearch": "fileFolder"
+        }
+      },
+      "id": "drive-buscar-executiva",
+      "name": "Drive — Buscar pasta SMTC_S02_EXECUTIVA",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        700,
+        640
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "REPLACE",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const r = $input.first().json; const item = (r.files && r.files[0]) || r; return [{ json: { fileId: item && item.id } }];"
+      },
+      "id": "drive-pick-executiva",
+      "name": "Escolher pasta SMTC_S02_EXECUTIVA",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        640
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "operation": "search",
+        "queryString": "JURIDICO S02",
+        "filter": {
+          "whatToSearch": "files",
+          "folderId": "={{ $json.fileId }}"
+        }
+      },
+      "id": "drive-buscar-juridico-s02",
+      "name": "Drive — Buscar pasta JURIDICO S02",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1100,
+        640
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "REPLACE",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const r = $input.first().json; const item = (r.files && r.files[0]) || r; return [{ json: { fileId: item && item.id } }];"
+      },
+      "id": "drive-pick-juridico-s02",
+      "name": "Escolher pasta JURIDICO S02",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1300,
+        640
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "operation": "search",
+        "queryString": "BR_SMTC_S02_CONTROLE DE CONTRATOS.xlsb",
+        "filter": {
+          "whatToSearch": "files",
+          "folderId": "={{ $json.fileId }}"
+        }
+      },
+      "id": "drive-buscar-softpre-xlsb",
+      "name": "Drive — Buscar Contratos Soft Pré (.xlsb)",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1500,
+        640
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "REPLACE",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const r = $input.first().json; const item = (r.files && r.files[0]) || r; return [{ json: { fileId: item && item.id } }];"
+      },
+      "id": "drive-pick-softpre-xlsb",
+      "name": "Escolher arquivo Contratos Soft Pré",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1700,
+        640
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "download",
+        "fileId": "={{ $json.fileId }}"
+      },
+      "id": "drive-baixar-softpre-xlsb",
+      "name": "Drive — Download Contratos Soft Pré",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1900,
+        640
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "REPLACE",
+          "name": "Google Drive account"
+        }
+      },
+      "notes": "Só leitura, sem lock/upload (spec.md seção 6, commit 7da28a2) — .xlsb não abre em preview no Drive mas download_file_content funciona normalmente."
     }
   ],
   "connections": {
@@ -1864,27 +2093,22 @@
       "main": [
         [
           {
-            "node": "Box — Download Contratos AREP",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Box — Download Contratos Reunion",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Box — Download Contratos Soft Pré",
-            "type": "main",
-            "index": 0
-          },
-          {
             "node": "Merge — downloads + config",
             "type": "main",
             "index": 0
           },
           {
             "node": "IF — Ambiente = homolog? (fonte Cost Report)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Drive — Buscar pasta JURIDICO (AREP+Reunion)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Drive — Buscar pasta SMTC_S02_EXECUTIVA",
             "type": "main",
             "index": 0
           }
@@ -1909,39 +2133,6 @@
             "node": "Merge — downloads + config",
             "type": "main",
             "index": 2
-          }
-        ]
-      ]
-    },
-    "Box — Download Contratos AREP": {
-      "main": [
-        [
-          {
-            "node": "Merge — downloads + config",
-            "type": "main",
-            "index": 3
-          }
-        ]
-      ]
-    },
-    "Box — Download Contratos Reunion": {
-      "main": [
-        [
-          {
-            "node": "Merge — downloads + config",
-            "type": "main",
-            "index": 4
-          }
-        ]
-      ]
-    },
-    "Box — Download Contratos Soft Pré": {
-      "main": [
-        [
-          {
-            "node": "Merge — downloads + config",
-            "type": "main",
-            "index": 5
           }
         ]
       ]
@@ -2819,6 +3010,176 @@
             "node": "Box — Upload nova versão",
             "type": "main",
             "index": 0
+          }
+        ]
+      ]
+    },
+    "Drive — Buscar pasta JURIDICO (AREP+Reunion)": {
+      "main": [
+        [
+          {
+            "node": "Escolher pasta JURIDICO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Escolher pasta JURIDICO": {
+      "main": [
+        [
+          {
+            "node": "Drive — Buscar Contratos AREP (.xlsb)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Drive — Buscar Contratos Reunion (.xlsb)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Drive — Buscar Contratos AREP (.xlsb)": {
+      "main": [
+        [
+          {
+            "node": "Escolher arquivo Contratos AREP",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Escolher arquivo Contratos AREP": {
+      "main": [
+        [
+          {
+            "node": "Drive — Download Contratos AREP",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Drive — Download Contratos AREP": {
+      "main": [
+        [
+          {
+            "node": "Merge — downloads + config",
+            "type": "main",
+            "index": 3
+          }
+        ]
+      ]
+    },
+    "Drive — Buscar Contratos Reunion (.xlsb)": {
+      "main": [
+        [
+          {
+            "node": "Escolher arquivo Contratos Reunion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Escolher arquivo Contratos Reunion": {
+      "main": [
+        [
+          {
+            "node": "Drive — Download Contratos Reunion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Drive — Download Contratos Reunion": {
+      "main": [
+        [
+          {
+            "node": "Merge — downloads + config",
+            "type": "main",
+            "index": 4
+          }
+        ]
+      ]
+    },
+    "Drive — Buscar pasta SMTC_S02_EXECUTIVA": {
+      "main": [
+        [
+          {
+            "node": "Escolher pasta SMTC_S02_EXECUTIVA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Escolher pasta SMTC_S02_EXECUTIVA": {
+      "main": [
+        [
+          {
+            "node": "Drive — Buscar pasta JURIDICO S02",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Drive — Buscar pasta JURIDICO S02": {
+      "main": [
+        [
+          {
+            "node": "Escolher pasta JURIDICO S02",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Escolher pasta JURIDICO S02": {
+      "main": [
+        [
+          {
+            "node": "Drive — Buscar Contratos Soft Pré (.xlsb)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Drive — Buscar Contratos Soft Pré (.xlsb)": {
+      "main": [
+        [
+          {
+            "node": "Escolher arquivo Contratos Soft Pré",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Escolher arquivo Contratos Soft Pré": {
+      "main": [
+        [
+          {
+            "node": "Drive — Download Contratos Soft Pré",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Drive — Download Contratos Soft Pré": {
+      "main": [
+        [
+          {
+            "node": "Merge — downloads + config",
+            "type": "main",
+            "index": 5
           }
         ]
       ]
