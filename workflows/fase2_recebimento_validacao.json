@@ -156,7 +156,7 @@
       "parameters": {
         "resource": "file",
         "operation": "download",
-        "fileId": "REPLACE_WITH_FILE_ID_COST_REPORT_S01"
+        "fileId": "2028817453680"
       },
       "id": "f2r-10-box-s01",
       "name": "Box — Download Cost Report S01",
@@ -177,7 +177,7 @@
       "parameters": {
         "resource": "file",
         "operation": "download",
-        "fileId": "REPLACE_WITH_FILE_ID_COST_REPORT_S02"
+        "fileId": "2366859928452"
       },
       "id": "f2r-11-box-s02",
       "name": "Box — Download Cost Report S02 (Soft Pré)",
@@ -361,7 +361,7 @@
     },
     {
       "parameters": {
-        "chatId": "REPLACE_WITH_MICHELLE_TELEGRAM_CHAT_ID",
+        "chatId": "749277207",
         "text": "={{ '❓ Não consegui identificar essa nota (Fase 2)\\n\\nNome/razão social: ' + ($json.extracao.nomeOuRazaoSocial || '?') + '\\nProjeto (Ref.): ' + ($json.extracao.projetoRef || '?') + '\\nValor: ' + ($json.extracao.valor || '?') + '\\nCompetência: ' + ($json.extracao.competencia || '?') + '\\n\\nResponda a ESTA mensagem (usando \"responder\") com a linha/colaborador correta.' }}",
         "additionalFields": {
           "parse_mode": "Markdown"

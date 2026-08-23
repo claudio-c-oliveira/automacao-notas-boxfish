@@ -112,7 +112,7 @@
       "parameters": {
         "resource": "file",
         "operation": "download",
-        "fileId": "REPLACE_WITH_FILE_ID_COST_REPORT_S01"
+        "fileId": "2028817453680"
       },
       "id": "n08-box-download-s01",
       "name": "Box — Download Cost Report S01",
@@ -134,7 +134,7 @@
       "parameters": {
         "resource": "file",
         "operation": "download",
-        "fileId": "REPLACE_WITH_FILE_ID_COST_REPORT_S02"
+        "fileId": "2366859928452"
       },
       "id": "n09-box-download-s02",
       "name": "Box — Download Cost Report S02 (Soft Pré)",
@@ -553,7 +553,7 @@
     },
     {
       "parameters": {
-        "chatId": "REPLACE_WITH_MICHELLE_TELEGRAM_CHAT_ID",
+        "chatId": "749277207",
         "text": "={{ '✅ Correção automática de contrato (Fase 1)\\n\\nFornecedor: ' + $json.fornecedor + '\\n\\nLinhas corrigidas pra \"OK - ASSINADO\" (estavam pendentes/vazias, mas outra linha do mesmo fornecedor/vencimento já estava assinada):\\n' + $json.linhasCorrigidas.map(l => '- Linha ' + l.linha + ': R$ ' + l.valor.toLocaleString('pt-BR', {minimumFractionDigits:2})).join('\\n') }}",
         "additionalFields": {
           "parse_mode": "Markdown"
@@ -577,7 +577,7 @@
     },
     {
       "parameters": {
-        "chatId": "REPLACE_WITH_MICHELLE_TELEGRAM_CHAT_ID",
+        "chatId": "749277207",
         "text": "={{ '⚠️ Situação não mapeada (Fase 1)\\n\\nProjeto: ' + $json.nota.projetoId + '\\nLinha: ' + $json.nota.linha + '\\nFornecedor/Descrição: ' + ($json.nota.colunaH || $json.nota.colunaJ) + '\\n\\n' + $json.situacaoNaoMapeada }}",
         "additionalFields": {
           "parse_mode": "Markdown"
@@ -1078,7 +1078,7 @@
     },
     {
       "parameters": {
-        "chatId": "REPLACE_WITH_MICHELLE_TELEGRAM_CHAT_ID",
+        "chatId": "749277207",
         "text": "={{ '📋 Relatório Fase 1 — Solicitação de Nota\\n\\nRascunhos criados: ' + $json.resumo.rascunhosCriados + '\\nEnvios diretos: ' + $json.resumo.enviosDiretos + '\\nPendentes de contrato: ' + $json.resumo.pendentesContrato + '\\nCom lacuna de informação (FALTA INFORMAÇÃO): ' + $json.resumo.comLacunaInformacao + '\\nCorreções de contrato aplicadas: ' + $json.resumo.correcoesContrato + '\\nSituações não mapeadas (alertadas): ' + $json.resumo.alertasSituacaoNaoMapeada + '\\nCiclos encerrados sem resposta: ' + $json.resumo.alertasEncerramento.length }}",
         "additionalFields": {
           "parse_mode": "Markdown"

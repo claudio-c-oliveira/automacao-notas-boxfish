@@ -50,7 +50,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Normaliza a origem do disparo: agendado (fim do dia, chat fixo da Michelle) ou\n// sob demanda (/resumo, responde no mesmo chat de onde veio o comando).\nconst viaComando = $input.first().json.message !== undefined;\nconst chatId = viaComando ? $input.first().json.message.chat.id : 'REPLACE_WITH_MICHELLE_TELEGRAM_CHAT_ID';\nreturn [{ json: { chatId } }];"
+        "jsCode": "// Normaliza a origem do disparo: agendado (fim do dia, chat fixo da Michelle) ou\n// sob demanda (/resumo, responde no mesmo chat de onde veio o comando).\nconst viaComando = $input.first().json.message !== undefined;\nconst chatId = viaComando ? $input.first().json.message.chat.id : '749277207';\nreturn [{ json: { chatId } }];"
       },
       "id": "r05-resolver-chat",
       "name": "Resolver chat de destino",

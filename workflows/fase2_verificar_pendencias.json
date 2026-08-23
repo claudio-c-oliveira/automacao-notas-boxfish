@@ -78,7 +78,7 @@
     },
     {
       "parameters": {
-        "chatId": "REPLACE_WITH_MICHELLE_TELEGRAM_CHAT_ID",
+        "chatId": "749277207",
         "text": "={{ '⏰ Lembrete — ainda preciso identificar essa nota (Fase 2)\\n\\nNome/razão social: ' + ($json.pendencia.dadosReferencia.nomeOuRazaoSocial || '?') + '\\nValor: ' + ($json.pendencia.dadosReferencia.valor || '?') + '\\n\\nResponda a ESTA mensagem (usando \"responder\") com a linha/colaborador correta.' }}",
         "additionalFields": {
           "parse_mode": "Markdown"
@@ -101,7 +101,7 @@
     },
     {
       "parameters": {
-        "chatId": "REPLACE_WITH_MICHELLE_TELEGRAM_CHAT_ID",
+        "chatId": "749277207",
         "text": "={{ '🛑 Ciclo encerrado sem resposta (Fase 2)\\n\\nNome/razão social: ' + ($json.pendencia.dadosReferencia.nomeOuRazaoSocial || '?') + '\\nValor: ' + ($json.pendencia.dadosReferencia.valor || '?') + '\\n\\nPassaram 26h sem resposta — não vou mais perguntar automaticamente sobre essa nota. Fica pendente pra você resolver manualmente.' }}",
         "additionalFields": {
           "parse_mode": "Markdown"
@@ -338,7 +338,7 @@
       "parameters": {
         "resource": "file",
         "operation": "download",
-        "fileId": "REPLACE_WITH_FILE_ID_COST_REPORT_S01"
+        "fileId": "2028817453680"
       },
       "id": "f2p-19-box-s01",
       "name": "Box — Download Cost Report S01",
@@ -359,7 +359,7 @@
       "parameters": {
         "resource": "file",
         "operation": "download",
-        "fileId": "REPLACE_WITH_FILE_ID_COST_REPORT_S02"
+        "fileId": "2366859928452"
       },
       "id": "f2p-20-box-s02",
       "name": "Box — Download Cost Report S02 (Soft Pré)",

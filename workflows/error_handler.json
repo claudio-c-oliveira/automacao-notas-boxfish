@@ -22,7 +22,7 @@
     },
     {
       "parameters": {
-        "chatId": "REPLACE_WITH_MICHELLE_TELEGRAM_CHAT_ID",
+        "chatId": "749277207",
         "text": "={{ $json.texto }}",
         "additionalFields": {
           "parse_mode": "Markdown"
