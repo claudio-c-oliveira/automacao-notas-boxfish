@@ -87,7 +87,7 @@
       ],
       "credentials": {
         "googleDriveOAuth2Api": {
-          "id": "REPLACE",
+          "id": "cred-gdrive-particular-michelle",
           "name": "Google Drive - Particular Michelle"
         }
       },
@@ -135,7 +135,7 @@
       ],
       "credentials": {
         "googleDriveOAuth2Api": {
-          "id": "REPLACE",
+          "id": "cred-gdrive-particular-michelle",
           "name": "Google Drive - Particular Michelle"
         }
       },
@@ -174,7 +174,7 @@
       ],
       "credentials": {
         "googleDriveOAuth2Api": {
-          "id": "REPLACE",
+          "id": "cred-gdrive-particular-michelle",
           "name": "Google Drive - Particular Michelle"
         }
       },
@@ -200,7 +200,7 @@
       ],
       "credentials": {
         "googleDriveOAuth2Api": {
-          "id": "REPLACE",
+          "id": "cred-gdrive-trabalho",
           "name": "Google Drive account"
         }
       },
@@ -248,7 +248,7 @@
       ],
       "credentials": {
         "googleDriveOAuth2Api": {
-          "id": "REPLACE",
+          "id": "cred-gdrive-trabalho",
           "name": "Google Drive account"
         }
       },
@@ -287,7 +287,7 @@
       ],
       "credentials": {
         "googleDriveOAuth2Api": {
-          "id": "REPLACE",
+          "id": "cred-gdrive-trabalho",
           "name": "Google Drive account"
         }
       },
@@ -348,7 +348,7 @@
       ],
       "credentials": {
         "boxOAuth2Api": {
-          "id": "REPLACE",
+          "id": "cred-box-account",
           "name": "Box account"
         }
       }
@@ -383,7 +383,7 @@
       ],
       "credentials": {
         "boxOAuth2Api": {
-          "id": "REPLACE",
+          "id": "cred-box-account",
           "name": "Box account"
         }
       }

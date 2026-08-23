@@ -7,7 +7,10 @@
       "name": "Error Trigger",
       "type": "n8n-nodes-base.errorTrigger",
       "typeVersion": 1,
-      "position": [0, 0],
+      "position": [
+        0,
+        0
+      ],
       "notes": "Disparado automaticamente pelo n8n quando qualquer workflow que aponte pra este como 'Error Workflow' (settings > Error Workflow) falha. Referência: spec.md seção 7.1/7.3."
     },
     {
@@ -18,7 +21,10 @@
       "name": "Montar mensagem de alerta",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [220, 0]
+      "position": [
+        220,
+        0
+      ]
     },
     {
       "parameters": {
@@ -32,10 +38,13 @@
       "name": "Telegram — Alertar Michelle",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [440, 0],
+      "position": [
+        440,
+        0
+      ],
       "credentials": {
         "telegramApi": {
-          "id": "REPLACE_WITH_CREDENTIAL_ID",
+          "id": "cred-telegram-account",
           "name": "Telegram account"
         }
       },
@@ -45,12 +54,24 @@
   "connections": {
     "Error Trigger": {
       "main": [
-        [{ "node": "Montar mensagem de alerta", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Montar mensagem de alerta",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Montar mensagem de alerta": {
       "main": [
-        [{ "node": "Telegram — Alertar Michelle", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Telegram — Alertar Michelle",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     }
   },

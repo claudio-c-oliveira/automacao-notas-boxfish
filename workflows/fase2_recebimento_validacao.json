@@ -18,9 +18,11 @@
     {
       "parameters": {
         "resource": "message",
-        "operation": "search",
-        "q": "has:attachment newer_than:2d",
-        "returnAll": true
+        "operation": "getAll",
+        "returnAll": true,
+        "filters": {
+          "q": "has:attachment newer_than:2d"
+        }
       },
       "id": "f2r-02-buscar-recentes",
       "name": "Gmail — Buscar e-mails recentes com anexo",
@@ -32,7 +34,7 @@
       ],
       "credentials": {
         "gmailOAuth2": {
-          "id": "REPLACE",
+          "id": "cred-gmail-producao",
           "name": "Gmail account"
         }
       },
@@ -62,7 +64,7 @@
       ],
       "credentials": {
         "gmailOAuth2": {
-          "id": "REPLACE",
+          "id": "cred-gmail-producao",
           "name": "Gmail account"
         }
       },
@@ -168,7 +170,7 @@
       ],
       "credentials": {
         "boxOAuth2Api": {
-          "id": "REPLACE",
+          "id": "cred-box-account",
           "name": "Box account"
         }
       }
@@ -189,7 +191,7 @@
       ],
       "credentials": {
         "boxOAuth2Api": {
-          "id": "REPLACE",
+          "id": "cred-box-account",
           "name": "Box account"
         }
       }
@@ -267,7 +269,7 @@
       ],
       "credentials": {
         "gmailOAuth2": {
-          "id": "REPLACE",
+          "id": "cred-gmail-producao",
           "name": "Gmail account"
         }
       }
@@ -377,7 +379,7 @@
       ],
       "credentials": {
         "telegramApi": {
-          "id": "REPLACE",
+          "id": "cred-telegram-account",
           "name": "Telegram account"
         }
       },
@@ -505,7 +507,7 @@
       ],
       "credentials": {
         "anthropicApi": {
-          "id": "REPLACE",
+          "id": "cred-claude-dev",
           "name": "Claude account (dev)"
         }
       }
@@ -539,7 +541,7 @@
       ],
       "credentials": {
         "anthropicApi": {
-          "id": "REPLACE",
+          "id": "cred-claude-producao",
           "name": "Claude account (produção)"
         }
       }
@@ -611,7 +613,7 @@
       ],
       "credentials": {
         "anthropicApi": {
-          "id": "REPLACE",
+          "id": "cred-claude-dev",
           "name": "Claude account (dev)"
         }
       }
@@ -645,7 +647,7 @@
       ],
       "credentials": {
         "anthropicApi": {
-          "id": "REPLACE",
+          "id": "cred-claude-producao",
           "name": "Claude account (produção)"
         }
       }

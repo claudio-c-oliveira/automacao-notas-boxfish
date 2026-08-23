@@ -6,31 +6,59 @@
   "nodes": [
     {
       "parameters": {
-        "rule": { "interval": [{ "field": "days", "daysInterval": 1, "triggerAtHour": 23 }] }
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "daysInterval": 1,
+              "triggerAtHour": 23
+            }
+          ]
+        }
       },
       "id": "r01-schedule-fim-dia",
       "name": "Schedule Trigger (fim do dia, 23h)",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [0, 0]
+      "position": [
+        0,
+        0
+      ]
     },
     {
       "parameters": {
-        "updates": ["message"]
+        "updates": [
+          "message"
+        ]
       },
       "id": "r02-telegram-trigger",
       "name": "Telegram Trigger",
       "type": "n8n-nodes-base.telegramTrigger",
       "typeVersion": 1.1,
-      "position": [0, 200],
-      "credentials": { "telegramApi": { "id": "REPLACE", "name": "Telegram account" } },
+      "position": [
+        0,
+        200
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "cred-telegram-account",
+          "name": "Telegram account"
+        }
+      },
       "notes": "Escuta todas as mensagens do bot — filtradas pro comando /resumo no node seguinte."
     },
     {
       "parameters": {
         "conditions": {
           "conditions": [
-            { "leftValue": "={{ ($json.message && $json.message.text || '').trim().toLowerCase() }}", "rightValue": "/resumo", "operator": { "type": "string", "operation": "equals" } }
+            {
+              "leftValue": "={{ ($json.message && $json.message.text || '').trim().toLowerCase() }}",
+              "rightValue": "/resumo",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
           ]
         }
       },
@@ -38,7 +66,10 @@
       "name": "IF — Comando é /resumo?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [220, 200]
+      "position": [
+        220,
+        200
+      ]
     },
     {
       "parameters": {},
@@ -46,7 +77,10 @@
       "name": "NoOp — Ignorar (não é /resumo)",
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
-      "position": [440, 320]
+      "position": [
+        440,
+        320
+      ]
     },
     {
       "parameters": {
@@ -56,15 +90,25 @@
       "name": "Resolver chat de destino",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [440, 100]
+      "position": [
+        440,
+        100
+      ]
     },
     {
-      "parameters": { "operation": "read", "fileSelector": "/home/node/.n8n/box-fish-config/log_diario.json", "options": {} },
+      "parameters": {
+        "operation": "read",
+        "fileSelector": "/home/node/.n8n/box-fish-config/log_diario.json",
+        "options": {}
+      },
       "id": "r07-ler-log",
       "name": "Ler log_diario.json",
       "type": "n8n-nodes-base.readWriteFile",
       "typeVersion": 1,
-      "position": [880, 100],
+      "position": [
+        880,
+        100
+      ],
       "notes": "Mesmo arquivo alimentado por 'Preparar log_diario.json atualizado' em fase1_solicitacao_nota.json (e, no futuro, pelas Fases 2 e 3+4)."
     },
     {
@@ -75,44 +119,109 @@
       "name": "Montar resumo do dia",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1100, 100],
+      "position": [
+        1100,
+        100
+      ],
       "notes": "Formato é ponto de partida, não definitivo (seção 7.3) — ajustar categorias/detalhe se a Michelle sentir falta de algo. Hoje só reflete a Fase 1; ganha mais categorias (notas recebidas/arquivadas etc.) quando as Fases 2 e 3+4 passarem a gravar no mesmo log_diario.json."
     },
     {
       "parameters": {
         "chatId": "={{ $json.chatId }}",
         "text": "={{ $json.texto }}",
-        "additionalFields": { "parse_mode": "Markdown" }
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
       },
       "id": "r09-telegram-enviar",
       "name": "Telegram — Enviar resumo",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [1320, 100],
-      "credentials": { "telegramApi": { "id": "REPLACE", "name": "Telegram account" } }
+      "position": [
+        1320,
+        100
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "cred-telegram-account",
+          "name": "Telegram account"
+        }
+      }
     }
   ],
   "connections": {
     "Schedule Trigger (fim do dia, 23h)": {
-      "main": [[{ "node": "Resolver chat de destino", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Resolver chat de destino",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Telegram Trigger": {
-      "main": [[{ "node": "IF — Comando é /resumo?", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "IF — Comando é /resumo?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "IF — Comando é /resumo?": {
       "main": [
-        [{ "node": "Resolver chat de destino", "type": "main", "index": 0 }],
-        [{ "node": "NoOp — Ignorar (não é /resumo)", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Resolver chat de destino",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "NoOp — Ignorar (não é /resumo)",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Resolver chat de destino": {
-      "main": [[{ "node": "Ler log_diario.json", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Ler log_diario.json",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Ler log_diario.json": {
-      "main": [[{ "node": "Montar resumo do dia", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Montar resumo do dia",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Montar resumo do dia": {
-      "main": [[{ "node": "Telegram — Enviar resumo", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Telegram — Enviar resumo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": false,
