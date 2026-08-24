@@ -1,9 +1,13 @@
 node_modules/
 .env
 .env.*
+!.env.example
 *.pem
 *.key
 credentials.json
 
 # Anotações locais de trabalho — não versionar
 resumo-ultima-entrega.md
+
+# Estado do deploy: IDs de workflow da instância do Claudio, não do projeto
+.n8n-deploy-state.json

@@ -52,7 +52,42 @@ despercebidos: `to` (o certo é `sendTo`), `operation: "search"` e `"uploadVersi
 (não existem), `options.labels` (não existe — nenhum marcador estava sendo aplicado) e
 `fileId` como string onde o node espera um objeto `resourceLocator`.
 
-Rodar sempre depois de mexer em workflow, e antes de importar no n8n.
+Rodar sempre depois de mexer em workflow, e antes de publicar no n8n.
+
+## Deploy na instância do n8n
+
+Fluxo completo, do ajuste até a conferência:
+
+```
+1. edita  workflows/_fonte/fase1_solicitacao_nota.fonte.json
+2. node scripts/gerar_workflows.js        # gera homolog + produção
+3. node scripts/validar_workflows.js      # confere os parâmetros localmente
+4. node scripts/deploy_n8n.js             # publica no n8n (SÓ homolog)
+5. node scripts/validar_workflows.js --remoto   # confere o que ficou publicado
+```
+
+Primeira vez: `cp .env.example .env` e preencha `N8N_BASE_URL` e `N8N_API_KEY`
+(a chave sai de Settings → n8n API dentro do n8n). O `.env` está no `.gitignore`.
+
+**O deploy nunca publica produção.** Arquivos `.producao.json` são ignorados; publicar
+exige `--producao --confirmo-producao` de propósito, e só depois da Fase 1 validada.
+
+Outras garantias do `deploy_n8n.js`:
+
+- **Cria ou atualiza** o workflow existente (casa pelo nome, com fallback num estado
+  local) — não precisa apagar nodes e reimportar na tela.
+- **Resolve os IDs reais das credenciais** na hora do deploy, listando as credenciais
+  da instância pela API e casando por nome (se a instância não permitir listar, usa os
+  IDs do `.env`). Por isso o repositório guarda só marcadores (`cred-gmail-homolog`),
+  nunca IDs reais — e você não reseleciona credencial a cada atualização.
+- **Resolve o Error Workflow** procurando o workflow "error handler" na instância, no
+  lugar do placeholder.
+- `--dry-run` mostra o que faria sem enviar nada.
+
+O `--remoto` do validador puxa de volta o workflow publicado e roda as mesmas checagens
+contra ele, além de comparar com o arquivo local — avisa só se houver divergência
+(node faltando/sobrando, parâmetro diferente, credencial sem ID real, ligações
+diferentes). É o que substitui conferir node a node na tela.
 - `/config/` — estado inicial dos arquivos de configuração que rodam em disco na VM
   do n8n (`config_execucao.json`, `apelidos.json`, `cobrancas.json` — spec.md seções
   3.1.1, 6.1 e 7.4; `log_diario.json` e `pendencias_identificacao.json` — spec.md

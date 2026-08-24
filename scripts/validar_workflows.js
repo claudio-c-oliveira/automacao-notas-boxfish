@@ -188,17 +188,157 @@ function validarArquivo(arquivo) {
   return erros.length;
 }
 
-const alvos = process.argv.slice(2);
+// ─────────────────────────────────────────────────────────────────────────
+// Modo --remoto: puxa o workflow PUBLICADO no n8n e confere se o que está lá
+// é mesmo o que deveria estar. Substitui a conferência visual node a node.
+// ─────────────────────────────────────────────────────────────────────────
+
+/** Compara só o que importa; ignora ruído que a API acrescenta (ids, datas, webhookId...). */
+function compararComPublicado(local, remoto, divergencias) {
+  const { prepararPayload } = require('./lib/n8n_api');
+  const esperado = prepararPayload(local);
+
+  const mapaEsperado = new Map(esperado.nodes.map((n) => [n.name, n]));
+  const mapaPublicado = new Map((remoto.nodes || []).map((n) => [n.name, n]));
+
+  for (const nome of mapaEsperado.keys()) {
+    if (!mapaPublicado.has(nome)) divergencias.push(`node faltando no n8n: "${nome}"`);
+  }
+  for (const nome of mapaPublicado.keys()) {
+    if (!mapaEsperado.has(nome)) divergencias.push(`node a mais no n8n (não está no arquivo): "${nome}"`);
+  }
+
+  for (const [nome, esp] of mapaEsperado) {
+    const pub = mapaPublicado.get(nome);
+    if (!pub) continue;
+
+    if (esp.type !== pub.type) divergencias.push(`"${nome}": type ${pub.type} publicado, esperado ${esp.type}`);
+    if (String(esp.typeVersion) !== String(pub.typeVersion)) {
+      divergencias.push(`"${nome}": typeVersion ${pub.typeVersion} publicado, esperado ${esp.typeVersion}`);
+    }
+    if (!!esp.disabled !== !!pub.disabled) {
+      divergencias.push(`"${nome}": disabled=${!!pub.disabled} publicado, esperado ${!!esp.disabled}`);
+    }
+    if ((esp.onError || null) !== (pub.onError || null)) {
+      divergencias.push(`"${nome}": onError=${pub.onError || 'nenhum'} publicado, esperado ${esp.onError || 'nenhum'}`);
+    }
+
+    const paramsEsp = JSON.stringify(esp.parameters || {});
+    const paramsPub = JSON.stringify(pub.parameters || {});
+    if (paramsEsp !== paramsPub) {
+      divergencias.push(`"${nome}": parâmetros diferentes do arquivo (o n8n pode ter normalizado, confira na tela)`);
+    }
+
+    // Credencial: compara por NOME. O ID é da instância e por definição difere
+    // do marcador que fica no repositório.
+    const credEsp = Object.entries(esp.credentials || {}).map(([t, c]) => `${t}:${c.name}`).sort().join(',');
+    const credPub = Object.entries(pub.credentials || {}).map(([t, c]) => `${t}:${c.name}`).sort().join(',');
+    if (credEsp !== credPub) {
+      divergencias.push(`"${nome}": credenciais publicadas [${credPub || 'nenhuma'}], esperadas [${credEsp || 'nenhuma'}]`);
+    }
+    for (const [tipo, c] of Object.entries(pub.credentials || {})) {
+      if (!c.id || String(c.id).startsWith('cred-')) {
+        divergencias.push(`"${nome}": credencial ${tipo} ("${c.name}") sem ID real no n8n — vai aparecer em branco na tela`);
+      }
+    }
+  }
+
+  if (JSON.stringify(esperado.connections) !== JSON.stringify(remoto.connections || {})) {
+    divergencias.push('as ligações entre nodes (connections) diferem do arquivo');
+  }
+  const errEsp = (esperado.settings || {}).errorWorkflow;
+  const errPub = (remoto.settings || {}).errorWorkflow;
+  if (errEsp && String(errEsp).startsWith('REPLACE_WITH') && !errPub) {
+    divergencias.push('Error Workflow não está definido no workflow publicado');
+  }
+}
+
+async function validarRemoto(arquivosLocais) {
+  const { carregarEnv, N8nApi } = require('./lib/n8n_api');
+  const api = new N8nApi(carregarEnv());
+  const estadoPath = path.join(__dirname, '..', '.n8n-deploy-state.json');
+  const estado = fs.existsSync(estadoPath) ? JSON.parse(fs.readFileSync(estadoPath, 'utf8')) : {};
+  const publicados = await api.listarWorkflows();
+
+  console.log(`\nConferindo o que está PUBLICADO em ${api.baseUrl}\n`);
+  let totalDivergencias = 0;
+
+  for (const arquivo of arquivosLocais) {
+    const nomeArquivo = path.basename(arquivo);
+    const local = JSON.parse(fs.readFileSync(arquivo, 'utf8'));
+
+    let id = estado[nomeArquivo];
+    if (!id && publicados) {
+      const achados = publicados.filter((w) => w.name === local.name);
+      if (achados.length === 1) id = achados[0].id;
+    }
+
+    console.log(`${'='.repeat(78)}\n${nomeArquivo}\n${'='.repeat(78)}`);
+    if (!id) {
+      console.log('  ainda não publicado (rode: node scripts/deploy_n8n.js)\n');
+      continue;
+    }
+
+    let remoto;
+    try {
+      remoto = await api.obterWorkflow(id);
+    } catch (e) {
+      console.log(`  ERRO ao buscar do n8n: ${e.message}\n`);
+      totalDivergencias++;
+      continue;
+    }
+
+    // 1) as mesmas checagens de parâmetro, agora contra a versão publicada
+    const achados = [];
+    for (const node of remoto.nodes || []) validarNode(node, achados);
+    const errosParam = achados.filter((a) => a.nivel === 'ERRO');
+
+    // 2) o publicado bate com o arquivo?
+    const divergencias = [];
+    compararComPublicado(local, remoto, divergencias);
+
+    if (errosParam.length === 0 && divergencias.length === 0) {
+      console.log(`  OK — publicado (id ${id}) confere com o arquivo, sem erro de parâmetro\n`);
+    } else {
+      for (const a of errosParam) console.log(`  [ERRO PARÂMETRO] ${a.node}\n          ${a.msg}`);
+      for (const d of divergencias) console.log(`  [DIVERGÊNCIA] ${d}`);
+      console.log(`\n  ${errosParam.length} erro(s) de parâmetro, ${divergencias.length} divergência(s)\n`);
+      totalDivergencias += errosParam.length + divergencias.length;
+    }
+  }
+
+  console.log('='.repeat(78));
+  console.log(totalDivergencias === 0 ? 'REMOTO: tudo confere' : `REMOTO: ${totalDivergencias} problema(s)`);
+  return totalDivergencias;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// CLI
+// ─────────────────────────────────────────────────────────────────────────
+const args = process.argv.slice(2);
+const remoto = args.includes('--remoto');
+const alvos = args.filter((a) => !a.startsWith('--'));
+
 const arquivos = alvos.length
   ? alvos
   : fs
       .readdirSync(path.join(__dirname, '..', 'workflows'))
       .filter((f) => f.endsWith('.json'))
-      .map((f) => path.join(__dirname, '..', 'workflows', f));
+      .map((f) => path.join(__dirname, '..', 'workflows', f))
+      // no modo remoto, produção não é publicada — não faz sentido cobrar
+      .filter((f) => (remoto ? !f.includes('.producao.') : true));
 
-let totalErros = 0;
-for (const arq of arquivos) totalErros += validarArquivo(arq);
-
-console.log(`\n${'='.repeat(78)}`);
-console.log(totalErros === 0 ? 'TOTAL: nenhum erro' : `TOTAL: ${totalErros} erro(s)`);
-process.exit(totalErros === 0 ? 0 : 1);
+if (remoto) {
+  validarRemoto(arquivos)
+    .then((n) => process.exit(n === 0 ? 0 : 1))
+    .catch((e) => {
+      console.error(`\nFalhou: ${e.message}\n`);
+      process.exit(1);
+    });
+} else {
+  let totalErros = 0;
+  for (const arq of arquivos) totalErros += validarArquivo(arq);
+  console.log(`\n${'='.repeat(78)}`);
+  console.log(totalErros === 0 ? 'TOTAL: nenhum erro' : `TOTAL: ${totalErros} erro(s)`);
+  process.exit(totalErros === 0 ? 0 : 1);
+}
