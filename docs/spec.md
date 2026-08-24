@@ -268,14 +268,14 @@ Salvar a nota com a retranca certa no **Drive particular da Michelle**. Importan
 
 - E-mail da conta: `michelle.mimiaguia@gmail.com`
 - Pasta raiz: `SMTC` (link: https://drive.google.com/drive/folders/13sbk5QKW_srcopi5HMCMLbUdAbksniBo)
-- Credencial já configurada no n8n: **"Google Drive - Particular Michelle"** (Google Drive OAuth2 API, conectada e autorizada)
+- Credencial já configurada no n8n: **"Google Drive - Michelle (michelle.mimiaguia@gmail.com)"** (Google Drive OAuth2 API, conectada e autorizada)
 
 **Salvamento 2 — arquivamento por função (oficial, definitivo):**
 Mover/copiar a nota desse pouso para dentro do Drive de trabalho (financeiro1@novorealitybox.com ou compartilhado da empresa), na estrutura já documentada: `FINANCEIRO > 08. NOTAS ARQUIVADAS > ARQUIVO DE NOTAS [PROJETO] > [código] - [CARGO]`.
 
 - Identificar a pasta: código vem da **coluna B ("CONTA NETFLIX")**, nome da função/cargo vem da **coluna C ("ÍTEM")**. O nome da coluna é literal — o código vem do próprio sistema de codificação de cargos da Netflix, usado porque os 3 projetos (AREP, Reunion, Soft Pré) são produções/reality shows da Netflix. Se a pasta daquele código ainda não existir, criar seguindo a mesma nomenclatura das pastas já existentes.
 - Padrão de nome de pasta por função — confirmado com exemplos reais: AREP usa "[código] - [CARGO]" (ex.: "1301 - DIRETOR GERAL"); Reunion usa "[código].R - [CARGO]" (ex.: "1301.R- DIRETOR GERAL", "7007.R - ACESSORIA JURÍDICA"); Soft Pré vai seguir o mesmo padrão do AREP ("[código] - [CARGO]") assim que surgirem os primeiros casos.
-- Credencial já configurada no n8n: **"Google Drive account"** (Google Drive OAuth2 API, conectada como financeiro1@novorealitybox.com)
+- Credencial já configurada no n8n: **"Google Drive - Produção (financeiro1@novorealitybox.com)"** (Google Drive OAuth2 API, conectada como financeiro1@novorealitybox.com)
 
 **IMPORTANTE — este NÃO é o mesmo arquivamento da remessa/Danilo** (pasta `09. CONTAS À PAGAR` / `11. CONTAS À PAGAR - [PROJETO]`, com a pasta de remessa levando sufixo "_MI") — esse outro continua acontecendo só na Fase 3+4, no momento da entrega (seção 5.3). São dois destinos e dois momentos diferentes.
 
@@ -284,8 +284,8 @@ Mover/copiar a nota desse pouso para dentro do Drive de trabalho (financeiro1@no
 | Credencial | Nome exato no n8n | Conta autorizada | Status |
 |---|---|---|---|
 | Gmail | Gmail account | financeiro1@novorealitybox.com | ✅ Conectada |
-| Google Drive (trabalho) | Google Drive account | financeiro1@novorealitybox.com | ✅ Conectada |
-| Google Drive (particular) | Google Drive - Particular Michelle | michelle.mimiaguia@gmail.com | ✅ Conectada |
+| Google Drive (trabalho) | Google Drive - Produção (financeiro1@novorealitybox.com) | financeiro1@novorealitybox.com | ✅ Conectada |
+| Google Drive (particular) | Google Drive - Michelle (michelle.mimiaguia@gmail.com) | michelle.mimiaguia@gmail.com | ✅ Conectada |
 | Telegram | Telegram account | Bot da Michelle | ✅ Conectada |
 | Box | Box account | michelle.mimiaguia@gmail.com (autorizado via app criado numa Box Developer Account separada — necessário porque contas Box comuns/gratuitas não conseguem mais salvar apps no Console do Desenvolvedor) | ✅ Conectada |
 | Claude (Anthropic API) — dev/homolog | Claude account (dev) | Chave `n8n-boxfish-notas-hml`, criada na conta do Claudio (Claude Console, workspace Default), cartão do Claudio — usada em testes e no ambiente de homologação (seção 7.4) | ✅ Criada |
@@ -378,7 +378,7 @@ Cada projeto vira um "perfil" de configuração — o motor (as 4 fases) é o me
 | Planilha Cost Report (Box) | Mesmo arquivo do Reunion — linhas sem preenchimento de cor | BR_SMTC_S01__COST REPORT_VS_EXECUÇÃO_1201.xlsx — linhas com preenchimento roxo/cinza | BR_SMTC_S02_SOFTPRE_PROVISÓRIO.xlsx (nome pode mudar, link permanece) |
 | Planilha de Contratos | BR_AREP_S01_CONTROLE_DE_CONTRATOS.xlsb | BR_AREP_S01_REUNION_CONTROLE_DE_CONTRATOS.xlsb | BR_SMTC_S02_CONTROLE_DE_CONTRATOS.xlsb |
 
-**Localização real e regra de acesso (confirmado com prints)**: essas 3 planilhas NÃO ficam no Box — ficam no **Google Drive**, dentro de pastas compartilhadas pela Danielle Barcelos / Bruna Bortolazo (visíveis em "Compartilhados comigo"), com a credencial "Google Drive account" (financeiro1@novorealitybox.com) já com acesso:
+**Localização real e regra de acesso (confirmado com prints)**: essas 3 planilhas NÃO ficam no Box — ficam no **Google Drive**, dentro de pastas compartilhadas pela Danielle Barcelos / Bruna Bortolazo (visíveis em "Compartilhados comigo"), com a credencial "Google Drive - Produção (financeiro1@novorealitybox.com)" (financeiro1@novorealitybox.com) já com acesso:
 - AREP + Reunion (S01): pasta `JURIDICO` (raiz), contendo `BR_AREP_S01_CONTROLE DE CONTRATOS.xlsb` e `BR_AREP_S01_REUNION_CONTROLE DE CONTRATOS.xlsb` direto.
 - Soft Pré (S02): pasta `SMTC_S02_EXECUTIVA > JURIDICO S02`, contendo `BR_SMTC_S02_CONTROLE DE CONTRATOS.xlsb`.
 
@@ -480,15 +480,15 @@ Estrutura de `config_execucao.json`:
   "limite_linhas_execucao": null,
   "homolog": {
     "drive_michelle_pasta_raiz": "1hgUYWVPNFOi2BWTKVlWENQ8nomIBCWtz",
-    "credencial_drive_arquivamento_funcao": "Google Drive - Homolog (Claudio pessoal)",
+    "credencial_drive_arquivamento_funcao": "Google Drive - HML (claudioco70@gmail.com)",
     "drive_financeiro_pasta_raiz": "16KAGjffE-ZibN3doOosQH9U-TH0q95_F"
   }
 }
 ```
 
-**Decisão de arquitetura — pasta-raiz-por-ambiente em vez de credencial-por-ambiente, no caso do Drive particular (Salvamento 1)**: diferente do que se imaginava inicialmente, o Drive de homologação da Michelle (`HOMOLOG_BOX-FISH`) está dentro da MESMA conta Google (michelle.mimiaguia@gmail.com) já conectada como credencial "Google Drive - Particular Michelle". Por isso, o `AMBIENTE` não troca de credencial nesse caso — troca só o **ID da pasta raiz** que o workflow usa (`drive_michelle_pasta_raiz` acima), lida do `config_execucao.json`. Em produção, usa a pasta raiz real (`SMTC`, seção 4.2); em homolog, usa `HOMOLOG_BOX-FISH`.
+**Decisão de arquitetura — pasta-raiz-por-ambiente em vez de credencial-por-ambiente, no caso do Drive particular (Salvamento 1)**: diferente do que se imaginava inicialmente, o Drive de homologação da Michelle (`HOMOLOG_BOX-FISH`) está dentro da MESMA conta Google (michelle.mimiaguia@gmail.com) já conectada como credencial "Google Drive - Michelle (michelle.mimiaguia@gmail.com)". Por isso, o `AMBIENTE` não troca de credencial nesse caso — troca só o **ID da pasta raiz** que o workflow usa (`drive_michelle_pasta_raiz` acima), lida do `config_execucao.json`. Em produção, usa a pasta raiz real (`SMTC`, seção 4.2); em homolog, usa `HOMOLOG_BOX-FISH`.
 
-**Arquivamento por função (Salvamento 2) em homolog usa credencial NOVA**: como o Drive de trabalho de produção (financeiro1@novorealitybox.com) não pode ser tocado nos testes, foi criada uma pasta de teste na conta PESSOAL do Claudio (`16KAGjffE-ZibN3doOosQH9U-TH0q95_F`), simulando a estrutura `FINANCEIRO` (S01 — AREP+Reunion) e `FINANCEIRO S02` (Soft Pré). Isso exigiu uma credencial nova no n8n — **"Google Drive - Homolog (Claudio pessoal)"** — usada SOMENTE quando `ambiente = homolog`, no lugar da credencial "Google Drive account" (financeiro1) usada em produção. O workflow deve navegar dentro dessa pasta raiz procurando as subpastas pelo NOME ("FINANCEIRO" ou "FINANCEIRO S02", conforme o projeto), em vez de depender de IDs de subpasta fixos — mais robusto a mudanças de estrutura.
+**Arquivamento por função (Salvamento 2) em homolog usa credencial NOVA**: como o Drive de trabalho de produção (financeiro1@novorealitybox.com) não pode ser tocado nos testes, foi criada uma pasta de teste na conta PESSOAL do Claudio (`16KAGjffE-ZibN3doOosQH9U-TH0q95_F`), simulando a estrutura `FINANCEIRO` (S01 — AREP+Reunion) e `FINANCEIRO S02` (Soft Pré). Isso exigiu uma credencial nova no n8n — **"Google Drive - HML (claudioco70@gmail.com)"** — usada SOMENTE quando `ambiente = homolog`, no lugar da credencial "Google Drive - Produção (financeiro1@novorealitybox.com)" (financeiro1) usada em produção. O workflow deve navegar dentro dessa pasta raiz procurando as subpastas pelo NOME ("FINANCEIRO" ou "FINANCEIRO S02", conforme o projeto), em vez de depender de IDs de subpasta fixos — mais robusto a mudanças de estrutura.
 
 **Cópia de teste do Cost Report**: as cópias das planilhas de teste (`BR_SMTC_S01__COST REPORT_VS_EXECUÇÃO_1201.xlsx` e `BR_SMTC_S02_SOFTPRE_PROVISÓRIO.xlsx`) ficam na raiz de `HOMOLOG_BOX-FISH` (Drive da Michelle) — não dentro do Box de produção.
 
