@@ -1,7 +1,7 @@
 {
   "name": "Resumo Diário — Notas Fiscais Box Fish",
   "meta": {
-    "description": "Resumo diário consolidado (spec.md seção 7.3, commit 460aa40): enviado automaticamente ao fim do dia via Telegram, e disponível sob demanda via comando /resumo. Lê /data/box-fish-config/log_diario.json (seção 7.5 — caminho absoluto real na VM), alimentado por cada execução das fases (ver 'Preparar log_diario.json atualizado' em workflows/fase1_solicitacao_nota.json)."
+    "description": "Resumo diário consolidado (spec.md seção 7.3, commit 460aa40): enviado automaticamente ao fim do dia via Telegram, e disponível sob demanda via comando /resumo. Lê /home/node/.n8n-files/box-fish-config/log_diario.json (seção 7.5 — caminho absoluto real na VM), alimentado por cada execução das fases (ver 'Preparar log_diario.json atualizado' em workflows/fase1_solicitacao_nota.json)."
   },
   "nodes": [
     {
@@ -98,7 +98,7 @@
     {
       "parameters": {
         "operation": "read",
-        "fileSelector": "/data/box-fish-config/log_diario.json",
+        "fileSelector": "/home/node/.n8n-files/box-fish-config/log_diario.json",
         "options": {}
       },
       "id": "r07-ler-log",

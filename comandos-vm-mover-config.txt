@@ -1,76 +1,61 @@
 ================================================================================
-MOVER OS 5 JSONs DE CONFIG PRA FORA DE /home/node/.n8n
+CORRECAO DO CAMINHO - REMONTAR EM /home/node/.n8n-files/box-fish-config
 ================================================================================
-Motivo: o n8n passou a bloquear os nodes "Read/Write File from Disk" dentro da
-pasta .n8n (correção da CVE-2025-68697). Caminho novo: /data/box-fish-config
-dentro do container, vindo de /opt/box-fish-config no host (bind mount).
+O caminho que eu te passei antes (/data/box-fish-config) NAO funciona. Eu errei:
+minha sonda anterior era invalida e me deu o resultado invertido.
 
-O bind mount NAO e opcional: /data fica na camada gravavel do container, entao
-sem ele os 5 JSONs (inclusive cobrancas.json, que guarda o estado das cobrancas
-em aberto) sumiriam no proximo "docker rm".
+O que descobri agora, testando de verdade (gravando um arquivo em cada pasta e
+lendo de volta): o n8n usa uma LISTA DE PERMISSAO por prefixo, nao uma lista de
+bloqueio. So passam:
 
-Cole UM comando por vez. Se voce ja usa docker sem sudo, pode tirar o sudo.
-Nada aqui apaga os arquivos antigos - eles ficam no volume n8n_data como backup.
+    /home/node/.n8n-files/   (e subpastas)
+    /files/                  (e subpastas)
 
---------------------------------------------------------------------------------
-PASSO 1 - ver o que existe hoje (anote quantos arquivos aparecem)
---------------------------------------------------------------------------------
-sudo docker exec n8n ls -la /home/node/.n8n/box-fish-config/
+Bloqueados: /data, /tmp, /home/node/, /home/node/.n8n/
 
---------------------------------------------------------------------------------
-PASSO 2 - criar a pasta no host
---------------------------------------------------------------------------------
-sudo mkdir -p /opt/box-fish-config
+Ou seja: sua sugestao original de .n8n-files estava certa desde o inicio.
+
+BOA NOTICIA: os arquivos ja estao em /opt/box-fish-config no host e continuam
+la. Nao precisa copiar nada de novo - so trocar o destino do mount.
+
+Cole UM comando por vez.
 
 --------------------------------------------------------------------------------
-PASSO 3 - copiar os arquivos de dentro do container pra ela
---------------------------------------------------------------------------------
-sudo docker cp n8n:/home/node/.n8n/box-fish-config/. /opt/box-fish-config/
-
---------------------------------------------------------------------------------
-PASSO 4 - dono correto (o n8n roda como uid 1000 dentro do container)
---------------------------------------------------------------------------------
-sudo chown -R 1000:1000 /opt/box-fish-config
-
---------------------------------------------------------------------------------
-PASSO 5 - conferir: tem que listar os 5 JSONs, com o mesmo tamanho do passo 1
+PASSO 1 - conferir que os arquivos continuam no host (nao mexemos neles)
 --------------------------------------------------------------------------------
 ls -la /opt/box-fish-config
 
-  Esperado: config_execucao.json, apelidos.json, cobrancas.json,
-            log_diario.json, pendencias_identificacao.json
+  Esperado: os 5 JSONs (config_execucao, apelidos, cobrancas, log_diario,
+  pendencias_identificacao).
 
-  >>> SO CONTINUE SE OS ARQUIVOS ESTIVEREM TODOS AI. <<<
+  >>> SO CONTINUE SE ELES ESTIVEREM AI. <<<
 
 --------------------------------------------------------------------------------
-PASSO 6 - recriar o container com o volume novo
+PASSO 2 - recriar o container com o mount no lugar certo
 --------------------------------------------------------------------------------
 sudo docker stop n8n
 
 sudo docker rm n8n
 
-sudo docker run -d --restart unless-stopped --name n8n -p 5678:5678 -e N8N_HOST=n8n.carvalhodeoliveira.com -e N8N_PROTOCOL=https -e WEBHOOK_URL=https://n8n.carvalhodeoliveira.com/ -e N8N_EDITOR_BASE_URL=https://n8n.carvalhodeoliveira.com/ -e NODE_FUNCTION_ALLOW_EXTERNAL=exceljs -e NODE_PATH=/usr/local/lib/node_modules_extra/node_modules -v n8n_data:/home/node/.n8n -v /opt/box-fish-config:/data/box-fish-config n8n-custom:latest
+sudo docker run -d --restart unless-stopped --name n8n -p 5678:5678 -e N8N_HOST=n8n.carvalhodeoliveira.com -e N8N_PROTOCOL=https -e WEBHOOK_URL=https://n8n.carvalhodeoliveira.com/ -e N8N_EDITOR_BASE_URL=https://n8n.carvalhodeoliveira.com/ -e NODE_FUNCTION_ALLOW_EXTERNAL=exceljs -e NODE_PATH=/usr/local/lib/node_modules_extra/node_modules -v n8n_data:/home/node/.n8n -v /opt/box-fish-config:/home/node/.n8n-files/box-fish-config n8n-custom:latest
 
-  (e o mesmo comando do spec 7.5, com UMA linha nova: o -v do box-fish-config.
-   Esta tudo numa linha so de proposito, por causa do SSH do Console.)
+  (unica diferenca pro comando anterior: o destino do ultimo -v mudou de
+   /data/box-fish-config para /home/node/.n8n-files/box-fish-config)
 
 --------------------------------------------------------------------------------
-PASSO 7 - conferir que subiu e que o container enxerga os arquivos
+PASSO 3 - conferir
 --------------------------------------------------------------------------------
-sudo docker exec n8n ls -la /data/box-fish-config
-
-sudo docker exec n8n cat /data/box-fish-config/config_execucao.json
+sudo docker exec n8n ls -la /home/node/.n8n-files/box-fish-config
 
 sudo docker logs --tail 20 n8n
 
 --------------------------------------------------------------------------------
 DEPOIS
 --------------------------------------------------------------------------------
-Me avise que eu rodo a sonda de novo e confirmo, de fora, que o n8n consegue
-LER os 5 arquivos no caminho novo - antes de voce gastar tempo no Manual Trigger.
+Me avise que eu sondo de novo. Desta vez a sonda testa LEITURA E ESCRITA de
+arquivos que existem de verdade - foi exatamente o que faltou na anterior.
 
-Dai pra frente, pra trocar ambiente/modo/limite, edite direto no host, sem
-docker exec:
+Pra trocar ambiente/modo/limite, continua editando no host, sem docker exec:
 
 sudo nano /opt/box-fish-config/config_execucao.json
 

@@ -465,7 +465,7 @@
     {
       "parameters": {
         "operation": "read",
-        "fileSelector": "/data/box-fish-config/cobrancas.json",
+        "fileSelector": "/home/node/.n8n-files/box-fish-config/cobrancas.json",
         "options": {}
       },
       "id": "f2f-19-ler-cobrancas",
@@ -493,7 +493,7 @@
     {
       "parameters": {
         "operation": "write",
-        "fileName": "/data/box-fish-config/cobrancas.json",
+        "fileName": "/home/node/.n8n-files/box-fish-config/cobrancas.json",
         "dataPropertyName": "data"
       },
       "id": "f2f-21-gravar-cobrancas",
