@@ -953,17 +953,44 @@
     },
     {
       "parameters": {
-        "resource": "fileFolder",
-        "operation": "search",
-        "queryString": "JURIDICO",
-        "filter": {
-          "whatToSearch": "fileFolder"
+        "url": "https://www.googleapis.com/drive/v3/files",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "sendQuery": true,
+        "specifyQuery": "keypair",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "=name = 'JURIDICO' and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
+            },
+            {
+              "name": "spaces",
+              "value": "drive"
+            },
+            {
+              "name": "fields",
+              "value": "files(id,name,mimeType)"
+            },
+            {
+              "name": "pageSize",
+              "value": "10"
+            },
+            {
+              "name": "supportsAllDrives",
+              "value": "true"
+            },
+            {
+              "name": "includeItemsFromAllDrives",
+              "value": "true"
+            }
+          ]
         }
       },
       "id": "drive-buscar-juridico",
       "name": "Drive — Buscar pasta JURIDICO (AREP+Reunion)",
-      "type": "n8n-nodes-base.googleDrive",
-      "typeVersion": 3,
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
       "position": [
         700,
         440
@@ -973,7 +1000,8 @@
           "id": "cred-gdrive-trabalho",
           "name": "Google Drive - Produção (financeiro1@novorealitybox.com)"
         }
-      }
+      },
+      "notes": "Busca feita via HTTP Request, e não pelo node nativo do Drive, de propósito: o node nativo envia spaces=\"appDataFolder, drive\" sempre que há filtro de pasta, exigindo o escopo drive.appdata que esta automação nunca usa. Aqui pedimos só spaces=drive. A resposta vem como {files:[...]}, mesmo formato que os nodes \"Escolher ...\" já esperavam."
     },
     {
       "parameters": {
@@ -990,22 +1018,44 @@
     },
     {
       "parameters": {
-        "resource": "fileFolder",
-        "operation": "search",
-        "queryString": "BR_AREP_S01_CONTROLE DE CONTRATOS.xlsb",
-        "filter": {
-          "whatToSearch": "files",
-          "folderId": {
-            "__rl": true,
-            "mode": "id",
-            "value": "={{ $json.fileId }}"
-          }
+        "url": "https://www.googleapis.com/drive/v3/files",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "sendQuery": true,
+        "specifyQuery": "keypair",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "=name = 'BR_AREP_S01_CONTROLE DE CONTRATOS.xlsb' and '{{ $json.fileId }}' in parents and mimeType != 'application/vnd.google-apps.folder' and trashed = false"
+            },
+            {
+              "name": "spaces",
+              "value": "drive"
+            },
+            {
+              "name": "fields",
+              "value": "files(id,name,mimeType)"
+            },
+            {
+              "name": "pageSize",
+              "value": "10"
+            },
+            {
+              "name": "supportsAllDrives",
+              "value": "true"
+            },
+            {
+              "name": "includeItemsFromAllDrives",
+              "value": "true"
+            }
+          ]
         }
       },
       "id": "drive-buscar-arep-xlsb",
       "name": "Drive — Buscar Contratos AREP (.xlsb)",
-      "type": "n8n-nodes-base.googleDrive",
-      "typeVersion": 3,
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
       "position": [
         1100,
         380
@@ -1015,7 +1065,8 @@
           "id": "cred-gdrive-trabalho",
           "name": "Google Drive - Produção (financeiro1@novorealitybox.com)"
         }
-      }
+      },
+      "notes": "Busca feita via HTTP Request, e não pelo node nativo do Drive, de propósito: o node nativo envia spaces=\"appDataFolder, drive\" sempre que há filtro de pasta, exigindo o escopo drive.appdata que esta automação nunca usa. Aqui pedimos só spaces=drive. A resposta vem como {files:[...]}, mesmo formato que os nodes \"Escolher ...\" já esperavam."
     },
     {
       "parameters": {
@@ -1058,22 +1109,44 @@
     },
     {
       "parameters": {
-        "resource": "fileFolder",
-        "operation": "search",
-        "queryString": "BR_AREP_S01_REUNION_CONTROLE DE CONTRATOS.xlsb",
-        "filter": {
-          "whatToSearch": "files",
-          "folderId": {
-            "__rl": true,
-            "mode": "id",
-            "value": "={{ $('Escolher pasta JURIDICO').first().json.fileId }}"
-          }
+        "url": "https://www.googleapis.com/drive/v3/files",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "sendQuery": true,
+        "specifyQuery": "keypair",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "=name = 'BR_AREP_S01_REUNION_CONTROLE DE CONTRATOS.xlsb' and '{{ $('Escolher pasta JURIDICO').first().json.fileId }}' in parents and mimeType != 'application/vnd.google-apps.folder' and trashed = false"
+            },
+            {
+              "name": "spaces",
+              "value": "drive"
+            },
+            {
+              "name": "fields",
+              "value": "files(id,name,mimeType)"
+            },
+            {
+              "name": "pageSize",
+              "value": "10"
+            },
+            {
+              "name": "supportsAllDrives",
+              "value": "true"
+            },
+            {
+              "name": "includeItemsFromAllDrives",
+              "value": "true"
+            }
+          ]
         }
       },
       "id": "drive-buscar-reunion-xlsb",
       "name": "Drive — Buscar Contratos Reunion (.xlsb)",
-      "type": "n8n-nodes-base.googleDrive",
-      "typeVersion": 3,
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
       "position": [
         1100,
         500
@@ -1083,7 +1156,8 @@
           "id": "cred-gdrive-trabalho",
           "name": "Google Drive - Produção (financeiro1@novorealitybox.com)"
         }
-      }
+      },
+      "notes": "Busca feita via HTTP Request, e não pelo node nativo do Drive, de propósito: o node nativo envia spaces=\"appDataFolder, drive\" sempre que há filtro de pasta, exigindo o escopo drive.appdata que esta automação nunca usa. Aqui pedimos só spaces=drive. A resposta vem como {files:[...]}, mesmo formato que os nodes \"Escolher ...\" já esperavam."
     },
     {
       "parameters": {
@@ -1126,17 +1200,44 @@
     },
     {
       "parameters": {
-        "resource": "fileFolder",
-        "operation": "search",
-        "queryString": "SMTC_S02_EXECUTIVA",
-        "filter": {
-          "whatToSearch": "fileFolder"
+        "url": "https://www.googleapis.com/drive/v3/files",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "sendQuery": true,
+        "specifyQuery": "keypair",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "=name = 'SMTC_S02_EXECUTIVA' and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
+            },
+            {
+              "name": "spaces",
+              "value": "drive"
+            },
+            {
+              "name": "fields",
+              "value": "files(id,name,mimeType)"
+            },
+            {
+              "name": "pageSize",
+              "value": "10"
+            },
+            {
+              "name": "supportsAllDrives",
+              "value": "true"
+            },
+            {
+              "name": "includeItemsFromAllDrives",
+              "value": "true"
+            }
+          ]
         }
       },
       "id": "drive-buscar-executiva",
       "name": "Drive — Buscar pasta SMTC_S02_EXECUTIVA",
-      "type": "n8n-nodes-base.googleDrive",
-      "typeVersion": 3,
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
       "position": [
         700,
         640
@@ -1146,7 +1247,8 @@
           "id": "cred-gdrive-trabalho",
           "name": "Google Drive - Produção (financeiro1@novorealitybox.com)"
         }
-      }
+      },
+      "notes": "Busca feita via HTTP Request, e não pelo node nativo do Drive, de propósito: o node nativo envia spaces=\"appDataFolder, drive\" sempre que há filtro de pasta, exigindo o escopo drive.appdata que esta automação nunca usa. Aqui pedimos só spaces=drive. A resposta vem como {files:[...]}, mesmo formato que os nodes \"Escolher ...\" já esperavam."
     },
     {
       "parameters": {
@@ -1163,22 +1265,44 @@
     },
     {
       "parameters": {
-        "resource": "fileFolder",
-        "operation": "search",
-        "queryString": "JURIDICO S02",
-        "filter": {
-          "whatToSearch": "files",
-          "folderId": {
-            "__rl": true,
-            "mode": "id",
-            "value": "={{ $json.fileId }}"
-          }
+        "url": "https://www.googleapis.com/drive/v3/files",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "sendQuery": true,
+        "specifyQuery": "keypair",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "=name = 'JURIDICO S02' and '{{ $json.fileId }}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
+            },
+            {
+              "name": "spaces",
+              "value": "drive"
+            },
+            {
+              "name": "fields",
+              "value": "files(id,name,mimeType)"
+            },
+            {
+              "name": "pageSize",
+              "value": "10"
+            },
+            {
+              "name": "supportsAllDrives",
+              "value": "true"
+            },
+            {
+              "name": "includeItemsFromAllDrives",
+              "value": "true"
+            }
+          ]
         }
       },
       "id": "drive-buscar-juridico-s02",
       "name": "Drive — Buscar pasta JURIDICO S02",
-      "type": "n8n-nodes-base.googleDrive",
-      "typeVersion": 3,
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
       "position": [
         1100,
         640
@@ -1188,7 +1312,8 @@
           "id": "cred-gdrive-trabalho",
           "name": "Google Drive - Produção (financeiro1@novorealitybox.com)"
         }
-      }
+      },
+      "notes": "Busca feita via HTTP Request, e não pelo node nativo do Drive, de propósito: o node nativo envia spaces=\"appDataFolder, drive\" sempre que há filtro de pasta, exigindo o escopo drive.appdata que esta automação nunca usa. Aqui pedimos só spaces=drive. A resposta vem como {files:[...]}, mesmo formato que os nodes \"Escolher ...\" já esperavam."
     },
     {
       "parameters": {
@@ -1205,22 +1330,44 @@
     },
     {
       "parameters": {
-        "resource": "fileFolder",
-        "operation": "search",
-        "queryString": "BR_SMTC_S02_CONTROLE DE CONTRATOS.xlsb",
-        "filter": {
-          "whatToSearch": "files",
-          "folderId": {
-            "__rl": true,
-            "mode": "id",
-            "value": "={{ $json.fileId }}"
-          }
+        "url": "https://www.googleapis.com/drive/v3/files",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "sendQuery": true,
+        "specifyQuery": "keypair",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "=name = 'BR_SMTC_S02_CONTROLE DE CONTRATOS.xlsb' and '{{ $json.fileId }}' in parents and mimeType != 'application/vnd.google-apps.folder' and trashed = false"
+            },
+            {
+              "name": "spaces",
+              "value": "drive"
+            },
+            {
+              "name": "fields",
+              "value": "files(id,name,mimeType)"
+            },
+            {
+              "name": "pageSize",
+              "value": "10"
+            },
+            {
+              "name": "supportsAllDrives",
+              "value": "true"
+            },
+            {
+              "name": "includeItemsFromAllDrives",
+              "value": "true"
+            }
+          ]
         }
       },
       "id": "drive-buscar-softpre-xlsb",
       "name": "Drive — Buscar Contratos Soft Pré (.xlsb)",
-      "type": "n8n-nodes-base.googleDrive",
-      "typeVersion": 3,
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
       "position": [
         1500,
         640
@@ -1230,7 +1377,8 @@
           "id": "cred-gdrive-trabalho",
           "name": "Google Drive - Produção (financeiro1@novorealitybox.com)"
         }
-      }
+      },
+      "notes": "Busca feita via HTTP Request, e não pelo node nativo do Drive, de propósito: o node nativo envia spaces=\"appDataFolder, drive\" sempre que há filtro de pasta, exigindo o escopo drive.appdata que esta automação nunca usa. Aqui pedimos só spaces=drive. A resposta vem como {files:[...]}, mesmo formato que os nodes \"Escolher ...\" já esperavam."
     },
     {
       "parameters": {
