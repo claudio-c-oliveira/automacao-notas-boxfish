@@ -97,7 +97,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Consolida config_execucao.json + cobrancas.json + apelidos.json (binário -> JSON)\n// e embute os 3 perfis de projeto (cópia de /profiles/*.json — seção 6 do spec.md).\n// Perfis embutidos aqui (não buscados via HTTP), por decisão já confirmada.\n\nfunction parseBinaryJson(item) {\n  if (!item || !item.binary || !item.binary.data) return {};\n  const buffer = Buffer.from(item.binary.data.data, 'base64');\n  return JSON.parse(buffer.toString('utf8'));\n}\n\nconst config = parseBinaryJson($('Ler config_execucao.json').first());\nconst cobrancas = parseBinaryJson($('Ler cobrancas.json').first());\nconst apelidos = parseBinaryJson($('Ler apelidos.json').first());\n\nconst perfis = {\n  AREP: {\n    projeto: 'AREP (S01 antigo)',\n    prefixo_assunto_pedido: 'AREP | EMISSÃO DE NF',\n    prefixo_assunto_entrega: 'AREP | NOTAS À PAGAR',\n    texto_ref: 'SMTC',\n    retranca: 'S01',\n  },\n  REUNION: {\n    projeto: 'Reunion (S01)',\n    prefixo_assunto_pedido: 'SMTC - S01 | REUNION | EMISSÃO DE NF',\n    prefixo_assunto_entrega: 'SMTC - S01 | REUNION | NOTAS À PAGAR',\n    texto_ref: 'SMTC - REUNION',\n    retranca: 'REUNION_S01',\n  },\n  SOFT_PRE: {\n    projeto: 'Soft Pré (S02)',\n    prefixo_assunto_pedido: 'SMTC - S02 | SOFT PRE | EMISSÃO DE NF',\n    prefixo_assunto_entrega: 'SMTC - S02 | SOFT PRE | NOTAS À PAGAR',\n    texto_ref: 'SMTC - SOFT PRE',\n    retranca: 'SOFT PRE_S02',\n  },\n};\n\n// [gerado] ambiente fixado em tempo de geração — este arquivo é \"homolog\" e se comporta como tal,\n// independente do que estiver no config_execucao.json da VM (evita, por exemplo,\n// o arquivo de homolog mandar e-mail pra destinatário real por config divergente).\nconfig.ambiente = 'homolog';\n\nreturn [{ json: { config, cobrancas, apelidos, perfis, dominioEmpresa: 'novorealitybox.com' } }];"
+        "jsCode": "// Consolida config_execucao.json + cobrancas.json + apelidos.json (binário -> JSON)\n// e embute os 3 perfis de projeto (cópia de /profiles/*.json — seção 6 do spec.md).\n// Perfis embutidos aqui (não buscados via HTTP), por decisão já confirmada.\n\n// Leitura de binário: esta instância do n8n guarda binário no disco (filesystem-v2),\n// então item.binary.data.data NÃO é o conteúdo, e sim o rótulo do modo de armazenamento.\n// O único acesso liberado no Code Node é helpers.getBinaryDataBuffer, que lê pelo ÍNDICE\n// do item no input DIRETO — daí localizarmos o item pelo id do binário. Cobre os 2 modos.\nconst helpers = this.helpers;\nconst entradasDoNode = $input.all();\nasync function bufferDe(item, prop) {\n  prop = prop || 'data';\n  const b = item && item.binary && item.binary[prop];\n  if (!b) return null;\n  if (!b.id) return Buffer.from(b.data, 'base64'); // modo embutido\n  const i = entradasDoNode.findIndex((e) => e.binary && e.binary[prop] && e.binary[prop].id === b.id);\n  if (i < 0) throw new Error('binario \"' + (b.fileName || prop) + '\" nao esta no input direto deste node — o Code Node so consegue le-lo por ai');\n  return await helpers.getBinaryDataBuffer(i, prop);\n}\n\nasync function parseBinaryJson(item) {\n  if (!item || !item.binary || !item.binary.data) return {};\n  const buffer = await bufferDe(item);\n  return JSON.parse(buffer.toString('utf8'));\n}\n\nconst config = await parseBinaryJson($('Ler config_execucao.json').first());\nconst cobrancas = await parseBinaryJson($('Ler cobrancas.json').first());\nconst apelidos = await parseBinaryJson($('Ler apelidos.json').first());\n\nconst perfis = {\n  AREP: {\n    projeto: 'AREP (S01 antigo)',\n    prefixo_assunto_pedido: 'AREP | EMISSÃO DE NF',\n    prefixo_assunto_entrega: 'AREP | NOTAS À PAGAR',\n    texto_ref: 'SMTC',\n    retranca: 'S01',\n  },\n  REUNION: {\n    projeto: 'Reunion (S01)',\n    prefixo_assunto_pedido: 'SMTC - S01 | REUNION | EMISSÃO DE NF',\n    prefixo_assunto_entrega: 'SMTC - S01 | REUNION | NOTAS À PAGAR',\n    texto_ref: 'SMTC - REUNION',\n    retranca: 'REUNION_S01',\n  },\n  SOFT_PRE: {\n    projeto: 'Soft Pré (S02)',\n    prefixo_assunto_pedido: 'SMTC - S02 | SOFT PRE | EMISSÃO DE NF',\n    prefixo_assunto_entrega: 'SMTC - S02 | SOFT PRE | NOTAS À PAGAR',\n    texto_ref: 'SMTC - SOFT PRE',\n    retranca: 'SOFT PRE_S02',\n  },\n};\n\n// [gerado] ambiente fixado em tempo de geração — este arquivo é \"homolog\" e se comporta como tal,\n// independente do que estiver no config_execucao.json da VM (evita, por exemplo,\n// o arquivo de homolog mandar e-mail pra destinatário real por config divergente).\nconfig.ambiente = 'homolog';\n\nreturn [{ json: { config, cobrancas, apelidos, perfis, dominioEmpresa: 'novorealitybox.com' } }];"
       },
       "id": "n07-carregar-config",
       "name": "Carregar config + perfis",
@@ -124,7 +124,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Requer NODE_FUNCTION_ALLOW_EXTERNAL=exceljs configurado na VM (spec.md seção 5, decisão técnica).\nconst ExcelJS = require('exceljs');\n\nfunction normalizar(texto) {\n  if (!texto) return '';\n  return String(texto).normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toLowerCase().trim().replace(/\\s+/g, ' ');\n}\n\nfunction linhaTemPreenchimento(cell) {\n  const fill = cell && cell.fill;\n  if (!fill || fill.type !== 'pattern' || fill.pattern !== 'solid') return false;\n  const argb = fill.fgColor && fill.fgColor.argb;\n  if (!argb) return false;\n  return argb !== 'FFFFFFFF' && argb !== '00000000';\n}\n\nasync function lerAbaNotas(binaryPropertyName, nodeName, projetoFixo) {\n  const item = $(nodeName).first();\n  const buffer = Buffer.from(item.binary.data.data, 'base64');\n  const wb = new ExcelJS.Workbook();\n  await wb.xlsx.load(buffer);\n  const ws = wb.getWorksheet('Notas') || wb.worksheets[0];\n  const linhas = [];\n  ws.eachRow({ includeEmpty: false }, (row, rowNumber) => {\n    if (rowNumber === 1) return; // cabeçalho\n    const projetoId = projetoFixo || (linhaTemPreenchimento(row.getCell('L')) ? 'REUNION' : 'AREP');\n    linhas.push({\n      linha: rowNumber,\n      projetoId,\n      colunaB: row.getCell('B').text,\n      colunaC: row.getCell('C').text,\n      colunaG: row.getCell('G').text,\n      colunaH: row.getCell('H').text,\n      colunaJ: row.getCell('J').text,\n      colunaK: Number(row.getCell('K').value) || 0,\n      colunaL: row.getCell('L').text,\n      colunaN: row.getCell('N').text,\n      colunaR: row.getCell('R').text,\n    });\n  });\n  return linhas;\n}\n\nasync function lerPlanilhaContratos(nodeName) {\n  const item = $(nodeName).first();\n  const buffer = Buffer.from(item.binary.data.data, 'base64');\n  const wb = new ExcelJS.Workbook();\n  await wb.xlsx.load(buffer);\n  const ws = wb.worksheets[0];\n  const linhas = [];\n  ws.eachRow({ includeEmpty: false }, (row, rowNumber) => {\n    if (rowNumber === 1) return;\n    linhas.push({\n      razaoSocial: row.getCell('A').text,\n      nomeColaborador: row.getCell('B').text,\n      status: row.getCell('C').text,\n    });\n  });\n  return linhas;\n}\n\nconst linhasS01 = await lerAbaNotas(null, 'Box — Download Cost Report S01', null); // cor decide AREP/REUNION\nconst linhasS02 = await lerAbaNotas(null, 'Box — Download Cost Report S02 (Soft Pré)', 'SOFT_PRE');\n\nconst contratos = {\n  AREP: await lerPlanilhaContratos('Drive — Download Contratos AREP'),\n  REUNION: await lerPlanilhaContratos('Drive — Download Contratos Reunion'),\n  SOFT_PRE: await lerPlanilhaContratos('Drive — Download Contratos Soft Pré'),\n};\n\nconst cfg = $('Carregar config + perfis').first().json;\n\nconst todasAsLinhas = [...linhasS01, ...linhasS02];\n\nreturn todasAsLinhas.map((nota) => ({\n  json: {\n    nota,\n    contratosDoProjeto: contratos[nota.projetoId],\n    config: cfg.config,\n    cobrancas: cfg.cobrancas,\n    apelidos: cfg.apelidos,\n    perfil: cfg.perfis[nota.projetoId],\n    dominioEmpresa: cfg.dominioEmpresa,\n  },\n}));"
+        "jsCode": "// Requer NODE_FUNCTION_ALLOW_EXTERNAL=exceljs configurado na VM (spec.md seção 5, decisão técnica).\n// Leitura de binário: esta instância do n8n guarda binário no disco (filesystem-v2),\n// então item.binary.data.data NÃO é o conteúdo, e sim o rótulo do modo de armazenamento.\n// O único acesso liberado no Code Node é helpers.getBinaryDataBuffer, que lê pelo ÍNDICE\n// do item no input DIRETO — daí localizarmos o item pelo id do binário. Cobre os 2 modos.\nconst helpers = this.helpers;\nconst entradasDoNode = $input.all();\nasync function bufferDe(item, prop) {\n  prop = prop || 'data';\n  const b = item && item.binary && item.binary[prop];\n  if (!b) return null;\n  if (!b.id) return Buffer.from(b.data, 'base64'); // modo embutido\n  const i = entradasDoNode.findIndex((e) => e.binary && e.binary[prop] && e.binary[prop].id === b.id);\n  if (i < 0) throw new Error('binario \"' + (b.fileName || prop) + '\" nao esta no input direto deste node — o Code Node so consegue le-lo por ai');\n  return await helpers.getBinaryDataBuffer(i, prop);\n}\n\nconst ExcelJS = require('exceljs');\n\nfunction normalizar(texto) {\n  if (!texto) return '';\n  return String(texto).normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toLowerCase().trim().replace(/\\s+/g, ' ');\n}\n\nfunction linhaTemPreenchimento(cell) {\n  const fill = cell && cell.fill;\n  if (!fill || fill.type !== 'pattern' || fill.pattern !== 'solid') return false;\n  const argb = fill.fgColor && fill.fgColor.argb;\n  if (!argb) return false;\n  return argb !== 'FFFFFFFF' && argb !== '00000000';\n}\n\nasync function lerAbaNotas(binaryPropertyName, nodeName, projetoFixo) {\n  const item = $(nodeName).first();\n  const buffer = await bufferDe(item);\n  const wb = new ExcelJS.Workbook();\n  await wb.xlsx.load(buffer);\n  const ws = wb.getWorksheet('Notas') || wb.worksheets[0];\n  const linhas = [];\n  ws.eachRow({ includeEmpty: false }, (row, rowNumber) => {\n    if (rowNumber === 1) return; // cabeçalho\n    const projetoId = projetoFixo || (linhaTemPreenchimento(row.getCell('L')) ? 'REUNION' : 'AREP');\n    linhas.push({\n      linha: rowNumber,\n      projetoId,\n      colunaB: row.getCell('B').text,\n      colunaC: row.getCell('C').text,\n      colunaG: row.getCell('G').text,\n      colunaH: row.getCell('H').text,\n      colunaJ: row.getCell('J').text,\n      colunaK: Number(row.getCell('K').value) || 0,\n      colunaL: row.getCell('L').text,\n      colunaN: row.getCell('N').text,\n      colunaR: row.getCell('R').text,\n    });\n  });\n  return linhas;\n}\n\nasync function lerPlanilhaContratos(nodeName) {\n  const item = $(nodeName).first();\n  const buffer = await bufferDe(item);\n  const wb = new ExcelJS.Workbook();\n  await wb.xlsx.load(buffer);\n  const ws = wb.worksheets[0];\n  const linhas = [];\n  ws.eachRow({ includeEmpty: false }, (row, rowNumber) => {\n    if (rowNumber === 1) return;\n    linhas.push({\n      razaoSocial: row.getCell('A').text,\n      nomeColaborador: row.getCell('B').text,\n      status: row.getCell('C').text,\n    });\n  });\n  return linhas;\n}\n\nconst linhasS01 = await lerAbaNotas(null, 'Box — Download Cost Report S01', null); // cor decide AREP/REUNION\nconst linhasS02 = await lerAbaNotas(null, 'Box — Download Cost Report S02 (Soft Pré)', 'SOFT_PRE');\n\nconst contratos = {\n  AREP: await lerPlanilhaContratos('Drive — Download Contratos AREP'),\n  REUNION: await lerPlanilhaContratos('Drive — Download Contratos Reunion'),\n  SOFT_PRE: await lerPlanilhaContratos('Drive — Download Contratos Soft Pré'),\n};\n\nconst cfg = $('Carregar config + perfis').first().json;\n\nconst todasAsLinhas = [...linhasS01, ...linhasS02];\n\nreturn todasAsLinhas.map((nota) => ({\n  json: {\n    nota,\n    contratosDoProjeto: contratos[nota.projetoId],\n    config: cfg.config,\n    cobrancas: cfg.cobrancas,\n    apelidos: cfg.apelidos,\n    perfil: cfg.perfis[nota.projetoId],\n    dominioEmpresa: cfg.dominioEmpresa,\n  },\n}));"
       },
       "id": "n13-parse-planilhas",
       "name": "Parsear planilhas (exceljs) e separar AREP/Reunion por cor",
@@ -160,9 +160,10 @@
       "type": "n8n-nodes-base.readWriteFile",
       "typeVersion": 1,
       "position": [
-        260,
-        160
-      ]
+        6180,
+        800
+      ],
+      "alwaysOutputData": true
     },
     {
       "parameters": {
@@ -674,7 +675,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Aplica as mudanças de coluna N e L em memória (exceljs) e prepara o binário pra upload.\n// Preserva ambiente + fileId no output pra o node seguinte decidir Drive vs Box.\nconst ExcelJS = require('exceljs');\n\nconst consolidado = $('Consolidar mudanças e cobrancas.json').first().json;\nconst mudancasN = consolidado.mudancasColunaN;\nconst mudancasL = consolidado.mudancasColunaL;\nconst contexto = $('Resolver arquivo-alvo da escrita').first().json;\n\nlet fileIdHomolog = null;\ntry { fileIdHomolog = $('Escolher arquivo-alvo (homolog)').first().json.fileId; } catch (e) { /* não rodou neste ramo (produção) */ }\n\nconst item = $input.first();\nconst buffer = Buffer.from(item.binary.data.data, 'base64');\nconst wb = new ExcelJS.Workbook();\nawait wb.xlsx.load(buffer);\nconst ws = wb.getWorksheet('Notas') || wb.worksheets[0];\n\nfor (const m of mudancasN) {\n  ws.getCell('N' + m.linha).value = m.valor;\n}\nfor (const m of mudancasL) {\n  ws.getCell('L' + m.linha).value = m.valor;\n}\n\nconst novoBuffer = await wb.xlsx.writeBuffer();\nreturn [{\n  json: { ambiente: contexto.config.ambiente, fileIdHomolog, fileIdBox: contexto.fileId },\n  binary: { data: { data: Buffer.from(novoBuffer).toString('base64'), mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', fileName: 'cost_report_atualizado.xlsx' } },\n}];"
+        "jsCode": "// Aplica as mudanças de coluna N e L em memória (exceljs) e prepara o binário pra upload.\n// Preserva ambiente + fileId no output pra o node seguinte decidir Drive vs Box.\n// Leitura de binário: esta instância do n8n guarda binário no disco (filesystem-v2),\n// então item.binary.data.data NÃO é o conteúdo, e sim o rótulo do modo de armazenamento.\n// O único acesso liberado no Code Node é helpers.getBinaryDataBuffer, que lê pelo ÍNDICE\n// do item no input DIRETO — daí localizarmos o item pelo id do binário. Cobre os 2 modos.\nconst helpers = this.helpers;\nconst entradasDoNode = $input.all();\nasync function bufferDe(item, prop) {\n  prop = prop || 'data';\n  const b = item && item.binary && item.binary[prop];\n  if (!b) return null;\n  if (!b.id) return Buffer.from(b.data, 'base64'); // modo embutido\n  const i = entradasDoNode.findIndex((e) => e.binary && e.binary[prop] && e.binary[prop].id === b.id);\n  if (i < 0) throw new Error('binario \"' + (b.fileName || prop) + '\" nao esta no input direto deste node — o Code Node so consegue le-lo por ai');\n  return await helpers.getBinaryDataBuffer(i, prop);\n}\n\nconst ExcelJS = require('exceljs');\n\nconst consolidado = $('Consolidar mudanças e cobrancas.json').first().json;\nconst mudancasN = consolidado.mudancasColunaN;\nconst mudancasL = consolidado.mudancasColunaL;\nconst contexto = $('Resolver arquivo-alvo da escrita').first().json;\n\nlet fileIdHomolog = null;\ntry { fileIdHomolog = $('Escolher arquivo-alvo (homolog)').first().json.fileId; } catch (e) { /* não rodou neste ramo (produção) */ }\n\nconst item = $input.first();\nconst buffer = await bufferDe(item);\nconst wb = new ExcelJS.Workbook();\nawait wb.xlsx.load(buffer);\nconst ws = wb.getWorksheet('Notas') || wb.worksheets[0];\n\nfor (const m of mudancasN) {\n  ws.getCell('N' + m.linha).value = m.valor;\n}\nfor (const m of mudancasL) {\n  ws.getCell('L' + m.linha).value = m.valor;\n}\n\nconst novoBuffer = await wb.xlsx.writeBuffer();\nreturn [{\n  json: { ambiente: contexto.config.ambiente, fileIdHomolog, fileIdBox: contexto.fileId },\n  binary: { data: { data: Buffer.from(novoBuffer).toString('base64'), mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', fileName: 'cost_report_atualizado.xlsx' } },\n}];"
       },
       "id": "n33-aplicar-mudancas",
       "name": "Aplicar mudanças (exceljs) e preparar upload",
@@ -726,15 +727,15 @@
     },
     {
       "parameters": {
-        "jsCode": "// Acrescenta o resumo desta execucao ao log diario (secao 7.3) — lido por\n// workflows/resumo_diario.json. Mantem só os últimos 30 dias pra não crescer sem limite\n// (não especificado no spec.md — escolha de implementação razoável, fácil de ajustar).\nlet log = [];\ntry {\n  const item = $('Ler log_diario.json').first();\n  if (item && item.binary && item.binary.data) log = JSON.parse(Buffer.from(item.binary.data.data, 'base64').toString('utf8'));\n} catch (e) { log = []; }\nlog.push($('Consolidar mudanças e cobrancas.json').first().json.logEntry);\nconst LIMITE_DIAS = 30;\nconst corte = new Date(); corte.setDate(corte.getDate() - LIMITE_DIAS);\nlog = log.filter((e) => new Date(e.timestamp) >= corte);\nreturn [{ json: {}, binary: { data: { data: Buffer.from(JSON.stringify(log, null, 2)).toString('base64'), mimeType: 'application/json', fileName: 'log_diario.json' } } }];"
+        "jsCode": "// Acrescenta o resumo desta execucao ao log diario (secao 7.3) — lido por\n// workflows/resumo_diario.json. Mantem só os últimos 30 dias pra não crescer sem limite\n// (não especificado no spec.md — escolha de implementação razoável, fácil de ajustar).\n// Leitura de binário: esta instância do n8n guarda binário no disco (filesystem-v2),\n// então item.binary.data.data NÃO é o conteúdo, e sim o rótulo do modo de armazenamento.\n// O único acesso liberado no Code Node é helpers.getBinaryDataBuffer, que lê pelo ÍNDICE\n// do item no input DIRETO — por isso \"Ler log_diario.json\" alimenta este node diretamente.\nlet log = [];\ntry {\n  const b = $input.first().binary;\n  if (b && b.data) {\n    const buf = b.data.id ? await this.helpers.getBinaryDataBuffer(0, 'data') : Buffer.from(b.data.data, 'base64');\n    log = JSON.parse(buf.toString('utf8'));\n  }\n} catch (e) { log = []; } // 1a execução: arquivo ainda não existe\nlog.push($('Consolidar mudanças e cobrancas.json').first().json.logEntry);\nconst LIMITE_DIAS = 30;\nconst corte = new Date(); corte.setDate(corte.getDate() - LIMITE_DIAS);\nlog = log.filter((e) => new Date(e.timestamp) >= corte);\nreturn [{ json: {}, binary: { data: { data: Buffer.from(JSON.stringify(log, null, 2)).toString('base64'), mimeType: 'application/json', fileName: 'log_diario.json' } } }];"
       },
       "id": "n_preparar_log_diario",
       "name": "Preparar log_diario.json atualizado",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        6180,
-        660
+        6400,
+        800
       ]
     },
     {
@@ -748,8 +749,8 @@
       "type": "n8n-nodes-base.readWriteFile",
       "typeVersion": 1,
       "position": [
-        6400,
-        660
+        6620,
+        800
       ]
     },
     {
@@ -1937,7 +1938,13 @@
     },
     "Ler log_diario.json": {
       "main": [
-        []
+        [
+          {
+            "node": "Preparar log_diario.json atualizado",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Merge — arquivos de config": {
@@ -2338,7 +2345,7 @@
             "index": 0
           },
           {
-            "node": "Preparar log_diario.json atualizado",
+            "node": "Ler log_diario.json",
             "type": "main",
             "index": 0
           }
@@ -2773,11 +2780,6 @@
           },
           {
             "node": "Ler apelidos.json",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Ler log_diario.json",
             "type": "main",
             "index": 0
           }
