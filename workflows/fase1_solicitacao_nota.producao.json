@@ -167,7 +167,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Requer NODE_FUNCTION_ALLOW_EXTERNAL=exceljs,xlsx configurado na VM (spec.md 5 e 7.5).\n// Duas bibliotecas de propósito, cada uma pelo que a outra não faz:\n//   exceljs  -> Cost Report (.xlsx). É a única que expõe a COR de preenchimento da célula,\n//               que é o que separa AREP de REUNION (spec 6).\n//   SheetJS  -> Contratos (.xlsb). O exceljs não lê .xlsb — e pior, falha calado: abre o\n//               arquivo e devolve zero abas, o que faria todo mundo virar \"sem contrato\".\n// Os 5 arquivos chegam pelo \"Merge — downloads + config\", que tem a MESMA forma nos dois\n// ambientes: input 0 = config (sem binário), 1 = Cost Report S01, 2 = Cost Report S02,\n// 3/4/5 = Contratos AREP / Reunion / Soft Pré.\n//\n// Identificamos por POSIÇÃO, de propósito, e não por nome de node: quem baixa o Cost Report\n// é o node do Box em produção e o do Drive em homolog, e o gerador remove o do ambiente que\n// não é usado. Citar o nome no texto quebrava o arquivo de homolog com \"Referenced node\n// doesn't exist\" — e quebrava só lá, o que é justamente o tipo de divergência que a fonte\n// única existe pra evitar.\n//\n// A leitura em si usa helpers.getBinaryDataBuffer porque esta instância guarda binário no\n// disco (filesystem-v2): ali binary.data.data é o rótulo do modo, não o conteúdo.\nconst helpers = this.helpers;\nconst entradasDoNode = $input.all();\nconst posicoesComBinario = [];\nentradasDoNode.forEach((it, i) => { if (it.binary && it.binary.data) posicoesComBinario.push(i); });\nif (posicoesComBinario.length !== 5) {\n  throw new Error(\n    'esperava 5 arquivos no input (2 Cost Reports + 3 planilhas de Contratos), vieram ' +\n    posicoesComBinario.length + '. Confira as ligações do \"Merge — downloads + config\".'\n  );\n}\nasync function bufferNaPosicao(pos) {\n  const i = posicoesComBinario[pos];\n  const b = entradasDoNode[i].binary.data;\n  if (!b.id) return Buffer.from(b.data, 'base64'); // modo embutido\n  return await helpers.getBinaryDataBuffer(i, 'data');\n}\n\nconst ExcelJS = require('exceljs');\nconst XLSX = require('xlsx');\n\nfunction normalizar(texto) {\n  if (!texto) return '';\n  return String(texto).normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toLowerCase().trim().replace(/\\s+/g, ' ');\n}\n\n// .text estoura com \"Cannot read properties of null (reading 'toString')\" quando a célula\n// não tem valor — acontece de verdade nesta planilha, em células mescladas (ValueType 1).\n// Esta versão do exceljs não protege esse caso.\nfunction textoDaCelula(row, col) {\n  try {\n    const c = row.getCell(col);\n    if (!c || c.value === null || c.value === undefined) return '';\n    return c.text;\n  } catch (e) {\n    return '';\n  }\n}\n\n// Mantém a semântica do original (Number(cell.value) || 0), só que sem estourar em célula\n// vazia/mesclada e resolvendo célula de fórmula pelo resultado calculado.\nfunction numeroDaCelula(row, col) {\n  try {\n    const c = row.getCell(col);\n    const v = c && c.value;\n    if (v && typeof v === 'object' && 'result' in v) return Number(v.result) || 0;\n    return Number(v) || 0;\n  } catch (e) {\n    return 0;\n  }\n}\n\n// getWorksheet() do exceljs é sensível a maiúsculas, e a aba real chama-se \"NOTAS\".\n// O código antigo caía num fallback silencioso pro worksheets[0] e lia a aba errada\n// (\"DETALHADO MÃE\"), sem nenhum sinal de erro.\nfunction abaChamada(wb, nome) {\n  const alvo = String(nome).trim().toUpperCase();\n  return wb.worksheets.find((w) => String(w.name).trim().toUpperCase() === alvo) || null;\n}\n\nfunction linhaTemPreenchimento(cell) {\n  const fill = cell && cell.fill;\n  if (!fill || fill.type !== 'pattern' || fill.pattern !== 'solid') return false;\n  const argb = fill.fgColor && fill.fgColor.argb;\n  if (!argb) return false;\n  return argb !== 'FFFFFFFF' && argb !== '00000000';\n}\n\nasync function lerAbaNotas(posicao, projetoFixo) {\n  const buffer = await bufferNaPosicao(posicao);\n  const wb = new ExcelJS.Workbook();\n  await wb.xlsx.load(buffer);\n  const ws = abaChamada(wb, 'NOTAS');\n  if (!ws) {\n    throw new Error('aba \"NOTAS\" nao encontrada no Cost Report. Abas do arquivo: ' + wb.worksheets.map((w) => w.name).join(', '));\n  }\n  const linhas = [];\n  ws.eachRow({ includeEmpty: false }, (row, rowNumber) => {\n    if (rowNumber === 1) return; // cabeçalho\n    const projetoId = projetoFixo || (linhaTemPreenchimento(row.getCell('L')) ? 'REUNION' : 'AREP');\n    linhas.push({\n      linha: rowNumber,\n      projetoId,\n      colunaB: textoDaCelula(row, 'B'),\n      colunaC: textoDaCelula(row, 'C'),\n      colunaG: textoDaCelula(row, 'G'),\n      colunaH: textoDaCelula(row, 'H'),\n      colunaJ: textoDaCelula(row, 'J'),\n      colunaK: numeroDaCelula(row, 'K'),\n      colunaL: textoDaCelula(row, 'L'),\n      colunaN: textoDaCelula(row, 'N'),\n      colunaR: textoDaCelula(row, 'R'),\n    });\n  });\n  return linhas;\n}\n\n// Colunas localizadas pelo NOME do cabeçalho, não por letra fixa: as abas têm layouts\n// diferentes (na de equipe a empresa fica em J; na de prestação de serviço, em F) e o\n// cabeçalho está na linha 3, não na 1. Mapeamento por letra fixa lia as colunas erradas.\nasync function lerPlanilhaContratos(posicao) {\n  const buffer = await bufferNaPosicao(posicao);\n  const wb = XLSX.read(buffer, { type: 'buffer' });\n  const linhas = [];\n\n  for (const nomeAba of wb.SheetNames) {\n    // Contratos cancelados/distratados não valem como contrato ativo. Ficar de fora é o\n    // lado seguro: sem match aqui, a nota cai na busca de ficha cadastral (spec 3.1) em\n    // vez de ser liberada indevidamente. Ver PENDENTE-contratos-xlsb.txt.\n    const abaNorm = normalizar(nomeAba);\n    if (abaNorm.includes('cancelado') || abaNorm.includes('distrato')) continue;\n\n    const grade = XLSX.utils.sheet_to_json(wb.Sheets[nomeAba], { header: 'A', raw: false, defval: '' });\n\n    let iCab = -1;\n    for (let i = 0; i < Math.min(grade.length, 10); i++) {\n      if (Object.values(grade[i]).some((v) => normalizar(v) === 'status')) { iCab = i; break; }\n    }\n    if (iCab < 0) continue;\n\n    const col = {};\n    for (const [letra, valor] of Object.entries(grade[iCab])) {\n      const h = normalizar(valor);\n      if (h === 'status') col.status = letra;\n      else if (h === 'nome') col.nome = letra;\n      else if (h.includes('informacoes da empresa')) col.empresa = letra;\n    }\n    if (!col.status) continue;\n\n    for (const linha of grade.slice(iCab + 1)) {\n      const razaoSocial = col.empresa ? String(linha[col.empresa] || '').trim() : '';\n      const nomeColaborador = col.nome ? String(linha[col.nome] || '').trim() : '';\n      if (!razaoSocial && !nomeColaborador) continue; // linha vazia ou separador\n      linhas.push({ razaoSocial, nomeColaborador, status: String(linha[col.status] || '').trim() });\n    }\n  }\n\n  if (linhas.length === 0) {\n    throw new Error('planilha de contratos veio sem nenhuma linha legivel — confira o formato do arquivo');\n  }\n  return linhas;\n}\n\nconst linhasS01 = await lerAbaNotas(0, null); // Cost Report S01 — a cor decide AREP/REUNION\nconst linhasS02 = await lerAbaNotas(1, 'SOFT_PRE'); // Cost Report S02\n\nconst contratos = {\n  AREP: await lerPlanilhaContratos(2),\n  REUNION: await lerPlanilhaContratos(3),\n  SOFT_PRE: await lerPlanilhaContratos(4),\n};\n\nconst cfg = $('Carregar config + perfis').first().json;\n\nconst todasAsLinhas = [...linhasS01, ...linhasS02];\n\nreturn todasAsLinhas.map((nota) => ({\n  json: {\n    nota,\n    contratosDoProjeto: contratos[nota.projetoId],\n    config: cfg.config,\n    cobrancas: cfg.cobrancas,\n    apelidos: cfg.apelidos,\n    perfil: cfg.perfis[nota.projetoId],\n    dominioEmpresa: cfg.dominioEmpresa,\n  },\n}));"
+        "jsCode": "// Requer NODE_FUNCTION_ALLOW_EXTERNAL=exceljs,xlsx configurado na VM (spec.md 5 e 7.5).\n// Duas bibliotecas de propósito, cada uma pelo que a outra não faz:\n//   exceljs  -> Cost Report (.xlsx). É a única que expõe a COR de preenchimento da célula,\n//               que é o que separa AREP de REUNION (spec 6).\n//   SheetJS  -> Contratos (.xlsb). O exceljs não lê .xlsb — e pior, falha calado: abre o\n//               arquivo e devolve zero abas, o que faria todo mundo virar \"sem contrato\".\n// Os 5 arquivos chegam pelo \"Merge — downloads + config\", que tem a MESMA forma nos dois\n// ambientes: input 0 = config (sem binário), 1 = Cost Report S01, 2 = Cost Report S02,\n// 3/4/5 = Contratos AREP / Reunion / Soft Pré.\n//\n// Identificamos por POSIÇÃO, de propósito, e não por nome de node: quem baixa o Cost Report\n// é o node do Box em produção e o do Drive em homolog, e o gerador remove o do ambiente que\n// não é usado. Citar o nome no texto quebrava o arquivo de homolog com \"Referenced node\n// doesn't exist\" — e quebrava só lá, o que é justamente o tipo de divergência que a fonte\n// única existe pra evitar.\n//\n// A leitura em si usa helpers.getBinaryDataBuffer porque esta instância guarda binário no\n// disco (filesystem-v2): ali binary.data.data é o rótulo do modo, não o conteúdo.\nconst helpers = this.helpers;\nconst entradasDoNode = $input.all();\nconst posicoesComBinario = [];\nentradasDoNode.forEach((it, i) => { if (it.binary && it.binary.data) posicoesComBinario.push(i); });\nif (posicoesComBinario.length !== 5) {\n  throw new Error(\n    'esperava 5 arquivos no input (2 Cost Reports + 3 planilhas de Contratos), vieram ' +\n    posicoesComBinario.length + '. Confira as ligações do \"Merge — downloads + config\".'\n  );\n}\nasync function bufferNaPosicao(pos) {\n  const i = posicoesComBinario[pos];\n  const b = entradasDoNode[i].binary.data;\n  if (!b.id) return Buffer.from(b.data, 'base64'); // modo embutido\n  return await helpers.getBinaryDataBuffer(i, 'data');\n}\n\nconst ExcelJS = require('exceljs');\nconst XLSX = require('xlsx');\n\nfunction normalizar(texto) {\n  if (!texto) return '';\n  return String(texto).normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toLowerCase().trim().replace(/\\s+/g, ' ');\n}\n\n// .text estoura com \"Cannot read properties of null (reading 'toString')\" quando a célula\n// não tem valor — acontece de verdade nesta planilha, em células mescladas (ValueType 1).\n// Esta versão do exceljs não protege esse caso.\nfunction textoDaCelula(row, col) {\n  try {\n    const c = row.getCell(col);\n    if (!c || c.value === null || c.value === undefined) return '';\n    return c.text;\n  } catch (e) {\n    return '';\n  }\n}\n\n// Mantém a semântica do original (Number(cell.value) || 0), só que sem estourar em célula\n// vazia/mesclada e resolvendo célula de fórmula pelo resultado calculado.\nfunction numeroDaCelula(row, col) {\n  try {\n    const c = row.getCell(col);\n    const v = c && c.value;\n    if (v && typeof v === 'object' && 'result' in v) return Number(v.result) || 0;\n    return Number(v) || 0;\n  } catch (e) {\n    return 0;\n  }\n}\n\n// getWorksheet() do exceljs é sensível a maiúsculas, e a aba real chama-se \"NOTAS\".\n// O código antigo caía num fallback silencioso pro worksheets[0] e lia a aba errada\n// (\"DETALHADO MÃE\"), sem nenhum sinal de erro.\nfunction abaChamada(wb, nome) {\n  const alvo = String(nome).trim().toUpperCase();\n  return wb.worksheets.find((w) => String(w.name).trim().toUpperCase() === alvo) || null;\n}\n\nfunction linhaTemPreenchimento(cell) {\n  const fill = cell && cell.fill;\n  if (!fill || fill.type !== 'pattern' || fill.pattern !== 'solid') return false;\n  const argb = fill.fgColor && fill.fgColor.argb;\n  if (!argb) return false;\n  return argb !== 'FFFFFFFF' && argb !== '00000000';\n}\n\nasync function lerAbaNotas(posicao, projetoFixo) {\n  const buffer = await bufferNaPosicao(posicao);\n  const wb = new ExcelJS.Workbook();\n  await wb.xlsx.load(buffer);\n  const ws = abaChamada(wb, 'NOTAS');\n  if (!ws) {\n    throw new Error('aba \"NOTAS\" nao encontrada no Cost Report. Abas do arquivo: ' + wb.worksheets.map((w) => w.name).join(', '));\n  }\n  const linhas = [];\n  ws.eachRow({ includeEmpty: false }, (row, rowNumber) => {\n    if (rowNumber === 1) return; // cabeçalho\n    const projetoId = projetoFixo || (linhaTemPreenchimento(row.getCell('L')) ? 'REUNION' : 'AREP');\n    linhas.push({\n      linha: rowNumber,\n      projetoId,\n      colunaB: textoDaCelula(row, 'B'),\n      colunaC: textoDaCelula(row, 'C'),\n      colunaG: textoDaCelula(row, 'G'),\n      colunaH: textoDaCelula(row, 'H'),\n      colunaJ: textoDaCelula(row, 'J'),\n      colunaK: numeroDaCelula(row, 'K'),\n      colunaL: textoDaCelula(row, 'L'),\n      colunaN: textoDaCelula(row, 'N'),\n      colunaR: textoDaCelula(row, 'R'),\n    });\n  });\n  return linhas;\n}\n\n// Colunas localizadas pelo NOME do cabeçalho, não por letra fixa: as abas têm layouts\n// diferentes (na de equipe a empresa fica em J; na de prestação de serviço, em F) e o\n// cabeçalho está na linha 3, não na 1. Mapeamento por letra fixa lia as colunas erradas.\nasync function lerPlanilhaContratos(posicao) {\n  const buffer = await bufferNaPosicao(posicao);\n  const wb = XLSX.read(buffer, { type: 'buffer' });\n  const linhas = [];\n\n  // Só a aba \"EQUIPE E E FORNECEDORES\" (spec 3.1). O arquivo é da diretoria de Contratos e\n  // a automação só lê — não cabe a ela decidir excluir aba. Restringindo à aba certa, as\n  // demais (inclusive CANCELADOS_DISTRATOS) simplesmente nunca entram na leitura.\n  const ABA_CONTRATOS = 'equipe e e fornecedores';\n  const abasAlvo = wb.SheetNames.filter((s) => normalizar(s) === ABA_CONTRATOS);\n  if (abasAlvo.length === 0) {\n    throw new Error('aba \"EQUIPE E E FORNECEDORES\" nao encontrada na planilha de contratos. Abas: ' + wb.SheetNames.join(', '));\n  }\n\n  for (const nomeAba of abasAlvo) {\n    const grade = XLSX.utils.sheet_to_json(wb.Sheets[nomeAba], { header: 'A', raw: false, defval: '' });\n\n    let iCab = -1;\n    for (let i = 0; i < Math.min(grade.length, 10); i++) {\n      if (Object.values(grade[i]).some((v) => normalizar(v) === 'status')) { iCab = i; break; }\n    }\n    if (iCab < 0) continue;\n\n    const col = {};\n    for (const [letra, valor] of Object.entries(grade[iCab])) {\n      const h = normalizar(valor);\n      if (h === 'status') col.status = letra;\n      else if (h === 'nome') col.nome = letra;\n      else if (h.includes('informacoes da empresa')) col.empresa = letra;\n    }\n    if (!col.status) continue;\n\n    for (const linha of grade.slice(iCab + 1)) {\n      const razaoSocial = col.empresa ? String(linha[col.empresa] || '').trim() : '';\n      const nomeColaborador = col.nome ? String(linha[col.nome] || '').trim() : '';\n      if (!razaoSocial && !nomeColaborador) continue; // linha vazia ou separador\n      linhas.push({ razaoSocial, nomeColaborador, status: String(linha[col.status] || '').trim() });\n    }\n  }\n\n  if (linhas.length === 0) {\n    throw new Error('planilha de contratos veio sem nenhuma linha legivel — confira o formato do arquivo');\n  }\n  return linhas;\n}\n\nconst linhasS01 = await lerAbaNotas(0, null); // Cost Report S01 — a cor decide AREP/REUNION\nconst linhasS02 = await lerAbaNotas(1, 'SOFT_PRE'); // Cost Report S02\n\nconst contratos = {\n  AREP: await lerPlanilhaContratos(2),\n  REUNION: await lerPlanilhaContratos(3),\n  SOFT_PRE: await lerPlanilhaContratos(4),\n};\n\nconst cfg = $('Carregar config + perfis').first().json;\n\nconst todasAsLinhas = [...linhasS01, ...linhasS02];\n\nreturn todasAsLinhas.map((nota) => ({\n  json: {\n    nota,\n    contratosDoProjeto: contratos[nota.projetoId],\n    config: cfg.config,\n    cobrancas: cfg.cobrancas,\n    apelidos: cfg.apelidos,\n    perfil: cfg.perfis[nota.projetoId],\n    dominioEmpresa: cfg.dominioEmpresa,\n  },\n}));"
       },
       "id": "n13-parse-planilhas",
       "name": "Parsear planilhas (exceljs) e separar AREP/Reunion por cor",
@@ -224,10 +224,10 @@
     },
     {
       "parameters": {
-        "jsCode": "// Checagem de contrato — etapa 1 (seção 3.1). Só roda pra fluxo='novo_pedido';\n// itens de fluxo='monitoramento' passam direto.\n\nfunction normalizar(texto) {\n  if (!texto) return '';\n  return String(texto).normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toLowerCase().trim().replace(/\\s+/g, ' ');\n}\n\nfunction classificarStatusContrato(statusContrato) {\n  const norm = normalizar(statusContrato);\n  if (norm.includes('assinado')) return 'ASSINADO';\n  return 'PENDENTE_VAZIO';\n}\n\nfunction cruzarComPlanilhaContratos(nota, linhasContratos) {\n  const alvoRazao = normalizar(nota.colunaH);\n  const partes = (nota.colunaJ || '').split(' - ');\n  const alvoNome = normalizar(partes.length >= 2 ? partes[1] : nota.colunaH);\n  const encontrada = (linhasContratos || []).find((linha) => {\n    const razao = normalizar(linha.razaoSocial);\n    const nome = normalizar(linha.nomeColaborador);\n    return (alvoRazao && razao === alvoRazao) || (alvoNome && nome === alvoNome);\n  });\n  if (!encontrada) return { liberado: false };\n  return { liberado: classificarStatusContrato(encontrada.status) === 'ASSINADO' };\n}\n\nreturn $input.all().map((item) => {\n  const { nota, contratosDoProjeto, fluxo } = item.json;\n  if (fluxo !== 'novo_pedido') return item; // monitoramento passa direto\n\n  const statusN = classificarStatusContrato(nota.colunaN);\n  if (statusN === 'ASSINADO') {\n    return { json: { ...item.json, liberado: true, precisaBuscarFichaCadastral: false, motivoLiberacao: 'coluna_n' } };\n  }\n  const cruzamento = cruzarComPlanilhaContratos(nota, contratosDoProjeto);\n  if (cruzamento.liberado) {\n    return { json: { ...item.json, liberado: true, precisaBuscarFichaCadastral: false, motivoLiberacao: 'planilha_contratos' } };\n  }\n  return { json: { ...item.json, liberado: false, precisaBuscarFichaCadastral: true } };\n});"
+        "jsCode": "// Checagem de contrato — passo 1 (spec 3.1): a coluna N do Cost Report.\n// Aqui o critério é \"CONTÉM assinado\" (o spec dá \"OK - Assinado\" como exemplo válido) —\n// diferente do critério da planilha de Contratos, que é o literal exato. São regras\n// distintas de propósito; não dá pra unificar as duas.\n//\n// Se a coluna N já resolve, nem planilha nem Gmail precisam ser consultados. Se não\n// resolve, as DUAS checagens rodam em paralelo (spec 3.1), sem prioridade entre si.\n// Itens de fluxo='monitoramento' não passam por checagem de contrato nenhuma.\n\nfunction normalizar(texto) {\n  if (!texto) return '';\n  return String(texto).normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toLowerCase().trim().replace(/\\s+/g, ' ');\n}\n\nreturn $input.all().map((item) => {\n  const { nota, fluxo } = item.json;\n  const chaveLinha = nota ? (nota.projetoId + '|' + nota.linha) : null;\n\n  if (fluxo !== 'novo_pedido') {\n    return { json: { ...item.json, chaveLinha, contratoResolvido: true } };\n  }\n\n  const liberado = normalizar(nota.colunaN).includes('assinado');\n  return { json: {\n    ...item.json,\n    chaveLinha,\n    liberado,\n    motivoLiberacao: liberado ? 'coluna_n' : undefined,\n    // coluna N já está preenchida: não há o que reescrever nela\n    contratoResolvido: liberado,\n  } };\n});"
       },
       "id": "n15-contrato-etapa1",
-      "name": "Checagem de contrato — etapa 1",
+      "name": "Checagem de contrato — coluna N",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
@@ -245,7 +245,7 @@
           },
           "conditions": [
             {
-              "leftValue": "={{ $json.precisaBuscarFichaCadastral }}",
+              "leftValue": "={{ $json.contratoResolvido }}",
               "rightValue": true,
               "operator": {
                 "type": "boolean",
@@ -257,7 +257,7 @@
         }
       },
       "id": "n16-if-precisa-ficha",
-      "name": "IF — Precisa buscar ficha cadastral?",
+      "name": "IF — Coluna N já resolve?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
@@ -267,10 +267,10 @@
     },
     {
       "parameters": {
-        "jsCode": "// Checagem de contrato — etapa 2: valida a ficha cadastral a partir das\n// mensagens da thread encontrada (critério corrigido — spec.md commit 8a06d6b):\n// mensagem de remetente FORA do domínio da empresa, com >=1 anexo.\n\nfunction normalizar(texto) {\n  if (!texto) return '';\n  return String(texto).normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toLowerCase().trim();\n}\n\nfunction validarFichaCadastral(mensagens, dominioEmpresa) {\n  const dominioNorm = normalizar(dominioEmpresa);\n  return (mensagens || []).some((msg) => {\n    const from = (msg.from || (msg.headers && msg.headers.from) || '');\n    const dominioRemetente = normalizar((from.split('@')[1] || '').replace('>', ''));\n    const externo = dominioRemetente !== '' && dominioRemetente !== dominioNorm;\n    const temAnexo = !!(msg.hasAttachment || (msg.payload && msg.payload.parts && msg.payload.parts.some((p) => p.filename)));\n    return externo && temAnexo;\n  });\n}\n\nconst mensagens = $input.all().map((i) => i.json);\nconst primeiro = $input.first();\nconst dominioEmpresa = primeiro.json.dominioEmpresa || 'novorealitybox.com';\nconst validada = validarFichaCadastral(mensagens, dominioEmpresa);\n\nreturn [{\n  json: {\n    ...primeiro.json,\n    liberado: validada,\n    atualizarColunaNPara: validada ? 'OK - ASSINADO' : undefined,\n  },\n}];"
+        "jsCode": "// Checagem B das duas paralelas (spec 3.1): ficha cadastral respondida na thread\n// marcada CONTRATAÇÃO. Sinal válido = mensagem de remetente FORA do domínio da empresa\n// com pelo menos 1 anexo (spec 3.1) — o anexo do pedido original não conta.\n//\n// As mensagens são reagrupadas POR LINHA via pairedItem. O node do Gmail roda uma busca\n// por linha e devolve tudo achatado num fluxo só; sem reagrupar, o anexo de um colaborador\n// validaria a linha de outro, e só a primeira linha sobreviveria.\n\nfunction normalizar(texto) {\n  if (!texto) return '';\n  return String(texto).normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toLowerCase().trim().replace(/\\s+/g, ' ');\n}\n\nfunction indiceDeOrigem(item) {\n  const p = item.pairedItem;\n  if (p === undefined || p === null) return null;\n  if (typeof p === 'number') return p;\n  if (Array.isArray(p)) return p.length && p[0] ? p[0].item : null;\n  return p.item === undefined ? null : p.item;\n}\n\nfunction validarFichaCadastral(mensagens, dominioEmpresa) {\n  const dominioNorm = normalizar(dominioEmpresa);\n  return (mensagens || []).some((msg) => {\n    const from = (msg.from || (msg.headers && msg.headers.from) || '');\n    const dominioRemetente = normalizar((from.split('@')[1] || '').replace('>', ''));\n    const externo = dominioRemetente !== '' && dominioRemetente !== dominioNorm;\n    const temAnexo = !!(msg.hasAttachment || (msg.payload && msg.payload.parts && msg.payload.parts.some((p) => p.filename)));\n    return externo && temAnexo;\n  });\n}\n\nconst origem = $('Preparar checagem paralela de contrato').all().map((i) => i.json);\n\nconst mensagensPorLinha = new Map();\nfor (const item of $input.all()) {\n  const i = indiceDeOrigem(item);\n  if (i === null || !origem[i]) continue;\n  const chave = origem[i].chaveLinha;\n  if (!mensagensPorLinha.has(chave)) mensagensPorLinha.set(chave, []);\n  mensagensPorLinha.get(chave).push(item.json);\n}\n\n// Devolve UMA linha por linha de origem, mesmo sem mensagem nenhuma — assim o\n// consolidador sempre recebe o par completo das duas checagens.\nreturn origem.map((linha) => {\n  const mensagens = mensagensPorLinha.get(linha.chaveLinha) || [];\n  const confirmado = validarFichaCadastral(mensagens, linha.dominioEmpresa || 'novorealitybox.com');\n  return { json: {\n    ...linha,\n    fonteChecagem: 'ficha_cadastral',\n    confirmado,\n    atualizarColunaNPara: confirmado ? 'OK - ASSINADO' : undefined,\n  } };\n});"
       },
       "id": "n18-contrato-etapa2",
-      "name": "Checagem de contrato — etapa 2 (validar ficha)",
+      "name": "Checagem de contrato — ficha cadastral (Gmail)",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
@@ -280,7 +280,7 @@
     },
     {
       "parameters": {
-        "numberInputs": 2
+        "numberInputs": 3
       },
       "id": "n19-merge-contrato",
       "name": "Merge — resultado da checagem de contrato",
@@ -1478,7 +1478,8 @@
           "name": "Gmail account"
         }
       },
-      "notes": "Busca por marcador CONTRATAÇÃO + nome do colaborador (seção 3.1.2/3.1). Ajustar a query real conforme testes em homologação — o operador 'label:' do Gmail é case/acento sensível dependendo de como o marcador foi criado."
+      "notes": "Busca por marcador CONTRATAÇÃO + nome do colaborador (seção 3.1.2/3.1). Ajustar a query real conforme testes em homologação — o operador 'label:' do Gmail é case/acento sensível dependendo de como o marcador foi criado.",
+      "alwaysOutputData": true
     },
     {
       "parameters": {
@@ -1736,6 +1737,45 @@
         5680,
         460
       ]
+    },
+    {
+      "id": "prep-par-contrato",
+      "name": "Preparar checagem paralela de contrato",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2040,
+        500
+      ],
+      "parameters": {
+        "jsCode": "// Ponto de partida das duas checagens paralelas (spec 3.1). Existe por dois motivos:\n// dar um ponto de ramificação explícito, e servir de referência estável — o node da ficha\n// cadastral precisa mapear cada mensagem do Gmail de volta pra linha que a originou.\nreturn $input.all();"
+      }
+    },
+    {
+      "id": "chk-planilha",
+      "name": "Checagem de contrato — planilha de Contratos",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2260,
+        420
+      ],
+      "parameters": {
+        "jsCode": "// Checagem A das duas paralelas (spec 3.1): cruzamento com a planilha de Contratos.\n// Critério LITERAL \"ASSINADO\" — qualquer outro valor (\"E A dd/mm\", vazio, \"AGUARDANDO\n// ASSINATURA DO CONTRATO\"...) não confirma e não escreve nada na coluna N.\n\nfunction normalizar(texto) {\n  if (!texto) return '';\n  return String(texto).normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toLowerCase().trim().replace(/\\s+/g, ' ');\n}\n\nfunction contratoAssinadoNaPlanilha(status) {\n  return normalizar(status) === 'assinado';\n}\n\nfunction cruzarComPlanilhaContratos(nota, linhasContratos) {\n  const alvoRazao = normalizar(nota.colunaH);\n  const partes = (nota.colunaJ || '').split(' - ');\n  const alvoNome = normalizar(partes.length >= 2 ? partes[1] : nota.colunaH);\n  const encontrada = (linhasContratos || []).find((linha) => {\n    const razao = normalizar(linha.razaoSocial);\n    const nome = normalizar(linha.nomeColaborador);\n    return (alvoRazao && razao === alvoRazao) || (alvoNome && nome === alvoNome);\n  });\n  return !!encontrada && contratoAssinadoNaPlanilha(encontrada.status);\n}\n\nreturn $input.all().map((item) => {\n  const confirmado = cruzarComPlanilhaContratos(item.json.nota, item.json.contratosDoProjeto);\n  return { json: {\n    ...item.json,\n    fonteChecagem: 'planilha_contratos',\n    confirmado,\n    // spec 3.1: match na planilha preenche a coluna N como \"OK - ASSINADO\"\n    atualizarColunaNPara: confirmado ? 'OK - ASSINADO' : undefined,\n  } };\n});"
+      }
+    },
+    {
+      "id": "consolidar-contrato",
+      "name": "Consolidar checagem de contrato",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2920,
+        300
+      ],
+      "parameters": {
+        "jsCode": "// Junta as duas checagens paralelas (spec 3.1): a PRIMEIRA confirmação positiva libera,\n// sem prioridade entre as fontes. Como as duas chegam pelo mesmo Merge, \"primeira\" aqui é\n// \"qualquer uma que tenha confirmado\" — o resultado é o mesmo, e não depende de qual\n// terminou antes.\n//\n// Cada linha pode aparecer até 2x no input (uma por checagem); o agrupamento é por\n// chaveLinha. Linhas já resolvidas pela coluna N vêm por outro ramo e passam direto.\n\nconst porLinha = new Map();\n\nfor (const item of $input.all()) {\n  const d = item.json;\n  const chave = d.chaveLinha;\n  if (chave === null || chave === undefined) continue;\n\n  if (!porLinha.has(chave)) {\n    porLinha.set(chave, { base: d, liberado: false, motivo: undefined, valorColunaN: undefined, passaDireto: false });\n  }\n  const acc = porLinha.get(chave);\n\n  // monitoramento e linhas liberadas pela coluna N não passam pelas checagens paralelas\n  if (d.contratoResolvido) {\n    acc.base = d;\n    acc.passaDireto = true;\n    continue;\n  }\n  acc.base = { ...acc.base, ...d };\n  if (d.confirmado && !acc.liberado) {\n    acc.liberado = true;\n    acc.motivo = d.fonteChecagem;\n    acc.valorColunaN = d.atualizarColunaNPara;\n  }\n}\n\nreturn [...porLinha.values()].map(({ base, liberado, motivo, valorColunaN, passaDireto }) => {\n  if (passaDireto) return { json: base };\n  const json = { ...base, liberado, motivoLiberacao: motivo, atualizarColunaNPara: valorColunaN };\n  delete json.confirmado;\n  delete json.fonteChecagem;\n  return { json };\n});"
+      }
     }
   ],
   "connections": {
@@ -1906,49 +1946,9 @@
       "main": [
         [
           {
-            "node": "Checagem de contrato — etapa 1",
+            "node": "Checagem de contrato — coluna N",
             "type": "main",
             "index": 0
-          }
-        ]
-      ]
-    },
-    "Checagem de contrato — etapa 1": {
-      "main": [
-        [
-          {
-            "node": "IF — Precisa buscar ficha cadastral?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "IF — Precisa buscar ficha cadastral?": {
-      "main": [
-        [
-          {
-            "node": "Gmail — Buscar thread CONTRATAÇÃO",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Merge — resultado da checagem de contrato",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Checagem de contrato — etapa 2 (validar ficha)": {
-      "main": [
-        [
-          {
-            "node": "Merge — resultado da checagem de contrato",
-            "type": "main",
-            "index": 1
           }
         ]
       ]
@@ -1957,7 +1957,7 @@
       "main": [
         [
           {
-            "node": "IF — É monitoramento?",
+            "node": "Consolidar checagem de contrato",
             "type": "main",
             "index": 0
           }
@@ -2522,7 +2522,7 @@
       "main": [
         [
           {
-            "node": "Checagem de contrato — etapa 2 (validar ficha)",
+            "node": "Checagem de contrato — ficha cadastral (Gmail)",
             "type": "main",
             "index": 0
           }
@@ -2667,6 +2667,84 @@
             "node": "Merge — resultados consolidados",
             "type": "main",
             "index": 4
+          }
+        ]
+      ]
+    },
+    "Checagem de contrato — coluna N": {
+      "main": [
+        [
+          {
+            "node": "IF — Coluna N já resolve?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — Coluna N já resolve?": {
+      "main": [
+        [
+          {
+            "node": "Merge — resultado da checagem de contrato",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Preparar checagem paralela de contrato",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Checagem de contrato — ficha cadastral (Gmail)": {
+      "main": [
+        [
+          {
+            "node": "Merge — resultado da checagem de contrato",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Preparar checagem paralela de contrato": {
+      "main": [
+        [
+          {
+            "node": "Checagem de contrato — planilha de Contratos",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Gmail — Buscar thread CONTRATAÇÃO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Checagem de contrato — planilha de Contratos": {
+      "main": [
+        [
+          {
+            "node": "Merge — resultado da checagem de contrato",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Consolidar checagem de contrato": {
+      "main": [
+        [
+          {
+            "node": "IF — É monitoramento?",
+            "type": "main",
+            "index": 0
           }
         ]
       ]
