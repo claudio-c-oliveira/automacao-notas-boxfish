@@ -980,7 +980,7 @@
       "credentials": {
         "googleDriveOAuth2Api": {
           "id": "cred-gdrive-particular-michelle",
-          "name": "Google Drive - Particular Michelle"
+          "name": "Google Drive - Michelle (michelle.mimiaguia@gmail.com)"
         }
       },
       "notes": "Mesma credencial de produção (seção 7.4: 'o AMBIENTE não troca de credencial nesse caso — troca só o ID da pasta raiz') — só muda a pasta raiz onde procura."
@@ -1020,7 +1020,7 @@
       "credentials": {
         "googleDriveOAuth2Api": {
           "id": "cred-gdrive-particular-michelle",
-          "name": "Google Drive - Particular Michelle"
+          "name": "Google Drive - Michelle (michelle.mimiaguia@gmail.com)"
         }
       }
     },
@@ -1049,7 +1049,7 @@
       "credentials": {
         "googleDriveOAuth2Api": {
           "id": "cred-gdrive-particular-michelle",
-          "name": "Google Drive - Particular Michelle"
+          "name": "Google Drive - Michelle (michelle.mimiaguia@gmail.com)"
         }
       },
       "notes": "Mesma credencial de produção (seção 7.4: 'o AMBIENTE não troca de credencial nesse caso — troca só o ID da pasta raiz') — só muda a pasta raiz onde procura."
@@ -1089,7 +1089,7 @@
       "credentials": {
         "googleDriveOAuth2Api": {
           "id": "cred-gdrive-particular-michelle",
-          "name": "Google Drive - Particular Michelle"
+          "name": "Google Drive - Michelle (michelle.mimiaguia@gmail.com)"
         }
       }
     },
@@ -1159,7 +1159,7 @@
       "credentials": {
         "googleDriveOAuth2Api": {
           "id": "cred-gdrive-particular-michelle",
-          "name": "Google Drive - Particular Michelle"
+          "name": "Google Drive - Michelle (michelle.mimiaguia@gmail.com)"
         }
       }
     },
@@ -1197,7 +1197,7 @@
       "credentials": {
         "googleDriveOAuth2Api": {
           "id": "cred-gdrive-particular-michelle",
-          "name": "Google Drive - Particular Michelle"
+          "name": "Google Drive - Michelle (michelle.mimiaguia@gmail.com)"
         }
       },
       "notes": "Sem lock — pasta de teste pessoal do Claudio, uso único, sem risco de edição concorrente (diferente do Box de produção, seção 7.2)."
@@ -1253,7 +1253,7 @@
       "credentials": {
         "googleDriveOAuth2Api": {
           "id": "cred-gdrive-particular-michelle",
-          "name": "Google Drive - Particular Michelle"
+          "name": "Google Drive - Michelle (michelle.mimiaguia@gmail.com)"
         }
       }
     },
@@ -1277,7 +1277,7 @@
       "credentials": {
         "googleDriveOAuth2Api": {
           "id": "cred-gdrive-trabalho",
-          "name": "Google Drive account"
+          "name": "Google Drive - Produção (financeiro1@novorealitybox.com)"
         }
       }
     },
@@ -1319,7 +1319,7 @@
       "credentials": {
         "googleDriveOAuth2Api": {
           "id": "cred-gdrive-trabalho",
-          "name": "Google Drive account"
+          "name": "Google Drive - Produção (financeiro1@novorealitybox.com)"
         }
       }
     },
@@ -1357,7 +1357,7 @@
       "credentials": {
         "googleDriveOAuth2Api": {
           "id": "cred-gdrive-trabalho",
-          "name": "Google Drive account"
+          "name": "Google Drive - Produção (financeiro1@novorealitybox.com)"
         }
       },
       "notes": "Só leitura, sem lock/upload (spec.md seção 6, commit 7da28a2) — .xlsb não abre em preview no Drive mas download_file_content funciona normalmente."
@@ -1387,7 +1387,7 @@
       "credentials": {
         "googleDriveOAuth2Api": {
           "id": "cred-gdrive-trabalho",
-          "name": "Google Drive account"
+          "name": "Google Drive - Produção (financeiro1@novorealitybox.com)"
         }
       }
     },
@@ -1425,7 +1425,7 @@
       "credentials": {
         "googleDriveOAuth2Api": {
           "id": "cred-gdrive-trabalho",
-          "name": "Google Drive account"
+          "name": "Google Drive - Produção (financeiro1@novorealitybox.com)"
         }
       },
       "notes": "Só leitura, sem lock/upload (spec.md seção 6, commit 7da28a2) — .xlsb não abre em preview no Drive mas download_file_content funciona normalmente."
@@ -1450,7 +1450,7 @@
       "credentials": {
         "googleDriveOAuth2Api": {
           "id": "cred-gdrive-trabalho",
-          "name": "Google Drive account"
+          "name": "Google Drive - Produção (financeiro1@novorealitybox.com)"
         }
       }
     },
@@ -1492,7 +1492,7 @@
       "credentials": {
         "googleDriveOAuth2Api": {
           "id": "cred-gdrive-trabalho",
-          "name": "Google Drive account"
+          "name": "Google Drive - Produção (financeiro1@novorealitybox.com)"
         }
       }
     },
@@ -1534,7 +1534,7 @@
       "credentials": {
         "googleDriveOAuth2Api": {
           "id": "cred-gdrive-trabalho",
-          "name": "Google Drive account"
+          "name": "Google Drive - Produção (financeiro1@novorealitybox.com)"
         }
       }
     },
@@ -1572,7 +1572,7 @@
       "credentials": {
         "googleDriveOAuth2Api": {
           "id": "cred-gdrive-trabalho",
-          "name": "Google Drive account"
+          "name": "Google Drive - Produção (financeiro1@novorealitybox.com)"
         }
       },
       "notes": "Só leitura, sem lock/upload (spec.md seção 6, commit 7da28a2) — .xlsb não abre em preview no Drive mas download_file_content funciona normalmente."
@@ -1634,7 +1634,7 @@
       "credentials": {
         "gmailOAuth2": {
           "__porAmbiente": {
-            "homolog": "Gmail - Homolog (Claudio pessoal)",
+            "homolog": "Gmail - Homolog (Claudio Pessoal)",
             "producao": "Gmail account"
           }
         }
@@ -1663,7 +1663,7 @@
       "credentials": {
         "gmailOAuth2": {
           "__porAmbiente": {
-            "homolog": "Gmail - Homolog (Claudio pessoal)",
+            "homolog": "Gmail - Homolog (Claudio Pessoal)",
             "producao": "Gmail account"
           }
         }
@@ -1691,7 +1691,7 @@
       "credentials": {
         "gmailOAuth2": {
           "__porAmbiente": {
-            "homolog": "Gmail - Homolog (Claudio pessoal)",
+            "homolog": "Gmail - Homolog (Claudio Pessoal)",
             "producao": "Gmail account"
           }
         }
@@ -1718,7 +1718,7 @@
       "credentials": {
         "gmailOAuth2": {
           "__porAmbiente": {
-            "homolog": "Gmail - Homolog (Claudio pessoal)",
+            "homolog": "Gmail - Homolog (Claudio Pessoal)",
             "producao": "Gmail account"
           }
         }
@@ -1747,7 +1747,7 @@
       "credentials": {
         "gmailOAuth2": {
           "__porAmbiente": {
-            "homolog": "Gmail - Homolog (Claudio pessoal)",
+            "homolog": "Gmail - Homolog (Claudio Pessoal)",
             "producao": "Gmail account"
           }
         }
@@ -1770,7 +1770,7 @@
       "credentials": {
         "gmailOAuth2": {
           "__porAmbiente": {
-            "homolog": "Gmail - Homolog (Claudio pessoal)",
+            "homolog": "Gmail - Homolog (Claudio Pessoal)",
             "producao": "Gmail account"
           }
         }
@@ -1808,7 +1808,7 @@
       "credentials": {
         "gmailOAuth2": {
           "__porAmbiente": {
-            "homolog": "Gmail - Homolog (Claudio pessoal)",
+            "homolog": "Gmail - Homolog (Claudio Pessoal)",
             "producao": "Gmail account"
           }
         }
@@ -1833,7 +1833,7 @@
       "credentials": {
         "gmailOAuth2": {
           "__porAmbiente": {
-            "homolog": "Gmail - Homolog (Claudio pessoal)",
+            "homolog": "Gmail - Homolog (Claudio Pessoal)",
             "producao": "Gmail account"
           }
         }
@@ -1858,7 +1858,7 @@
       "credentials": {
         "gmailOAuth2": {
           "__porAmbiente": {
-            "homolog": "Gmail - Homolog (Claudio pessoal)",
+            "homolog": "Gmail - Homolog (Claudio Pessoal)",
             "producao": "Gmail account"
           }
         }
@@ -1883,7 +1883,7 @@
       "credentials": {
         "gmailOAuth2": {
           "__porAmbiente": {
-            "homolog": "Gmail - Homolog (Claudio pessoal)",
+            "homolog": "Gmail - Homolog (Claudio Pessoal)",
             "producao": "Gmail account"
           }
         }

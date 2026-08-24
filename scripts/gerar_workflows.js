@@ -42,13 +42,13 @@ const AMBIENTES = ['homolog', 'producao'];
 /** ids estáveis por nome de credencial — o n8n casa credencial por id na importação. */
 const CRED_IDS = {
   'Gmail account': 'cred-gmail-producao',
-  'Gmail - Homolog (Claudio pessoal)': 'cred-gmail-homolog',
+  'Gmail - Homolog (Claudio Pessoal)': 'cred-gmail-homolog',
   'Box account': 'cred-box-account',
   'Claude account (dev)': 'cred-claude-dev',
   'Claude account (produção)': 'cred-claude-producao',
-  'Google Drive account': 'cred-gdrive-trabalho',
-  'Google Drive - Particular Michelle': 'cred-gdrive-particular-michelle',
-  'Google Drive - Homolog (Claudio pessoal)': 'cred-gdrive-homolog',
+  'Google Drive - Produção (financeiro1@novorealitybox.com)': 'cred-gdrive-trabalho',
+  'Google Drive - Michelle (michelle.mimiaguia@gmail.com)': 'cred-gdrive-particular-michelle',
+  'Google Drive - HML (claudioco70@gmail.com)': 'cred-gdrive-homolog',
   'Telegram account': 'cred-telegram-account',
 };
 

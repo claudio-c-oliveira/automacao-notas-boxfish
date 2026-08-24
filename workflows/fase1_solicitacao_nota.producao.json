@@ -971,7 +971,7 @@
       "credentials": {
         "googleDriveOAuth2Api": {
           "id": "cred-gdrive-trabalho",
-          "name": "Google Drive account"
+          "name": "Google Drive - Produção (financeiro1@novorealitybox.com)"
         }
       }
     },
@@ -1013,7 +1013,7 @@
       "credentials": {
         "googleDriveOAuth2Api": {
           "id": "cred-gdrive-trabalho",
-          "name": "Google Drive account"
+          "name": "Google Drive - Produção (financeiro1@novorealitybox.com)"
         }
       }
     },
@@ -1051,7 +1051,7 @@
       "credentials": {
         "googleDriveOAuth2Api": {
           "id": "cred-gdrive-trabalho",
-          "name": "Google Drive account"
+          "name": "Google Drive - Produção (financeiro1@novorealitybox.com)"
         }
       },
       "notes": "Só leitura, sem lock/upload (spec.md seção 6, commit 7da28a2) — .xlsb não abre em preview no Drive mas download_file_content funciona normalmente."
@@ -1081,7 +1081,7 @@
       "credentials": {
         "googleDriveOAuth2Api": {
           "id": "cred-gdrive-trabalho",
-          "name": "Google Drive account"
+          "name": "Google Drive - Produção (financeiro1@novorealitybox.com)"
         }
       }
     },
@@ -1119,7 +1119,7 @@
       "credentials": {
         "googleDriveOAuth2Api": {
           "id": "cred-gdrive-trabalho",
-          "name": "Google Drive account"
+          "name": "Google Drive - Produção (financeiro1@novorealitybox.com)"
         }
       },
       "notes": "Só leitura, sem lock/upload (spec.md seção 6, commit 7da28a2) — .xlsb não abre em preview no Drive mas download_file_content funciona normalmente."
@@ -1144,7 +1144,7 @@
       "credentials": {
         "googleDriveOAuth2Api": {
           "id": "cred-gdrive-trabalho",
-          "name": "Google Drive account"
+          "name": "Google Drive - Produção (financeiro1@novorealitybox.com)"
         }
       }
     },
@@ -1186,7 +1186,7 @@
       "credentials": {
         "googleDriveOAuth2Api": {
           "id": "cred-gdrive-trabalho",
-          "name": "Google Drive account"
+          "name": "Google Drive - Produção (financeiro1@novorealitybox.com)"
         }
       }
     },
@@ -1228,7 +1228,7 @@
       "credentials": {
         "googleDriveOAuth2Api": {
           "id": "cred-gdrive-trabalho",
-          "name": "Google Drive account"
+          "name": "Google Drive - Produção (financeiro1@novorealitybox.com)"
         }
       }
     },
@@ -1266,7 +1266,7 @@
       "credentials": {
         "googleDriveOAuth2Api": {
           "id": "cred-gdrive-trabalho",
-          "name": "Google Drive account"
+          "name": "Google Drive - Produção (financeiro1@novorealitybox.com)"
         }
       },
       "notes": "Só leitura, sem lock/upload (spec.md seção 6, commit 7da28a2) — .xlsb não abre em preview no Drive mas download_file_content funciona normalmente."

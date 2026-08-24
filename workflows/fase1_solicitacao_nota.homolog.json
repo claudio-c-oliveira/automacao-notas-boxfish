@@ -805,7 +805,7 @@
       "credentials": {
         "googleDriveOAuth2Api": {
           "id": "cred-gdrive-particular-michelle",
-          "name": "Google Drive - Particular Michelle"
+          "name": "Google Drive - Michelle (michelle.mimiaguia@gmail.com)"
         }
       },
       "notes": "Mesma credencial de produção (seção 7.4: 'o AMBIENTE não troca de credencial nesse caso — troca só o ID da pasta raiz') — só muda a pasta raiz onde procura."
@@ -845,7 +845,7 @@
       "credentials": {
         "googleDriveOAuth2Api": {
           "id": "cred-gdrive-particular-michelle",
-          "name": "Google Drive - Particular Michelle"
+          "name": "Google Drive - Michelle (michelle.mimiaguia@gmail.com)"
         }
       }
     },
@@ -874,7 +874,7 @@
       "credentials": {
         "googleDriveOAuth2Api": {
           "id": "cred-gdrive-particular-michelle",
-          "name": "Google Drive - Particular Michelle"
+          "name": "Google Drive - Michelle (michelle.mimiaguia@gmail.com)"
         }
       },
       "notes": "Mesma credencial de produção (seção 7.4: 'o AMBIENTE não troca de credencial nesse caso — troca só o ID da pasta raiz') — só muda a pasta raiz onde procura."
@@ -914,7 +914,7 @@
       "credentials": {
         "googleDriveOAuth2Api": {
           "id": "cred-gdrive-particular-michelle",
-          "name": "Google Drive - Particular Michelle"
+          "name": "Google Drive - Michelle (michelle.mimiaguia@gmail.com)"
         }
       }
     },
@@ -956,7 +956,7 @@
       "credentials": {
         "googleDriveOAuth2Api": {
           "id": "cred-gdrive-particular-michelle",
-          "name": "Google Drive - Particular Michelle"
+          "name": "Google Drive - Michelle (michelle.mimiaguia@gmail.com)"
         }
       }
     },
@@ -994,7 +994,7 @@
       "credentials": {
         "googleDriveOAuth2Api": {
           "id": "cred-gdrive-particular-michelle",
-          "name": "Google Drive - Particular Michelle"
+          "name": "Google Drive - Michelle (michelle.mimiaguia@gmail.com)"
         }
       },
       "notes": "Sem lock — pasta de teste pessoal do Claudio, uso único, sem risco de edição concorrente (diferente do Box de produção, seção 7.2)."
@@ -1022,7 +1022,7 @@
       "credentials": {
         "googleDriveOAuth2Api": {
           "id": "cred-gdrive-particular-michelle",
-          "name": "Google Drive - Particular Michelle"
+          "name": "Google Drive - Michelle (michelle.mimiaguia@gmail.com)"
         }
       }
     },
@@ -1046,7 +1046,7 @@
       "credentials": {
         "googleDriveOAuth2Api": {
           "id": "cred-gdrive-trabalho",
-          "name": "Google Drive account"
+          "name": "Google Drive - Produção (financeiro1@novorealitybox.com)"
         }
       }
     },
@@ -1088,7 +1088,7 @@
       "credentials": {
         "googleDriveOAuth2Api": {
           "id": "cred-gdrive-trabalho",
-          "name": "Google Drive account"
+          "name": "Google Drive - Produção (financeiro1@novorealitybox.com)"
         }
       }
     },
@@ -1126,7 +1126,7 @@
       "credentials": {
         "googleDriveOAuth2Api": {
           "id": "cred-gdrive-trabalho",
-          "name": "Google Drive account"
+          "name": "Google Drive - Produção (financeiro1@novorealitybox.com)"
         }
       },
       "notes": "Só leitura, sem lock/upload (spec.md seção 6, commit 7da28a2) — .xlsb não abre em preview no Drive mas download_file_content funciona normalmente."
@@ -1156,7 +1156,7 @@
       "credentials": {
         "googleDriveOAuth2Api": {
           "id": "cred-gdrive-trabalho",
-          "name": "Google Drive account"
+          "name": "Google Drive - Produção (financeiro1@novorealitybox.com)"
         }
       }
     },
@@ -1194,7 +1194,7 @@
       "credentials": {
         "googleDriveOAuth2Api": {
           "id": "cred-gdrive-trabalho",
-          "name": "Google Drive account"
+          "name": "Google Drive - Produção (financeiro1@novorealitybox.com)"
         }
       },
       "notes": "Só leitura, sem lock/upload (spec.md seção 6, commit 7da28a2) — .xlsb não abre em preview no Drive mas download_file_content funciona normalmente."
@@ -1219,7 +1219,7 @@
       "credentials": {
         "googleDriveOAuth2Api": {
           "id": "cred-gdrive-trabalho",
-          "name": "Google Drive account"
+          "name": "Google Drive - Produção (financeiro1@novorealitybox.com)"
         }
       }
     },
@@ -1261,7 +1261,7 @@
       "credentials": {
         "googleDriveOAuth2Api": {
           "id": "cred-gdrive-trabalho",
-          "name": "Google Drive account"
+          "name": "Google Drive - Produção (financeiro1@novorealitybox.com)"
         }
       }
     },
@@ -1303,7 +1303,7 @@
       "credentials": {
         "googleDriveOAuth2Api": {
           "id": "cred-gdrive-trabalho",
-          "name": "Google Drive account"
+          "name": "Google Drive - Produção (financeiro1@novorealitybox.com)"
         }
       }
     },
@@ -1341,7 +1341,7 @@
       "credentials": {
         "googleDriveOAuth2Api": {
           "id": "cred-gdrive-trabalho",
-          "name": "Google Drive account"
+          "name": "Google Drive - Produção (financeiro1@novorealitybox.com)"
         }
       },
       "notes": "Só leitura, sem lock/upload (spec.md seção 6, commit 7da28a2) — .xlsb não abre em preview no Drive mas download_file_content funciona normalmente."
@@ -1401,7 +1401,7 @@
       "credentials": {
         "gmailOAuth2": {
           "id": "cred-gmail-homolog",
-          "name": "Gmail - Homolog (Claudio pessoal)"
+          "name": "Gmail - Homolog (Claudio Pessoal)"
         }
       },
       "notes": "Busca por marcador CONTRATAÇÃO + nome do colaborador (seção 3.1.2/3.1). Ajustar a query real conforme testes em homologação — o operador 'label:' do Gmail é case/acento sensível dependendo de como o marcador foi criado."
@@ -1428,7 +1428,7 @@
       "credentials": {
         "gmailOAuth2": {
           "id": "cred-gmail-homolog",
-          "name": "Gmail - Homolog (Claudio pessoal)"
+          "name": "Gmail - Homolog (Claudio Pessoal)"
         }
       },
       "notes": "Modo MVP ('rascunho') — Status Box (coluna L) NÃO é atualizado automaticamente aqui (seção 3.1.3, manual pela Michelle)."
@@ -1454,7 +1454,7 @@
       "credentials": {
         "gmailOAuth2": {
           "id": "cred-gmail-homolog",
-          "name": "Gmail - Homolog (Claudio pessoal)"
+          "name": "Gmail - Homolog (Claudio Pessoal)"
         }
       },
       "notes": "Só roda quando MODO_EXECUCAO=automatico E gatilho=SOLICITAR (envio imediato)."
@@ -1479,7 +1479,7 @@
       "credentials": {
         "gmailOAuth2": {
           "id": "cred-gmail-homolog",
-          "name": "Gmail - Homolog (Claudio pessoal)"
+          "name": "Gmail - Homolog (Claudio Pessoal)"
         }
       },
       "notes": "ASSUNÇÃO: nota.threadId precisa vir preenchido a partir da thread original de pedido (não temos, nesta entrega, o mecanismo que grava o threadId no momento da criação do rascunho — próxima iteração deve gravar o threadId retornado por n22 em cobrancas.json pra permitir a resposta na MESMA thread, seção 3.1.1). Por ora este node está estruturalmente correto mas depende desse dado existir."
@@ -1506,7 +1506,7 @@
       "credentials": {
         "gmailOAuth2": {
           "id": "cred-gmail-homolog",
-          "name": "Gmail - Homolog (Claudio pessoal)"
+          "name": "Gmail - Homolog (Claudio Pessoal)"
         }
       }
     },
@@ -1527,7 +1527,7 @@
       "credentials": {
         "gmailOAuth2": {
           "id": "cred-gmail-homolog",
-          "name": "Gmail - Homolog (Claudio pessoal)"
+          "name": "Gmail - Homolog (Claudio Pessoal)"
         }
       },
       "notes": "Marcadores precisam ser aplicados por ID, não por nome (spec.md seção 3.1.2 lista os nomes). Este node lê os marcadores da conta pra montar o mapa nome->id do node seguinte."
@@ -1563,7 +1563,7 @@
       "credentials": {
         "gmailOAuth2": {
           "id": "cred-gmail-homolog",
-          "name": "Gmail - Homolog (Claudio pessoal)"
+          "name": "Gmail - Homolog (Claudio Pessoal)"
         }
       },
       "notes": "Aplica os marcadores de 'Gmail — Criar rascunho (pedido)' (spec.md 3.1.2: 'IA' + marcador do projeto). Traduz nome->ID via 'Mapear marcadores'."
@@ -1586,7 +1586,7 @@
       "credentials": {
         "gmailOAuth2": {
           "id": "cred-gmail-homolog",
-          "name": "Gmail - Homolog (Claudio pessoal)"
+          "name": "Gmail - Homolog (Claudio Pessoal)"
         }
       },
       "notes": "Aplica os marcadores de 'Gmail — Enviar direto (automático)' (spec.md 3.1.2: 'IA' + marcador do projeto). Traduz nome->ID via 'Mapear marcadores'."
@@ -1609,7 +1609,7 @@
       "credentials": {
         "gmailOAuth2": {
           "id": "cred-gmail-homolog",
-          "name": "Gmail - Homolog (Claudio pessoal)"
+          "name": "Gmail - Homolog (Claudio Pessoal)"
         }
       },
       "notes": "Aplica os marcadores de 'Gmail — Cobrança (rascunho, responde Todos)' (spec.md 3.1.2: 'IA' + marcador do projeto). Traduz nome->ID via 'Mapear marcadores'."
@@ -1632,7 +1632,7 @@
       "credentials": {
         "gmailOAuth2": {
           "id": "cred-gmail-homolog",
-          "name": "Gmail - Homolog (Claudio pessoal)"
+          "name": "Gmail - Homolog (Claudio Pessoal)"
         }
       },
       "notes": "Aplica os marcadores de 'Gmail — Cobrança (enviar, automático)' (spec.md 3.1.2: 'IA' + marcador do projeto). Traduz nome->ID via 'Mapear marcadores'."
