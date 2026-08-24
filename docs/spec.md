@@ -401,7 +401,7 @@ Valores iniciais de `apelidos.json` (seed da primeira entrega, seção 3.1.1):
 | Vanessa (aprovação, cc) | executiva@novorealitybox.com | `imperialdiamondlead+van@gmail.com` (mesma caixa do Danilo, distinguível pela tag) |
 | Danielle (aprovação, cc) | financeiro@novorealitybox.com | `imperialdiamondlead+danielle@gmail.com` (mesma caixa, distinguível pela tag) |
 
-**Credencial de Gmail em homolog (decisão desta rodada)**: a credencial "Gmail account" hoje conectada é a conta REAL de produção (financeiro1@novorealitybox.com) — usá-la também para enviar/rascunhar e-mails de teste poluiria a caixa real (rascunhos, enviados, marcadores). Por isso, criar uma credencial nova — **"Gmail - Homolog (Claudio pessoal)"** — conectada a um e-mail pessoal do Claudio, usada SOMENTE quando `ambiente = homolog`, no lugar de "Gmail account" (mesmo padrão já adotado para o Drive de arquivamento por função — seção 4.2).
+**Credencial de Gmail em homolog (decisão desta rodada)**: a credencial "Gmail account" hoje conectada é a conta REAL de produção (financeiro1@novorealitybox.com) — usá-la também para enviar/rascunhar e-mails de teste poluiria a caixa real (rascunhos, enviados, marcadores). Por isso, criar uma credencial nova — **"Gmail - Homolog (Claudio Pessoal)"** — conectada a um e-mail pessoal do Claudio, usada SOMENTE quando `ambiente = homolog`, no lugar de "Gmail account" (mesmo padrão já adotado para o Drive de arquivamento por função — seção 4.2).
 
 ## 7. Arquitetura técnica
 
@@ -452,7 +452,7 @@ Se, na prática, a Michelle sentir falta de mais detalhe ou de outro formato, el
 São duas variáveis SEPARADAS, que não devem ser confundidas nem amarradas uma à outra:
 
 **Eixo 1 — AMBIENTE (`homolog` / `produção`)**: define PRA QUEM vai o e-mail e QUAL credencial de API é usada.
-- `homolog`: destinatários trocados pelos e-mails de teste do Claudio (mapeamento completo na seção 6.1), usa a credencial "Claude account (dev)" pra IA e "Gmail - Homolog (Claudio pessoal)" pra envio/rascunho de e-mail (em vez de "Gmail account", que é a conta real de produção).
+- `homolog`: destinatários trocados pelos e-mails de teste do Claudio (mapeamento completo na seção 6.1), usa a credencial "Claude account (dev)" pra IA e "Gmail - Homolog (Claudio Pessoal)" pra envio/rascunho de e-mail (em vez de "Gmail account", que é a conta real de produção).
 - `produção`: destinatários reais (Danielle, Vanessa, colaboradores de verdade), usa a credencial "Claude account (produção)".
 
 **Eixo 2 — `MODO_EXECUCAO` (`rascunho` / `automatico`)** (seção 3.1.3): define COMO a automação age, independente de pra quem está mandando.
