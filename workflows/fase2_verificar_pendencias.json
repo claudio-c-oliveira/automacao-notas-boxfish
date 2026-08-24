@@ -276,7 +276,9 @@
             }
           ]
         },
-        "fallbackOutput": "extra"
+        "options": {
+          "fallbackOutput": "extra"
+        }
       },
       "id": "f2p-15-switch-correlacao",
       "name": "Switch — resultado da correlação",

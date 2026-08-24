@@ -73,7 +73,11 @@
         "operation": "search",
         "queryString": "={{ $json.pastaVencimento }}",
         "filter": {
-          "folderId": "REPLACE_WITH_FOLDER_ID_CONTAS_A_PAGAR_",
+          "folderId": {
+            "__rl": true,
+            "mode": "id",
+            "value": "REPLACE_WITH_FOLDER_ID_CONTAS_A_PAGAR_"
+          },
           "whatToSearch": "folders"
         }
       },
@@ -121,8 +125,17 @@
       "parameters": {
         "resource": "folder",
         "name": "={{ $('Gerar retranca e nomes de pasta').item.json.pastaVencimento }}",
-        "options": {
-          "parentId": "REPLACE_WITH_FOLDER_ID_CONTAS_A_PAGAR"
+        "options": {},
+        "operation": "create",
+        "folderId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_WITH_FOLDER_ID_CONTAS_A_PAGAR"
+        },
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
         }
       },
       "id": "f2f-05-criar-pasta-venc",
@@ -159,10 +172,18 @@
         "resource": "file",
         "operation": "upload",
         "name": "={{ $('Gerar retranca e nomes de pasta').item.json.retranca }}",
-        "options": {
-          "parentId": "={{ $json.id || ($json.files && $json.files[0].id) }}"
+        "options": {},
+        "folderId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.id || ($json.files && $json.files[0].id) }}"
         },
-        "binaryPropertyName": "data"
+        "inputDataFieldName": "data",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        }
       },
       "id": "f2f-07-upload-particular",
       "name": "Drive particular — Upload da nota (retranca)",
@@ -186,7 +207,11 @@
         "operation": "search",
         "queryString": "={{ $('Gerar retranca e nomes de pasta').item.json.pastaFuncao }}",
         "filter": {
-          "folderId": "REPLACE_WITH_FOLDER_ID_ARQUIVO_DE_NOTAS_",
+          "folderId": {
+            "__rl": true,
+            "mode": "id",
+            "value": "REPLACE_WITH_FOLDER_ID_ARQUIVO_DE_NOTAS_"
+          },
           "whatToSearch": "folders"
         }
       },
@@ -234,8 +259,17 @@
       "parameters": {
         "resource": "folder",
         "name": "={{ $('Gerar retranca e nomes de pasta').item.json.pastaFuncao }}",
-        "options": {
-          "parentId": "REPLACE_WITH_FOLDER_ID_ARQUIVO_DE_NOTAS"
+        "options": {},
+        "operation": "create",
+        "folderId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_WITH_FOLDER_ID_ARQUIVO_DE_NOTAS"
+        },
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
         }
       },
       "id": "f2f-10-criar-pasta-funcao",
@@ -272,10 +306,18 @@
         "resource": "file",
         "operation": "upload",
         "name": "={{ $('Gerar retranca e nomes de pasta').item.json.retranca }}",
-        "options": {
-          "parentId": "={{ $json.id || ($json.files && $json.files[0].id) }}"
+        "options": {},
+        "folderId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.id || ($json.files && $json.files[0].id) }}"
         },
-        "binaryPropertyName": "data"
+        "inputDataFieldName": "data",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        }
       },
       "id": "f2f-12-upload-funcao",
       "name": "Drive trabalho — Upload da nota (arquivamento por função)",
@@ -368,25 +410,31 @@
     },
     {
       "parameters": {
-        "resource": "file",
-        "operation": "uploadVersion",
-        "fileId": "={{ $json.boxFileId }}",
-        "binaryPropertyName": "data"
+        "method": "POST",
+        "url": "=https://upload.box.com/api/2.0/files/{{ $json.boxFileId }}/content",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "boxOAuth2Api",
+        "contentType": "multipart-form-data",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "data"
+            }
+          ]
+        }
       },
       "id": "f2f-17-box-upload",
       "name": "Box — Upload nova versão",
-      "type": "n8n-nodes-base.box",
-      "typeVersion": 1,
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
       "position": [
         2420,
         0
       ],
-      "credentials": {
-        "boxOAuth2Api": {
-          "id": "cred-box-account",
-          "name": "Box account"
-        }
-      }
+      "notes": "O node nativo do Box não tem operação de \"subir nova versão\" — só \"upload\", que cria arquivo novo. Nova versão exige POST em upload.box.com/api/2.0/files/{id}/content, daí o HTTP Request."
     },
     {
       "parameters": {
@@ -402,8 +450,7 @@
               "value": "={{ null }}"
             }
           ]
-        },
-        "onError": "continueRegularOutput"
+        }
       },
       "id": "f2f-18-box-unlock",
       "name": "Box — Unlock (sempre, mesmo em erro)",
@@ -412,7 +459,8 @@
       "position": [
         2640,
         0
-      ]
+      ],
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
