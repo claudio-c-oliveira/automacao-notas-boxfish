@@ -194,7 +194,7 @@ function validarArquivo(arquivo) {
 // ─────────────────────────────────────────────────────────────────────────
 
 /** Compara só o que importa; ignora ruído que a API acrescenta (ids, datas, webhookId...). */
-function compararComPublicado(local, remoto, divergencias) {
+function compararComPublicado(local, remoto, divergencias, grafiasDiferentes = new Set()) {
   const { prepararPayload } = require('./lib/n8n_api');
   const esperado = prepararPayload(local);
 
@@ -229,12 +229,24 @@ function compararComPublicado(local, remoto, divergencias) {
       divergencias.push(`"${nome}": parâmetros diferentes do arquivo (o n8n pode ter normalizado, confira na tela)`);
     }
 
-    // Credencial: compara por NOME. O ID é da instância e por definição difere
-    // do marcador que fica no repositório.
-    const credEsp = Object.entries(esp.credentials || {}).map(([t, c]) => `${t}:${c.name}`).sort().join(',');
-    const credPub = Object.entries(pub.credentials || {}).map(([t, c]) => `${t}:${c.name}`).sort().join(',');
+    // Credencial: compara por NOME (o ID é da instância e por definição difere do
+    // marcador do repositório). A comparação ignora maiúsculas/minúsculas e espaço
+    // extra, do mesmo jeito que o deploy resolve — senão uma diferença só de
+    // grafia viraria uma "divergência" por node, escondendo o que importa.
+    const norm = (s) => String(s).toLowerCase().trim().replace(/\s+/g, ' ');
+    const credEsp = Object.entries(esp.credentials || {}).map(([t, c]) => `${t}:${norm(c.name)}`).sort().join(',');
+    const credPub = Object.entries(pub.credentials || {}).map(([t, c]) => `${t}:${norm(c.name)}`).sort().join(',');
     if (credEsp !== credPub) {
-      divergencias.push(`"${nome}": credenciais publicadas [${credPub || 'nenhuma'}], esperadas [${credEsp || 'nenhuma'}]`);
+      const legivelEsp = Object.entries(esp.credentials || {}).map(([t, c]) => `${t}:${c.name}`).sort().join(',');
+      const legivelPub = Object.entries(pub.credentials || {}).map(([t, c]) => `${t}:${c.name}`).sort().join(',');
+      divergencias.push(`"${nome}": credenciais publicadas [${legivelPub || 'nenhuma'}], esperadas [${legivelEsp || 'nenhuma'}]`);
+    } else {
+      for (const [tipo, c] of Object.entries(pub.credentials || {})) {
+        const espCred = (esp.credentials || {})[tipo];
+        if (espCred && espCred.name !== c.name) {
+          grafiasDiferentes.add(`${tipo}: "${espCred.name}" (arquivo) x "${c.name}" (n8n)`);
+        }
+      }
     }
     for (const [tipo, c] of Object.entries(pub.credentials || {})) {
       if (!c.id || String(c.id).startsWith('cred-')) {
@@ -295,16 +307,21 @@ async function validarRemoto(arquivosLocais) {
 
     // 2) o publicado bate com o arquivo?
     const divergencias = [];
-    compararComPublicado(local, remoto, divergencias);
+    const grafiasDiferentes = new Set();
+    compararComPublicado(local, remoto, divergencias, grafiasDiferentes);
 
     if (errosParam.length === 0 && divergencias.length === 0) {
-      console.log(`  OK — publicado (id ${id}) confere com o arquivo, sem erro de parâmetro\n`);
+      console.log(`  OK — publicado (id ${id}) confere com o arquivo, sem erro de parâmetro`);
     } else {
       for (const a of errosParam) console.log(`  [ERRO PARÂMETRO] ${a.node}\n          ${a.msg}`);
       for (const d of divergencias) console.log(`  [DIVERGÊNCIA] ${d}`);
-      console.log(`\n  ${errosParam.length} erro(s) de parâmetro, ${divergencias.length} divergência(s)\n`);
+      console.log(`\n  ${errosParam.length} erro(s) de parâmetro, ${divergencias.length} divergência(s)`);
       totalDivergencias += errosParam.length + divergencias.length;
     }
+    // Diferença só de grafia não é divergência (o deploy casa ignorando maiúsculas),
+    // mas vale registrar uma vez pra você alinhar o nome quando quiser.
+    for (const g of grafiasDiferentes) console.log(`  (nota) grafia diferente, casada mesmo assim — ${g}`);
+    console.log('');
   }
 
   console.log('='.repeat(78));

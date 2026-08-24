@@ -56,31 +56,56 @@ const gravarEstado = (e) => fs.writeFileSync(ARQUIVO_ESTADO, JSON.stringify(e, n
  * Prioridade: nome batendo na listagem da API > valor no .env > mantém o marcador (e avisa).
  */
 function resolverCredenciais(wf, credenciaisDaInstancia, env, avisos) {
-  const porNome = new Map();
-  for (const c of credenciaisDaInstancia || []) porNome.set(c.name, c.id);
+  // Casamento por nome tolerante a maiúsculas/minúsculas e espaço extra: a
+  // credencial na instância pode ter sido cadastrada com grafia levemente
+  // diferente da documentada (caso real: "Claudio Pessoal" x "Claudio pessoal").
+  const normalizar = (s) => String(s).toLowerCase().trim().replace(/\s+/g, ' ');
+
+  const porNomeNormalizado = new Map();
+  const contagemPorNome = new Map();
+  for (const c of credenciaisDaInstancia || []) {
+    const k = normalizar(c.name);
+    contagemPorNome.set(k, (contagemPorNome.get(k) || 0) + 1);
+    porNomeNormalizado.set(k, c);
+  }
 
   const naoResolvidas = new Set();
+  const grafiaDiferente = new Set();
+  const ambiguas = new Set();
+
   for (const node of wf.nodes) {
     if (!node.credentials) continue;
     for (const [tipo, cred] of Object.entries(node.credentials)) {
       if (!cred || !cred.name) continue;
 
-      const idReal =
-        porNome.get(cred.name) ||
-        (CRED_MARCADOR_PARA_ENV[cred.id] ? env[CRED_MARCADOR_PARA_ENV[cred.id]] : null);
+      const achada = porNomeNormalizado.get(normalizar(cred.name));
+      const idDoEnv = CRED_MARCADOR_PARA_ENV[cred.id] ? env[CRED_MARCADOR_PARA_ENV[cred.id]] : null;
 
-      if (idReal) {
-        node.credentials[tipo] = { id: String(idReal), name: cred.name };
+      if (achada) {
+        if (achada.name !== cred.name) grafiaDiferente.add(`"${cred.name}" (arquivo) x "${achada.name}" (n8n)`);
+        if (contagemPorNome.get(normalizar(cred.name)) > 1) {
+          ambiguas.add(`"${achada.name}" existe ${contagemPorNome.get(normalizar(cred.name))}x na instância`);
+        }
+        node.credentials[tipo] = { id: String(achada.id), name: achada.name };
+      } else if (idDoEnv) {
+        node.credentials[tipo] = { id: String(idDoEnv), name: cred.name };
       } else {
-        naoResolvidas.add(`${cred.name} (marcador ${cred.id})`);
+        naoResolvidas.add(`"${cred.name}" (tipo ${tipo})`);
       }
     }
   }
+
   for (const n of naoResolvidas) {
     avisos.push(
-      `credencial não resolvida: ${n} — o workflow sobe, mas essa credencial vai aparecer ` +
-        `em branco no n8n. Crie/renomeie a credencial na instância, ou preencha o ID no .env.`,
+      `credencial NÃO EXISTE na instância: ${n} — o workflow sobe, mas essa credencial fica ` +
+        `em branco no n8n e o node falha ao executar. Crie a credencial no n8n, ou preencha o ID no .env.`,
     );
+  }
+  for (const g of grafiaDiferente) {
+    avisos.push(`grafia diferente (casei mesmo assim, ignorando maiúsculas): ${g}`);
+  }
+  for (const a of ambiguas) {
+    avisos.push(`credencial DUPLICADA: ${a} — usei uma delas; renomeie ou apague a sobrando pra não ficar ambíguo.`);
   }
 }
 
@@ -141,9 +166,23 @@ async function publicar(arquivo, api, contexto, opcoes) {
     return;
   }
 
-  const resultado = idExistente
-    ? await api.atualizarWorkflow(idExistente, payload)
-    : await api.criarWorkflow(payload);
+  // O campo `description` existe no schema do n8n mais novo, mas versões um pouco
+  // anteriores rejeitam com "must NOT have additional properties". Como é só
+  // cosmético (a descrição real vive no arquivo, em meta.description), se a
+  // instância recusar, tira e tenta de novo — em vez de falhar o deploy inteiro.
+  const enviar = (corpo) =>
+    idExistente ? api.atualizarWorkflow(idExistente, corpo) : api.criarWorkflow(corpo);
+
+  let resultado;
+  try {
+    resultado = await enviar(payload);
+  } catch (e) {
+    const ehCampoExtra = e.status === 400 && /additional properties/i.test(JSON.stringify(e.dados || ''));
+    if (!ehCampoExtra || !('description' in payload)) throw e;
+    delete payload.description;
+    resultado = await enviar(payload);
+    console.log('     obs: esta instância não aceita o campo "description" — publiquei sem ele.');
+  }
 
   estado[nomeArquivo] = resultado.id;
   gravarEstado(estado);
