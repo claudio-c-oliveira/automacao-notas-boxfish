@@ -319,7 +319,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Interpreta a resposta da IA - nunca lanca excecao, falha vira situacaoNaoMapeada\n// (regra geral de seguranca, secao 3.2 item 6: nunca adivinhar, sempre alertar).\nfunction parseRespostaIA(textoResposta) {\n  try {\n    const obj = JSON.parse(textoResposta);\n    if (!obj || !obj.tipoLinha) return { situacaoNaoMapeada: 'Resposta da IA sem tipoLinha: ' + String(textoResposta).slice(0,300) };\n    return obj;\n  } catch (e) {\n    return { situacaoNaoMapeada: 'Resposta da IA nao e JSON valido: ' + String(textoResposta).slice(0,300) };\n  }\n}\n\nreturn $input.all().map((item) => {\n  const textoResposta = item.json.content && item.json.content[0] ? item.json.content[0].text : '';\n  const resultado = parseRespostaIA(textoResposta);\n  return { json: { ...item.json, ...resultado } };\n});"
+        "jsCode": "// Interpreta a resposta da IA — nunca lanca excecao, falha vira situacaoNaoMapeada\n// (regra geral de seguranca, secao 3.2 item 6: nunca adivinhar, sempre alertar).\n//\n// DOIS consertos, ambos vistos na execucao 75:\n//\n// 1. A IA devolve o JSON dentro de um bloco cercado (```json ... ```), que e comportamento\n//    normal do modelo. JSON.parse direto no texto falhava e a linha virava \"situacao nao\n//    mapeada\" mesmo com a resposta PERFEITA.\n// 2. O node HTTP SUBSTITUI o json do item pela resposta da API: nota, perfil, config,\n//    apelidos, liberado, gatilho — tudo se perdia aqui. O alerta no Telegram saiu\n//    literalmente como \"undefined\", e a montagem do e-mail tambem ficaria sem os dados da\n//    linha. O contexto e reanexado casando pelo pairedItem.\n\nfunction indiceDeOrigem(item) {\n  const p = item.pairedItem;\n  if (p === undefined || p === null) return null;\n  if (typeof p === 'number') return p;\n  if (Array.isArray(p)) return p.length && p[0] ? p[0].item : null;\n  return p.item === undefined ? null : p.item;\n}\n\nfunction extrairJson(texto) {\n  const t = String(texto || '').trim();\n  const cercado = t.match(/```(?:json)?\\s*([\\s\\S]*?)```/i);\n  const bruto = cercado ? cercado[1] : t;\n  const inicio = bruto.indexOf('{');\n  const fim = bruto.lastIndexOf('}');\n  return inicio >= 0 && fim > inicio ? bruto.slice(inicio, fim + 1) : bruto;\n}\n\nfunction parseRespostaIA(textoResposta) {\n  try {\n    const obj = JSON.parse(extrairJson(textoResposta));\n    if (!obj || !obj.tipoLinha) return { situacaoNaoMapeada: 'Resposta da IA sem tipoLinha: ' + String(textoResposta).slice(0, 300) };\n    return obj;\n  } catch (e) {\n    return { situacaoNaoMapeada: 'Resposta da IA nao e JSON valido: ' + String(textoResposta).slice(0, 300) };\n  }\n}\n\nconst origem = $('Preparar chamada da IA (coluna J)').all().map((i) => i.json);\n\nreturn $input.all().map((item, i) => {\n  const idx = indiceDeOrigem(item);\n  const contexto = (idx !== null && origem[idx]) ? origem[idx] : (origem[i] || {});\n  const textoResposta = item.json.content && item.json.content[0] ? item.json.content[0].text : '';\n  return { json: { ...contexto, ...parseRespostaIA(textoResposta) } };\n});"
       },
       "id": "n20g-interpretar-ia",
       "name": "Interpretar resposta da IA",
@@ -357,7 +357,7 @@
     },
     {
       "parameters": {
-        "jsCode": "return $input.all().map((item) => ({ json: { ...item.json, acao: 'alerta_situacao_nao_mapeada' } }));"
+        "jsCode": "// Monta o texto do alerta AQUI, e nao na expressao do node do Telegram.\n// Na execucao 75 a expressao era '... ' + $json.nota.projetoId + ' ...' e, com nota\n// ausente, o n8n resolveu a expressao inteira como \"undefined\" — a mensagem chegou, mas\n// sem nenhuma informacao. Montando no Code, um campo faltando vira \"?\" e o resto do alerta\n// continua legivel.\nreturn $input.all().map((item) => {\n  const d = item.json;\n  const nota = d.nota || {};\n  const texto = [\n    '⚠️ Situação não mapeada (Fase 1)',\n    '',\n    'Projeto: ' + (nota.projetoId || '?'),\n    'Linha: ' + (nota.linha || '?'),\n    'Fornecedor/Descrição: ' + (nota.colunaH || nota.colunaJ || '?'),\n    '',\n    String(d.situacaoNaoMapeada || 'sem detalhe'),\n  ].join('\\n');\n  return { json: { ...d, acao: 'alerta_situacao_nao_mapeada', textoAlerta: texto } };\n});"
       },
       "id": "n20i-marcar-alerta",
       "name": "Marcar alerta — situação não mapeada",
@@ -449,7 +449,7 @@
     {
       "parameters": {
         "chatId": "749277207",
-        "text": "={{ '⚠️ Situação não mapeada (Fase 1)\\n\\nProjeto: ' + $json.nota.projetoId + '\\nLinha: ' + $json.nota.linha + '\\nFornecedor/Descrição: ' + ($json.nota.colunaH || $json.nota.colunaJ) + '\\n\\n' + $json.situacaoNaoMapeada }}",
+        "text": "={{ $json.textoAlerta }}",
         "additionalFields": {
           "parse_mode": "Markdown"
         }
@@ -2184,6 +2184,19 @@
       "parameters": {
         "jsCode": "// Serializa o cobrancas.json atualizado em binário: o node de escrita em disco só aceita\n// binário, não JSON. Mesmo padrão do \"Preparar log_diario.json atualizado\".\n//\n// Node separado de propósito, em vez de emitir o binário lá no \"Consolidar\": aquele node\n// alimenta 4 ramos, e pendurar o arquivo serializado no item faria os 4 carregarem uma\n// cópia — a mesma duplicação de payload que travou a VM.\nconst cobrancas = $input.first().json.cobrancasAtualizadas || {};\nreturn [{\n  json: {},\n  binary: { data: {\n    data: Buffer.from(JSON.stringify(cobrancas, null, 2)).toString('base64'),\n    mimeType: 'application/json',\n    fileName: 'cobrancas.json',\n  } },\n}];"
       }
+    },
+    {
+      "id": "prep-ia-colunaj",
+      "name": "Preparar chamada da IA (coluna J)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3140,
+        240
+      ],
+      "parameters": {
+        "jsCode": "// Âncora de correlação pra chamada da IA. O node HTTP substitui o json do item pela\n// resposta da API, então o contexto da linha (nota, perfil, config, apelidos, liberado...)\n// precisa ser recuperado depois — e pra isso é preciso um node estável pra casar via\n// pairedItem. Não transforma nada, só passa adiante.\nreturn $input.all();"
+      }
     }
   ],
   "connections": {
@@ -2378,7 +2391,7 @@
         ],
         [
           {
-            "node": "IA — Parsing coluna J (Claude)",
+            "node": "Preparar chamada da IA (coluna J)",
             "type": "main",
             "index": 0
           }
@@ -3315,6 +3328,17 @@
         [
           {
             "node": "Gravar cobrancas.json",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar chamada da IA (coluna J)": {
+      "main": [
+        [
+          {
+            "node": "IA — Parsing coluna J (Claude)",
             "type": "main",
             "index": 0
           }
