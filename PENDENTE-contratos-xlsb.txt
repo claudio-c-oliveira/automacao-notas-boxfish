@@ -1,0 +1,80 @@
+================================================================================
+DECISAO NECESSARIA - AS PLANILHAS DE CONTRATOS (.xlsb) NAO SAO LEGIVEIS
+================================================================================
+Nao vou decidir isso sozinho porque envolve mexer em arquivo de outra equipe ou
+mudar a imagem do container. Preciso da sua escolha.
+
+--------------------------------------------------------------------------------
+O QUE ACONTECE
+--------------------------------------------------------------------------------
+As 3 planilhas de contratos estao em formato .xlsb (Excel BINARIO):
+
+  BR_AREP_S01_CONTROLE DE CONTRATOS.xlsb           (pasta JURIDICO)
+  BR_AREP_S01_REUNION_CONTROLE DE CONTRATOS.xlsb   (pasta JURIDICO)
+  BR_SMTC_S02_CONTROLE DE CONTRATOS.xlsb           (pasta JURIDICO S02)
+
+A biblioteca que usamos pra ler planilha (exceljs) NAO le .xlsb. Le .xlsx e .csv.
+
+O pior e COMO ela falha: nao da erro nenhum. Ela abre o arquivo (que por fora e
+um zip, igual .xlsx), nao encontra as partes internas que espera - num .xlsb elas
+sao .bin em vez de .xml - e devolve um documento com ZERO abas, calada.
+
+Testei os 3 arquivos na instancia, baixando de verdade do Drive: os 3 se
+comportam assim. Nao e problema de permissao nem de download - o arquivo chega
+inteiro (158 KB no caso do AREP).
+
+Por que so apareceu agora: as leituras anteriores quebravam antes de chegar aqui.
+Os Cost Reports (.xlsx) leem normalmente - 3729 linhas no S01, 183 no S02.
+
+--------------------------------------------------------------------------------
+POR QUE ISSO IMPORTA
+--------------------------------------------------------------------------------
+Os contratos alimentam a checagem de contrato assinado (spec 3.1). Sem eles, a
+automacao trataria TODO MUNDO como "sem contrato" - e silenciosamente, se eu nao
+tivesse posto uma falha explicita. Por isso o node agora ESTOURA com mensagem
+clara em vez de seguir com a lista vazia.
+
+--------------------------------------------------------------------------------
+OPCOES
+--------------------------------------------------------------------------------
+
+OPCAO A - Instalar uma biblioteca que leia .xlsb  (MINHA RECOMENDACAO)
+  A SheetJS (pacote "xlsx") le .xlsb. Mesma abordagem ja usada com o exceljs:
+  instalar na pasta isolada da imagem customizada e liberar em
+  NODE_FUNCTION_ALLOW_EXTERNAL.
+  + Nao mexe em nenhum arquivo da equipe juridica
+  + Nao depende de ninguem manter um formato novo
+  - Exige rebuild da imagem e recriar o container (procedimento do spec 7.5)
+  - Uma dependencia a mais
+
+OPCAO B - Converter os 3 arquivos pra .xlsx no Drive
+  + Nao mexe na infraestrutura, resolve hoje
+  - Sao arquivos de trabalho da equipe juridica (Danielle). Se alguem salvar de
+    novo como .xlsb, ou trabalhar na copia errada, quebra outra vez - e agora com
+    duas versoes do mesmo controle circulando
+  - Precisa de combinado com quem usa esses arquivos
+
+OPCAO C - Converter na hora, via Google Drive
+  Subir o .xlsb como Google Sheets e exportar .xlsx a cada execucao.
+  + Nao mexe nos arquivos nem na imagem
+  - Bem mais peca movel: escreve no Drive a cada execucao, mais lento, mais
+    coisa pra falhar. So valeria se A e B estiverem descartadas
+
+--------------------------------------------------------------------------------
+O QUE EU PRECISO DE VOCE
+--------------------------------------------------------------------------------
+1) Qual opcao? (A, B ou C)
+
+2) Se for A: eu te passo o Dockerfile ajustado e os comandos, no mesmo formato
+   dos anteriores. Preciso so do seu OK pra rebuildar a imagem.
+
+3) Se for B: me confirme os nomes exatos dos arquivos convertidos, porque o
+   workflow procura por nome exato. E vale confirmar com a Danielle antes.
+
+--------------------------------------------------------------------------------
+ENQUANTO ISSO
+--------------------------------------------------------------------------------
+O resto da Fase 1 esta funcionando: os 2 Cost Reports sao lidos corretamente, a
+separacao AREP/Reunion por cor esta certa (3388 AREP / 150 REUNION no S01). O
+fluxo para no ponto dos contratos, com mensagem explicita apontando pra este
+arquivo.
