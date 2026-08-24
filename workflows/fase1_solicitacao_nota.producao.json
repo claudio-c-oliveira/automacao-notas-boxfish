@@ -39,7 +39,7 @@
     {
       "parameters": {
         "operation": "read",
-        "fileSelector": "/home/node/.n8n/box-fish-config/config_execucao.json",
+        "fileSelector": "/data/box-fish-config/config_execucao.json",
         "options": {}
       },
       "id": "n03-read-config",
@@ -55,7 +55,7 @@
     {
       "parameters": {
         "operation": "read",
-        "fileSelector": "/home/node/.n8n/box-fish-config/cobrancas.json",
+        "fileSelector": "/data/box-fish-config/cobrancas.json",
         "options": {}
       },
       "id": "n04-read-cobrancas",
@@ -70,7 +70,7 @@
     {
       "parameters": {
         "operation": "read",
-        "fileSelector": "/home/node/.n8n/box-fish-config/apelidos.json",
+        "fileSelector": "/data/box-fish-config/apelidos.json",
         "options": {}
       },
       "id": "n05-read-apelidos",
@@ -195,7 +195,7 @@
     {
       "parameters": {
         "operation": "read",
-        "fileSelector": "/home/node/.n8n/box-fish-config/log_diario.json",
+        "fileSelector": "/data/box-fish-config/log_diario.json",
         "options": {}
       },
       "id": "n_ler_log_diario",
@@ -833,7 +833,7 @@
     {
       "parameters": {
         "operation": "write",
-        "fileName": "/home/node/.n8n/box-fish-config/cobrancas.json",
+        "fileName": "/data/box-fish-config/cobrancas.json",
         "dataPropertyName": "data"
       },
       "id": "n36-write-cobrancas",
@@ -885,7 +885,7 @@
     {
       "parameters": {
         "operation": "write",
-        "fileName": "/home/node/.n8n/box-fish-config/log_diario.json",
+        "fileName": "/data/box-fish-config/log_diario.json",
         "dataPropertyName": "data"
       },
       "id": "n_gravar_log_diario",

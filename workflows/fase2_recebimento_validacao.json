@@ -86,7 +86,7 @@
     {
       "parameters": {
         "operation": "read",
-        "fileSelector": "/home/node/.n8n/box-fish-config/config_execucao.json",
+        "fileSelector": "/data/box-fish-config/config_execucao.json",
         "options": {}
       },
       "id": "f2r-05-ler-config",
@@ -101,7 +101,7 @@
     {
       "parameters": {
         "operation": "read",
-        "fileSelector": "/home/node/.n8n/box-fish-config/cobrancas.json",
+        "fileSelector": "/data/box-fish-config/cobrancas.json",
         "options": {}
       },
       "id": "f2r-06-ler-cobrancas",
@@ -116,7 +116,7 @@
     {
       "parameters": {
         "operation": "read",
-        "fileSelector": "/home/node/.n8n/box-fish-config/pendencias_identificacao.json",
+        "fileSelector": "/data/box-fish-config/pendencias_identificacao.json",
         "options": {}
       },
       "id": "f2r-07-ler-pendencias",
@@ -402,7 +402,7 @@
     {
       "parameters": {
         "operation": "write",
-        "fileName": "/home/node/.n8n/box-fish-config/pendencias_identificacao.json",
+        "fileName": "/data/box-fish-config/pendencias_identificacao.json",
         "dataPropertyName": "data"
       },
       "id": "f2r-26-gravar-pendencias",

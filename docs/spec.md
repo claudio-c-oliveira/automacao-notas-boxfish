@@ -517,7 +517,8 @@ Estrutura de `config_execucao.json`:
 - NÃO usa docker-compose — é Docker "puro" (`docker run` direto)
 - Nome do container: `n8n`
 - Imagem: `n8n-custom:latest` (customizada, não é a `n8nio/n8n` oficial pura — ver exceljs abaixo)
-- Volume nomeado `n8n_data`, montado em `/home/node/.n8n` dentro do container (workflows, credenciais e os arquivos de config do projeto — tudo sobrevive se o container for recriado)
+- Volume nomeado `n8n_data`, montado em `/home/node/.n8n` dentro do container (workflows e credenciais — sobrevive se o container for recriado)
+- Bind mount `/opt/box-fish-config` (host) → `/data/box-fish-config` (container): os 5 arquivos JSON de estado do projeto. Ver "Arquivos de configuração" abaixo pra entender por que eles NÃO ficam mais dentro de `/home/node/.n8n`.
 - Comando completo usado pra subir o container (referência caso precise recriar):
   ```
   docker run -d --restart unless-stopped --name n8n -p 5678:5678 \
@@ -528,6 +529,7 @@ Estrutura de `config_execucao.json`:
     -e NODE_FUNCTION_ALLOW_EXTERNAL=exceljs \
     -e NODE_PATH=/usr/local/lib/node_modules_extra/node_modules \
     -v n8n_data:/home/node/.n8n \
+    -v /opt/box-fish-config:/data/box-fish-config \
     n8n-custom:latest
   ```
 
@@ -544,11 +546,19 @@ Estrutura de `config_execucao.json`:
   USER node
   ```
 
-**Arquivos de configuração do projeto (`config_execucao.json`, `apelidos.json`, `cobrancas.json`)**
+**Arquivos de configuração do projeto**
 - Caminho ABSOLUTO real dentro do container (usar esse caminho nos nodes "Read/Write File from Disk" dos workflows — não o caminho relativo `config/` do repositório Git, que é só para versionamento/referência):
-  - `/home/node/.n8n/box-fish-config/config_execucao.json`
-  - `/home/node/.n8n/box-fish-config/apelidos.json`
-  - `/home/node/.n8n/box-fish-config/cobrancas.json`
+  - `/data/box-fish-config/config_execucao.json`
+  - `/data/box-fish-config/apelidos.json`
+  - `/data/box-fish-config/cobrancas.json`
+  - `/data/box-fish-config/log_diario.json`
+  - `/data/box-fish-config/pendencias_identificacao.json`
+- No HOST da VM esses arquivos ficam em `/opt/box-fish-config/` (bind mount). Dá pra editar o `config_execucao.json` direto por SSH com `nano`, sem `docker exec`.
+
+**⚠️ Por que NÃO ficam dentro de `/home/node/.n8n/` (mudança de 24/08/2026)**: originalmente a pasta era `/home/node/.n8n/box-fish-config/`. A partir de uma versão recente, o n8n passou a BLOQUEAR por padrão o acesso dos nodes "Read/Write File from Disk" a qualquer arquivo dentro da pasta `.n8n` — mudança de segurança deliberada, ligada à correção da CVE-2025-68697. O sintoma é o erro `Access to the file is not allowed.` mesmo com o arquivo existindo e sendo legível via `docker exec`. Não é erro de configuração nossa e não há como desligar por node.
+- Verificado empiricamente nesta instância: **só** `/home/node/.n8n/` está bloqueado. `/data`, `/files`, `/tmp`, `/home/node/` e `/home/node/.n8n-files/` estão todos liberados.
+- Por isso **não** usamos a variável `N8N_RESTRICT_FILE_ACCESS_TO`: ela serve pra RESTRINGIR o acesso a uma lista de caminhos, não pra liberar. Como o caminho novo já é permitido por padrão, ligá-la só criaria uma segunda trava pra manter em sincronia.
+- O bind mount é obrigatório, não opcional: `/data` está na camada gravável do container, então sem o mount os 5 JSONs (incluindo `cobrancas.json`, que guarda o estado das cobranças em aberto) seriam PERDIDOS no próximo `docker rm` — que é justo o passo 3 do procedimento de recriação logo abaixo.
 
 **⚠️ ATENÇÃO CRÍTICA — nunca usar o nome "config" sozinho**: existe um ARQUIVO (não pasta) em `/home/node/.n8n/config` que pertence ao PRÓPRIO n8n — arquivo interno de configuração que contém a chave de criptografia usada para proteger as credenciais salvas (Gmail, Drive, Box, Claude API). NUNCA criar pasta/arquivo chamado "config" direto dentro de `/home/node/.n8n/`, nem apagar/sobrescrever esse arquivo — quebraria o acesso a TODAS as credenciais já configuradas. Por isso o projeto usa o nome `box-fish-config` (com prefixo), evitando colisão.
 
@@ -587,7 +597,7 @@ PENDENTE: Escopo de Recibos de Reembolso (RDP'S) — fora desta automação por 
 - Corte para o Danilo: Status Box = "ENTREGUE" (não "ENTREGA MI" — nomenclatura definitiva confirmada).
 - Marcadores de e-mail (labels do Gmail): confirmados — "IA" + marcador do projeto em toda interação com e-mail (seção 3.1.2).
 - MVP: Status Box do pedido/cobrança ao colaborador e da entrega ao Danilo ficam manuais (Michelle) enquanto o modo de execução for "rascunho"; "RECEBIDA MI" continua automático mesmo no MVP (seção 3.1.3).
-- Armazenamento de controle de cobrança, apelidos de projeto e modo de execução: NÃO ficam na planilha — ficam em arquivos JSON no disco da VM do n8n (`cobrancas.json`, `apelidos.json`, `config_execucao.json`), lidos/escritos pelos nodes nativos de arquivo do n8n (seções 3.1.1, 3.1.3, 6.1). Caminho absoluto real na VM: `/home/node/.n8n/box-fish-config/` — seção 7.5.
+- Armazenamento de controle de cobrança, apelidos de projeto e modo de execução: NÃO ficam na planilha — ficam em arquivos JSON no disco da VM do n8n (`cobrancas.json`, `apelidos.json`, `config_execucao.json`), lidos/escritos pelos nodes nativos de arquivo do n8n (seções 3.1.1, 3.1.3, 6.1). Caminho absoluto real na VM: `/data/box-fish-config/` — seção 7.5.
 - Nome do projeto confirmado como "AREP" (uma letra R) em todo o documento — confirmado por Claudio junto com a Michelle; a grafia "ARREP" usada temporariamente numa rodada anterior foi revertida.
 
 ## 11. Checklist de próximos passos

@@ -27,7 +27,7 @@
     {
       "parameters": {
         "operation": "read",
-        "fileSelector": "/home/node/.n8n/box-fish-config/pendencias_identificacao.json",
+        "fileSelector": "/data/box-fish-config/pendencias_identificacao.json",
         "options": {}
       },
       "id": "f2p-02-ler-pendencias-a",
@@ -177,7 +177,7 @@
     {
       "parameters": {
         "operation": "write",
-        "fileName": "/home/node/.n8n/box-fish-config/pendencias_identificacao.json",
+        "fileName": "/data/box-fish-config/pendencias_identificacao.json",
         "dataPropertyName": "data"
       },
       "id": "f2p-11-gravar",
@@ -213,7 +213,7 @@
     {
       "parameters": {
         "operation": "read",
-        "fileSelector": "/home/node/.n8n/box-fish-config/pendencias_identificacao.json",
+        "fileSelector": "/data/box-fish-config/pendencias_identificacao.json",
         "options": {}
       },
       "id": "f2p-13-ler-pendencias-b",
@@ -475,7 +475,7 @@
     {
       "parameters": {
         "operation": "write",
-        "fileName": "/home/node/.n8n/box-fish-config/pendencias_identificacao.json",
+        "fileName": "/data/box-fish-config/pendencias_identificacao.json",
         "dataPropertyName": "data"
       },
       "id": "f2p-27-gravar-resolvida",
