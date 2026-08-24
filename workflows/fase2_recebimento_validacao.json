@@ -364,7 +364,7 @@
     {
       "parameters": {
         "chatId": "749277207",
-        "text": "={{ '❓ Não consegui identificar essa nota (Fase 2)\\n\\nNome/razão social: ' + ($json.extracao.nomeOuRazaoSocial || '?') + '\\nProjeto (Ref.): ' + ($json.extracao.projetoRef || '?') + '\\nValor: ' + ($json.extracao.valor || '?') + '\\nCompetência: ' + ($json.extracao.competencia || '?') + '\\n\\nResponda a ESTA mensagem (usando \"responder\") com a linha/colaborador correta.' }}",
+        "text": "={{ '❓ Não consegui identificar essa nota (Fase 2)\\n\\nNome/razão social: ' + ($json.extracao?.nomeOuRazaoSocial || '?') + '\\nProjeto (Ref.): ' + ($json.extracao?.projetoRef || '?') + '\\nValor: ' + ($json.extracao?.valor || '?') + '\\nCompetência: ' + ($json.extracao?.competencia || '?') + '\\n\\nResponda a ESTA mensagem (usando \"responder\") com a linha/colaborador correta.' }}",
         "additionalFields": {
           "parse_mode": "Markdown"
         }

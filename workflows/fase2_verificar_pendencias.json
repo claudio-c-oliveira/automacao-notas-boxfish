@@ -79,7 +79,7 @@
     {
       "parameters": {
         "chatId": "749277207",
-        "text": "={{ '⏰ Lembrete — ainda preciso identificar essa nota (Fase 2)\\n\\nNome/razão social: ' + ($json.pendencia.dadosReferencia.nomeOuRazaoSocial || '?') + '\\nValor: ' + ($json.pendencia.dadosReferencia.valor || '?') + '\\n\\nResponda a ESTA mensagem (usando \"responder\") com a linha/colaborador correta.' }}",
+        "text": "={{ '⏰ Lembrete — ainda preciso identificar essa nota (Fase 2)\\n\\nNome/razão social: ' + ($json.pendencia?.dadosReferencia?.nomeOuRazaoSocial || '?') + '\\nValor: ' + ($json.pendencia?.dadosReferencia?.valor || '?') + '\\n\\nResponda a ESTA mensagem (usando \"responder\") com a linha/colaborador correta.' }}",
         "additionalFields": {
           "parse_mode": "Markdown"
         }
@@ -102,7 +102,7 @@
     {
       "parameters": {
         "chatId": "749277207",
-        "text": "={{ '🛑 Ciclo encerrado sem resposta (Fase 2)\\n\\nNome/razão social: ' + ($json.pendencia.dadosReferencia.nomeOuRazaoSocial || '?') + '\\nValor: ' + ($json.pendencia.dadosReferencia.valor || '?') + '\\n\\nPassaram 26h sem resposta — não vou mais perguntar automaticamente sobre essa nota. Fica pendente pra você resolver manualmente.' }}",
+        "text": "={{ '🛑 Ciclo encerrado sem resposta (Fase 2)\\n\\nNome/razão social: ' + ($json.pendencia?.dadosReferencia?.nomeOuRazaoSocial || '?') + '\\nValor: ' + ($json.pendencia?.dadosReferencia?.valor || '?') + '\\n\\nPassaram 26h sem resposta — não vou mais perguntar automaticamente sobre essa nota. Fica pendente pra você resolver manualmente.' }}",
         "additionalFields": {
           "parse_mode": "Markdown"
         }
@@ -316,7 +316,7 @@
     {
       "parameters": {
         "chatId": "={{ $json.chatId }}",
-        "text": "={{ '⚠️ Tenho mais de uma nota pendente de identificação ao mesmo tempo — não vou adivinhar qual você quis responder.\\n\\nPra essa aqui (' + ($json.pendencia.dadosReferencia.nomeOuRazaoSocial || '?') + ', R$ ' + ($json.pendencia.dadosReferencia.valor || '?') + '), responda usando \"responder\" NESTA mensagem específica.' }}",
+        "text": "={{ '⚠️ Tenho mais de uma nota pendente de identificação ao mesmo tempo — não vou adivinhar qual você quis responder.\\n\\nPra essa aqui (' + ($json.pendencia?.dadosReferencia?.nomeOuRazaoSocial || '?') + ', R$ ' + ($json.pendencia?.dadosReferencia?.valor || '?') + '), responda usando \"responder\" NESTA mensagem específica.' }}",
         "additionalFields": {
           "parse_mode": "Markdown"
         }

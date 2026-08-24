@@ -211,7 +211,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// 'Modo assistido' (secao 7.4): limite_linhas_execucao corta o numero de linhas\n// processadas nesta execucao (na ordem em que aparecem na planilha). null/0 = sem limite.\n// Vale igualmente para novo_pedido e monitoramento (mesma lista filtrada).\nconst config = $('Carregar config + perfis').first().json.config;\nconst limite = config && config.limite_linhas_execucao;\nconst itens = $input.all();\nif (!limite || limite <= 0) return itens;\nreturn itens.slice(0, limite);"
+        "jsCode": "// 'Modo assistido' (secao 7.4): limite_linhas_execucao corta o numero de linhas\n// processadas nesta execucao. null/0 = sem limite.\n//\n// ORDEM DE PRIORIDADE dentro do limite (confirmada por Claudio):\n//   1o  SOLICITAR (e variantes) — pedido imediato, e o que a Michelle esta esperando sair\n//   2o  PROGRAMAR ATE          — tem data marcada, aguenta a proxima execucao\n//   3o  Monitoramento          — so se sobrar vaga; cobranca pode esperar\n// Vale igual em homolog e producao.\n//\n// O corte era pela ordem da planilha: com limite baixo, uma leva de linhas de\n// monitoramento no topo consumia as vagas e nenhum pedido saia.\n//\n// A ordenacao roda mesmo SEM limite. Nao muda o que e processado, so a ordem — e\n// mantem o comportamento previsivel entre uma execucao limitada e uma sem limite.\n\nfunction prioridade(d) {\n  if (d.fluxo === 'novo_pedido' && d.gatilho === 'SOLICITAR') return 0;\n  if (d.fluxo === 'novo_pedido' && d.gatilho === 'PROGRAMAR_ATE') return 1;\n  if (d.fluxo === 'monitoramento') return 2;\n  return 3; // nao previsto: fica por ultimo em vez de furar a fila\n}\n\nconst config = $('Carregar config + perfis').first().json.config;\nconst limite = config && config.limite_linhas_execucao;\n\n// sort do JS e estavel: dentro da mesma prioridade, a ordem da planilha e preservada\nconst itens = $input.all().slice().sort((a, b) => prioridade(a.json) - prioridade(b.json));\n\nif (!limite || limite <= 0) return itens;\nreturn itens.slice(0, limite);"
       },
       "id": "n14b-limite-execucao",
       "name": "Aplicar limite de execução (modo assistido)",
@@ -425,7 +425,7 @@
     {
       "parameters": {
         "chatId": "749277207",
-        "text": "={{ '✅ Correção automática de contrato (Fase 1)\\n\\nFornecedor: ' + $json.fornecedor + '\\n\\nLinhas corrigidas pra \"OK - ASSINADO\" (estavam pendentes/vazias, mas outra linha do mesmo fornecedor/vencimento já estava assinada):\\n' + $json.linhasCorrigidas.map(l => '- Linha ' + l.linha + ': R$ ' + l.valor.toLocaleString('pt-BR', {minimumFractionDigits:2})).join('\\n') }}",
+        "text": "={{ '✅ Correção automática de contrato (Fase 1)\\n\\nFornecedor: ' + ($json.fornecedor || '?') + '\\n\\nLinhas corrigidas pra \"OK - ASSINADO\" (estavam pendentes/vazias, mas outra linha do mesmo fornecedor/vencimento já estava assinada):\\n' + (($json.linhasCorrigidas || []).map(l => '- Linha ' + (l?.linha ?? '?') + ': R$ ' + (typeof l?.valor === 'number' ? l.valor.toLocaleString('pt-BR', {minimumFractionDigits:2}) : '?')).join('\\n') || '- (sem detalhe)') }}",
         "additionalFields": {
           "parse_mode": "Markdown"
         }
@@ -851,7 +851,7 @@
     {
       "parameters": {
         "chatId": "749277207",
-        "text": "={{ '📋 Relatório Fase 1 — Solicitação de Nota\\n\\nRascunhos criados: ' + $json.resumo.rascunhosCriados + '\\nEnvios diretos: ' + $json.resumo.enviosDiretos + '\\nPendentes de contrato: ' + $json.resumo.pendentesContrato + '\\nCom lacuna de informação (FALTA INFORMAÇÃO): ' + $json.resumo.comLacunaInformacao + '\\nCorreções de contrato aplicadas: ' + $json.resumo.correcoesContrato + '\\nSituações não mapeadas (alertadas): ' + $json.resumo.alertasSituacaoNaoMapeada + '\\nCiclos encerrados sem resposta: ' + $json.resumo.alertasEncerramento.length }}",
+        "text": "={{ '📋 Relatório Fase 1 — Solicitação de Nota\\n\\nRascunhos criados: ' + ($json.resumo?.rascunhosCriados ?? '?') + '\\nEnvios diretos: ' + ($json.resumo?.enviosDiretos ?? '?') + '\\nPendentes de contrato: ' + ($json.resumo?.pendentesContrato ?? '?') + '\\nCom lacuna de informação (FALTA INFORMAÇÃO): ' + ($json.resumo?.comLacunaInformacao ?? '?') + '\\nCorreções de contrato aplicadas: ' + ($json.resumo?.correcoesContrato ?? '?') + '\\nSituações não mapeadas (alertadas): ' + ($json.resumo?.alertasSituacaoNaoMapeada ?? '?') + '\\nCiclos encerrados sem resposta: ' + ($json.resumo?.alertasEncerramento?.length ?? '?') }}",
         "additionalFields": {
           "parse_mode": "Markdown"
         }
