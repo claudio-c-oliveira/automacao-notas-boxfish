@@ -195,6 +195,17 @@ function nomesDaFonte(arquivo) {
   }
 }
 
+/**
+ * Remove comentários de linha antes de procurar referências.
+ *
+ * Sem isto a checagem acusa referência quebrada num $('...') escrito dentro de um
+ * comentário explicativo — falso positivo que corrói a confiança no validador. O blob vem
+ * de JSON.stringify, então a quebra de linha é o literal \n.
+ */
+function semComentarios(blob) {
+  return blob.replace(/\/\/(?:(?!\\n).)*/g, '');
+}
+
 function validarReferenciasANodes(wf, achados, vocabulario = new Set()) {
   const existentes = new Set((wf.nodes || []).map((n) => n.name));
   const conhecidos = new Set([...existentes, ...vocabulario]);
@@ -210,7 +221,7 @@ function validarReferenciasANodes(wf, achados, vocabulario = new Set()) {
   const alcancavel = new Set([...comEntrada, ...(wf.nodes || []).filter(ehTrigger).map((n) => n.name)]);
 
   for (const node of wf.nodes || []) {
-    const blob = JSON.stringify(node.parameters || {});
+    const blob = semComentarios(JSON.stringify(node.parameters || {}));
     const citados = new Set();
 
     for (const m of blob.matchAll(/\$\(\\?'([^']+?)\\?'\)/g)) citados.add(m[1]);
