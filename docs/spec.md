@@ -526,23 +526,27 @@ Estrutura de `config_execucao.json`:
     -e N8N_PROTOCOL=https \
     -e WEBHOOK_URL=https://n8n.carvalhodeoliveira.com/ \
     -e N8N_EDITOR_BASE_URL=https://n8n.carvalhodeoliveira.com/ \
-    -e NODE_FUNCTION_ALLOW_EXTERNAL=exceljs \
+    -e NODE_FUNCTION_ALLOW_EXTERNAL=exceljs,xlsx \
     -e NODE_PATH=/usr/local/lib/node_modules_extra/node_modules \
     -v n8n_data:/home/node/.n8n \
     -v /opt/box-fish-config:/home/node/.n8n-files/box-fish-config \
     n8n-custom:latest
   ```
 
-**exceljs (leitura de cor de célula, AREP/Reunion — confirmado funcionando)**
-- Instalado numa pasta ISOLADA dentro da imagem customizada (`/usr/local/lib/node_modules_extra/`), não dentro da pasta do n8n (o `package.json` do n8n usa formato `catalog:` do pnpm, incompatível com npm comum)
-- Dockerfile da imagem customizada, em `~/n8n-custom/Dockerfile` no host:
+**Bibliotecas de planilha: exceljs + SheetJS (`xlsx`) — as duas, cada uma pelo que a outra não faz**
+- `exceljs` → **Cost Report (.xlsx)**. É a única das duas que expõe a **cor de preenchimento** da célula, que é o que separa AREP de REUNION (seção 6).
+- `xlsx` (SheetJS) → **planilhas de Contratos (.xlsb)**. O exceljs **não lê .xlsb**, e o modo como ele falha é o perigoso: abre o arquivo (por fora é um zip, igual .xlsx), não encontra as partes internas que espera (num .xlsb são `.bin`, não `.xml`) e devolve um documento com **zero abas, sem erro nenhum**. Isso faria a automação tratar todo mundo como "sem contrato". Verificado nos 3 arquivos reais.
+- Ambas instaladas numa pasta ISOLADA dentro da imagem customizada (`/usr/local/lib/node_modules_extra/`), não dentro da pasta do n8n (o `package.json` do n8n usa formato `catalog:` do pnpm, incompatível com npm comum)
+- **Instalar a lib não basta**: `NODE_FUNCTION_ALLOW_EXTERNAL` precisa listar as duas (`exceljs,xlsx`), senão o n8n bloqueia o `require` mesmo com a biblioteca presente.
+- **Estrutura real das planilhas de contratos** (verificada nos 3 arquivos): cabeçalho na **linha 3**, não na 1; abas `EQUIPE E E FORNECEDORES`, `PRESTAÇÃO DE SERVIÇO + LOCAÇÃO` e `CANCELADOS_DISTRATOS`, com **layouts diferentes** entre si (na primeira a empresa fica na coluna J, na segunda na F). Por isso o workflow localiza as colunas pelo **nome do cabeçalho** (`STATUS`, `NOME`, `INFORMAÇÕES DA EMPRESA`), não por letra fixa.
+- Dockerfile da imagem customizada, em `~/n8n-custom/Dockerfile` no host (cópia versionada em `infra/Dockerfile`):
   ```
   FROM n8nio/n8n:latest
   USER root
   RUN mkdir -p /usr/local/lib/node_modules_extra
   WORKDIR /usr/local/lib/node_modules_extra
   RUN npm init -y
-  RUN npm install exceljs
+  RUN npm install exceljs xlsx
   USER node
   ```
 

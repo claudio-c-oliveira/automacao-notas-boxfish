@@ -1,80 +1,88 @@
 ================================================================================
-DECISAO NECESSARIA - AS PLANILHAS DE CONTRATOS (.xlsb) NAO SAO LEGIVEIS
+CONTRATOS .XLSB - RESOLVIDO O FORMATO, MAS 2 REGRAS PRECISAM DA SUA DECISAO
 ================================================================================
-Nao vou decidir isso sozinho porque envolve mexer em arquivo de outra equipe ou
-mudar a imagem do container. Preciso da sua escolha.
+A parte tecnica esta resolvida: voce escolheu a Opcao A, a SheetJS le os 3
+arquivos, testei contra os 3 baixando de verdade do Drive.
+
+Comandos da VM: comandos-vm-instalar-sheetjs.txt
+
+Abrindo os arquivos, porem, descobri que o codigo lia as COLUNAS ERRADAS - e
+sobraram 2 regras que eu nao tenho como decidir sozinho.
 
 --------------------------------------------------------------------------------
-O QUE ACONTECE
+O QUE JA CORRIGI (era erro claro, nao decisao)
 --------------------------------------------------------------------------------
-As 3 planilhas de contratos estao em formato .xlsb (Excel BINARIO):
+O codigo antigo assumia: coluna A = razao social, B = nome, C = status.
+A estrutura real dos 3 arquivos e outra:
 
-  BR_AREP_S01_CONTROLE DE CONTRATOS.xlsb           (pasta JURIDICO)
-  BR_AREP_S01_REUNION_CONTROLE DE CONTRATOS.xlsb   (pasta JURIDICO)
-  BR_SMTC_S02_CONTROLE DE CONTRATOS.xlsb           (pasta JURIDICO S02)
+  cabecalho na LINHA 3 (nao na 1)
 
-A biblioteca que usamos pra ler planilha (exceljs) NAO le .xlsb. Le .xlsx e .csv.
+  aba "EQUIPE E E FORNECEDORES":
+      B = STATUS      D = NOME      J = INFORMACOES DA EMPRESA
+  aba "PRESTACAO DE SERVICO + LOCACAO":
+      B = STATUS                    F = INFORMACOES DA EMPRESA   (nao tem NOME)
 
-O pior e COMO ela falha: nao da erro nenhum. Ela abre o arquivo (que por fora e
-um zip, igual .xlsx), nao encontra as partes internas que espera - num .xlsb elas
-sao .bin em vez de .xml - e devolve um documento com ZERO abas, calada.
+Ou seja, os layouts das abas sao DIFERENTES entre si. Por isso o codigo agora
+acha as colunas pelo NOME DO CABECALHO, nao por letra fixa - funciona nos dois
+layouts e aguenta a coluna mudar de lugar.
 
-Testei os 3 arquivos na instancia, baixando de verdade do Drive: os 3 se
-comportam assim. Nao e problema de permissao nem de download - o arquivo chega
-inteiro (158 KB no caso do AREP).
-
-Por que so apareceu agora: as leituras anteriores quebravam antes de chegar aqui.
-Os Cost Reports (.xlsx) leem normalmente - 3729 linhas no S01, 183 no S02.
-
---------------------------------------------------------------------------------
-POR QUE ISSO IMPORTA
---------------------------------------------------------------------------------
-Os contratos alimentam a checagem de contrato assinado (spec 3.1). Sem eles, a
-automacao trataria TODO MUNDO como "sem contrato" - e silenciosamente, se eu nao
-tivesse posto uma falha explicita. Por isso o node agora ESTOURA com mensagem
-clara em vez de seguir com a lista vazia.
+Resultado lendo os arquivos reais:
+      contratos_arep       587 contratos   (579 assinados)
+      contratos_reunion    122 contratos   ( 72 assinados)
+      contratos_softpre     38 contratos   ( 27 assinados)
 
 --------------------------------------------------------------------------------
-OPCOES
+DECISAO 1 - A ABA "CANCELADOS_DISTRATOS" ENTRA OU NAO?
 --------------------------------------------------------------------------------
+Os 3 arquivos tem uma terceira aba, CANCELADOS_DISTRATOS, com contratos
+cancelados ou distratados. Na coluna STATUS dela nem ha status - ha data
+("17-Sep", "1-Oct"), e as observacoes dizem "CANCELADO PELA VAN", "CANCELADO
+PELA FLAVIA EM 0...".
 
-OPCAO A - Instalar uma biblioteca que leia .xlsb  (MINHA RECOMENDACAO)
-  A SheetJS (pacote "xlsx") le .xlsb. Mesma abordagem ja usada com o exceljs:
-  instalar na pasta isolada da imagem customizada e liberar em
-  NODE_FUNCTION_ALLOW_EXTERNAL.
-  + Nao mexe em nenhum arquivo da equipe juridica
-  + Nao depende de ninguem manter um formato novo
-  - Exige rebuild da imagem e recriar o container (procedimento do spec 7.5)
-  - Uma dependencia a mais
+Eu DEIXEI ESSA ABA DE FORA, porque e o lado seguro: sem achar o contrato ali, a
+nota cai na busca de ficha cadastral (spec 3.1) em vez de ser liberada
+indevidamente. Se eu incluisse e errasse, liberaria pagamento com base em
+contrato cancelado.
 
-OPCAO B - Converter os 3 arquivos pra .xlsx no Drive
-  + Nao mexe na infraestrutura, resolve hoje
-  - Sao arquivos de trabalho da equipe juridica (Danielle). Se alguem salvar de
-    novo como .xlsb, ou trabalhar na copia errada, quebra outra vez - e agora com
-    duas versoes do mesmo controle circulando
-  - Precisa de combinado com quem usa esses arquivos
-
-OPCAO C - Converter na hora, via Google Drive
-  Subir o .xlsb como Google Sheets e exportar .xlsx a cada execucao.
-  + Nao mexe nos arquivos nem na imagem
-  - Bem mais peca movel: escreve no Drive a cada execucao, mais lento, mais
-    coisa pra falhar. So valeria se A e B estiverem descartadas
+  >>> Confirma que contrato cancelado/distratado NAO vale como contrato
+      assinado? (minha suposicao, marcada aqui pra voce validar)
 
 --------------------------------------------------------------------------------
-O QUE EU PRECISO DE VOCE
+DECISAO 2 - O QUE SIGNIFICA O STATUS "E A dd/mm"?  (esta e a que me trava)
 --------------------------------------------------------------------------------
-1) Qual opcao? (A, B ou C)
+Levantei todos os valores distintos de STATUS nos 3 arquivos:
 
-2) Se for A: eu te passo o Dockerfile ajustado e os comandos, no mesmo formato
-   dos anteriores. Preciso so do seu OK pra rebuildar a imagem.
+     678x  ASSINADO                            <- regra atual reconhece
+      49x  "E A 20/08", "E A 13/08", "E A 19/08", "E A 21/07", ...  <- ???
+      17x  (vazio)
+       1x  AGUARDANDO ASSINATURA DO CONTRATO
+       1x  DOCUMENTACAO NAO ENVIADA
+       1x  CONTRATO E PGTO - NETFLIX
 
-3) Se for B: me confirme os nomes exatos dos arquivos convertidos, porque o
-   workflow procura por nome exato. E vale confirmar com a Danielle antes.
+A regra hoje libera a nota quando o status contem "assinado". Ela acerta nos 678
+e corretamente NAO libera "AGUARDANDO ASSINATURA DO CONTRATO" nem "DOCUMENTACAO
+NAO ENVIADA".
+
+O problema sao as 49 linhas "E A dd/mm". Nao sei o que "E A" quer dizer, e nao
+vou chutar - se for algo como "Enviado para Assinatura", NAO deve liberar; se for
+"Entregue Assinado", DEVE. Sao 49 contratos que dependem disso.
+
+  >>> O que significa "E A dd/mm"? Esse status conta como contrato assinado?
+
+  >>> E o "CONTRATO E PGTO - NETFLIX" (1 linha): conta como assinado?
+
+Enquanto voce nao responder, nenhum desses libera - continuam caindo na busca de
+ficha cadastral. Falha pro lado seguro, mas pode gerar busca desnecessaria.
 
 --------------------------------------------------------------------------------
-ENQUANTO ISSO
+OBSERVACAO SOBRE O SPEC (nao mexi, so registro)
 --------------------------------------------------------------------------------
-O resto da Fase 1 esta funcionando: os 2 Cost Reports sao lidos corretamente, a
-separacao AREP/Reunion por cor esta certa (3388 AREP / 150 REUNION no S01). O
-fluxo para no ponto dos contratos, com mensagem explicita apontando pra este
-arquivo.
+O spec (secao 3.1, linha 30) descreve a checagem de contrato so pela COLUNA N do
+Cost Report: se contem "ASSINADO", segue; senao, procura ficha cadastral no
+Gmail. O cruzamento com as planilhas .xlsb NAO esta descrito la - esta
+implementado no workflow como checagem secundaria (quando a coluna N nao
+resolve). Pode ser que tenha sido combinado e nao registrado.
+
+  >>> Vale confirmar se esse cruzamento com o .xlsb deve mesmo existir, e se
+      sim, incluir a regra no spec - hoje ele e a unica coisa no fluxo sem
+      respaldo escrito.

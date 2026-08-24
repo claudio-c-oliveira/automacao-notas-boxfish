@@ -1,0 +1,87 @@
+================================================================================
+INSTALAR A SHEETJS NA IMAGEM (leitura das planilhas de contratos .xlsb)
+================================================================================
+Mesmo padrao do exceljs: instala na pasta isolada da imagem customizada e libera
+em NODE_FUNCTION_ALLOW_EXTERNAL.
+
+DUAS coisas precisam andar juntas, senao nao funciona:
+  1. rebuild da imagem com a lib nova
+  2. NODE_FUNCTION_ALLOW_EXTERNAL passa de "exceljs" para "exceljs,xlsx"
+Sem o item 2, o n8n bloqueia o require('xlsx') mesmo com a lib instalada.
+
+Ja testei a biblioteca contra os 3 .xlsb reais (baixei os arquivos e rodei aqui):
+le os tres, nos dois layouts de aba. Nao e uma aposta.
+
+Cole UM comando por vez.
+
+--------------------------------------------------------------------------------
+PASSO 1 - abrir o Dockerfile
+--------------------------------------------------------------------------------
+nano ~/n8n-custom/Dockerfile
+
+  Troque a linha:      RUN npm install exceljs
+  por:                 RUN npm install exceljs xlsx
+
+  (e a UNICA mudanca no arquivo. Salvar: Ctrl+O, Enter, Ctrl+X)
+
+  O conteudo final deve ficar assim:
+
+    FROM n8nio/n8n:latest
+    USER root
+    RUN mkdir -p /usr/local/lib/node_modules_extra
+    WORKDIR /usr/local/lib/node_modules_extra
+    RUN npm init -y
+    RUN npm install exceljs xlsx
+    USER node
+
+--------------------------------------------------------------------------------
+PASSO 2 - reconstruir a imagem (demora alguns minutos)
+--------------------------------------------------------------------------------
+sudo docker build -t n8n-custom:latest ~/n8n-custom
+
+  Espere terminar. Tem que aparecer algo como "naming to docker.io/library/
+  n8n-custom:latest" no fim, sem ERROR.
+
+--------------------------------------------------------------------------------
+PASSO 3 - conferir que a lib entrou ANTES de derrubar o container
+--------------------------------------------------------------------------------
+sudo docker run --rm --entrypoint node n8n-custom:latest -e "console.log(require('/usr/local/lib/node_modules_extra/node_modules/xlsx/package.json').version)"
+
+  Tem que imprimir um numero de versao (ex.: 0.18.5).
+  Se der erro aqui, PARE e me mande a mensagem - nao siga pro passo 4.
+
+--------------------------------------------------------------------------------
+PASSO 4 - recriar o container
+--------------------------------------------------------------------------------
+sudo docker stop n8n
+
+sudo docker rm n8n
+
+sudo docker run -d --restart unless-stopped --name n8n -p 5678:5678 -e N8N_HOST=n8n.carvalhodeoliveira.com -e N8N_PROTOCOL=https -e WEBHOOK_URL=https://n8n.carvalhodeoliveira.com/ -e N8N_EDITOR_BASE_URL=https://n8n.carvalhodeoliveira.com/ -e NODE_FUNCTION_ALLOW_EXTERNAL=exceljs,xlsx -e NODE_PATH=/usr/local/lib/node_modules_extra/node_modules -v n8n_data:/home/node/.n8n -v /opt/box-fish-config:/home/node/.n8n-files/box-fish-config n8n-custom:latest
+
+  Diferencas pro comando anterior, so estas duas:
+    - NODE_FUNCTION_ALLOW_EXTERNAL=exceljs,xlsx   (era so exceljs)
+    - o bind mount do box-fish-config continua igual, ja no caminho certo
+
+--------------------------------------------------------------------------------
+PASSO 5 - conferir que subiu
+--------------------------------------------------------------------------------
+sudo docker ps --filter name=n8n
+
+sudo docker exec n8n ls /home/node/.n8n-files/box-fish-config
+
+sudo docker logs --tail 20 n8n
+
+--------------------------------------------------------------------------------
+DEPOIS
+--------------------------------------------------------------------------------
+Me avise que eu rodo a verificacao de fora: leio as 3 planilhas de contratos pela
+instancia e te mostro quantos contratos vieram de cada uma. So depois disso vale a
+pena gastar o Manual Trigger.
+
+--------------------------------------------------------------------------------
+SE PRECISAR VOLTAR ATRAS
+--------------------------------------------------------------------------------
+A imagem antiga nao e apagada pelo build - ela so perde a tag "latest". Se algo
+der errado, me chame antes de mexer. O volume n8n_data e a pasta
+/opt/box-fish-config nao sao tocados por nada aqui.
