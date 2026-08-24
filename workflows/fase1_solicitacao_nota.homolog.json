@@ -1918,6 +1918,19 @@
       "parameters": {
         "jsCode": "// Junta as duas checagens paralelas (spec 3.1): a PRIMEIRA confirmação positiva libera,\n// sem prioridade entre as fontes. Como as duas chegam pelo mesmo Merge, \"primeira\" aqui é\n// \"qualquer uma que tenha confirmado\" — o resultado é o mesmo, e não depende de qual\n// terminou antes.\n//\n// Cada linha pode aparecer até 2x no input (uma por checagem); o agrupamento é por\n// chaveLinha. Linhas já resolvidas pela coluna N vêm por outro ramo e passam direto.\n\nconst porLinha = new Map();\n\nfor (const item of $input.all()) {\n  const d = item.json;\n  const chave = d.chaveLinha;\n  if (chave === null || chave === undefined) continue;\n\n  if (!porLinha.has(chave)) {\n    porLinha.set(chave, { base: d, liberado: false, motivo: undefined, valorColunaN: undefined, passaDireto: false });\n  }\n  const acc = porLinha.get(chave);\n\n  // monitoramento e linhas liberadas pela coluna N não passam pelas checagens paralelas\n  if (d.contratoResolvido) {\n    acc.base = d;\n    acc.passaDireto = true;\n    continue;\n  }\n  acc.base = { ...acc.base, ...d };\n  if (d.confirmado && !acc.liberado) {\n    acc.liberado = true;\n    acc.motivo = d.fonteChecagem;\n    acc.valorColunaN = d.atualizarColunaNPara;\n  }\n}\n\nreturn [...porLinha.values()].map(({ base, liberado, motivo, valorColunaN, passaDireto }) => {\n  if (passaDireto) return { json: base };\n  const json = { ...base, liberado, motivoLiberacao: motivo, atualizarColunaNPara: valorColunaN };\n  delete json.confirmado;\n  delete json.fonteChecagem;\n  return { json };\n});"
       }
+    },
+    {
+      "id": "prep-cobrancas",
+      "name": "Preparar cobrancas.json",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5960,
+        780
+      ],
+      "parameters": {
+        "jsCode": "// Serializa o cobrancas.json atualizado em binário: o node de escrita em disco só aceita\n// binário, não JSON. Mesmo padrão do \"Preparar log_diario.json atualizado\".\n//\n// Node separado de propósito, em vez de emitir o binário lá no \"Consolidar\": aquele node\n// alimenta 4 ramos, e pendurar o arquivo serializado no item faria os 4 carregarem uma\n// cópia — a mesma duplicação de payload que travou a VM.\nconst cobrancas = $input.first().json.cobrancasAtualizadas || {};\nreturn [{\n  json: {},\n  binary: { data: {\n    data: Buffer.from(JSON.stringify(cobrancas, null, 2)).toString('base64'),\n    mimeType: 'application/json',\n    fileName: 'cobrancas.json',\n  } },\n}];"
+      }
     }
   ],
   "connections": {
@@ -2335,7 +2348,7 @@
             "index": 0
           },
           {
-            "node": "Gravar cobrancas.json",
+            "node": "Preparar cobrancas.json",
             "type": "main",
             "index": 0
           },
@@ -2924,6 +2937,17 @@
         [
           {
             "node": "IF — É monitoramento?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar cobrancas.json": {
+      "main": [
+        [
+          {
+            "node": "Gravar cobrancas.json",
             "type": "main",
             "index": 0
           }
