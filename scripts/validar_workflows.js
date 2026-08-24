@@ -168,10 +168,80 @@ function validarNode(node, achados) {
   }
 }
 
+/**
+ * Referências a nodes que não existem no arquivo.
+ *
+ * Existe por causa de um bug real: o node de parsear planilhas citava
+ * 'Box — Download Cost Report S01' como TEXTO, e o gerador remove os nodes do Box no
+ * arquivo de homolog. Resultado: "Referenced node doesn't exist" em execução, só em
+ * homolog — exatamente a divergência entre ambientes que a fonte única deveria impedir.
+ * Nenhuma validação de parâmetro pegava isso, porque o parâmetro estava perfeito.
+ *
+ * Pega as duas formas: $('Nome') e o nome passado como argumento/string solta.
+ *
+ * Pro segundo caso é preciso um VOCABULÁRIO de nomes conhecidos: um nome citado como
+ * argumento é só uma string qualquer, e o nome que interessa é justamente um que NÃO está
+ * mais no arquivo. O vocabulário vem do arquivo-fonte, que tem os nodes dos dois ambientes.
+ */
+function nomesDaFonte(arquivo) {
+  const m = path.basename(arquivo).match(/^(.+?)\.(homolog|producao)\.json$/);
+  if (!m) return new Set();
+  const fonte = path.join(path.dirname(arquivo), '_fonte', `${m[1]}.fonte.json`);
+  if (!fs.existsSync(fonte)) return new Set();
+  try {
+    return new Set((JSON.parse(fs.readFileSync(fonte, 'utf8')).nodes || []).map((n) => n.name));
+  } catch {
+    return new Set();
+  }
+}
+
+function validarReferenciasANodes(wf, achados, vocabulario = new Set()) {
+  const existentes = new Set((wf.nodes || []).map((n) => n.name));
+  const conhecidos = new Set([...existentes, ...vocabulario]);
+
+  const comEntrada = new Set();
+  for (const spec of Object.values(wf.connections || {})) {
+    for (const saida of spec.main || []) for (const e of saida) comEntrada.add(e.node);
+  }
+  const ehTrigger = (n) =>
+    n.type.endsWith('Trigger') ||
+    n.type === 'n8n-nodes-base.manualTrigger' ||
+    n.type === 'n8n-nodes-base.executeWorkflowTrigger';
+  const alcancavel = new Set([...comEntrada, ...(wf.nodes || []).filter(ehTrigger).map((n) => n.name)]);
+
+  for (const node of wf.nodes || []) {
+    const blob = JSON.stringify(node.parameters || {});
+    const citados = new Set();
+
+    for (const m of blob.matchAll(/\$\(\\?'([^']+?)\\?'\)/g)) citados.add(m[1]);
+    // nome de node passado como argumento — como lerAbaNotas(null, 'Box — Download...', null)
+    for (const nome of conhecidos) {
+      if (nome !== node.name && blob.includes(`'${nome}'`)) citados.add(nome);
+    }
+
+    for (const alvo of citados) {
+      if (!existentes.has(alvo)) {
+        achados.push({
+          nivel: 'ERRO',
+          node: node.name,
+          msg: `referencia o node "${alvo}", que não existe neste arquivo — em execução vira "Referenced node doesn't exist"`,
+        });
+      } else if (!alcancavel.has(alvo)) {
+        achados.push({
+          nivel: 'AVISO',
+          node: node.name,
+          msg: `referencia o node "${alvo}", que existe mas nada alimenta — nunca executa, então a referência vem vazia`,
+        });
+      }
+    }
+  }
+}
+
 function validarArquivo(arquivo) {
   const wf = JSON.parse(fs.readFileSync(arquivo, 'utf8'));
   const achados = [];
   for (const node of wf.nodes || []) validarNode(node, achados);
+  validarReferenciasANodes(wf, achados, nomesDaFonte(arquivo));
 
   const erros = achados.filter((a) => a.nivel === 'ERRO');
   const avisos = achados.filter((a) => a.nivel === 'AVISO');
