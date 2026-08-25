@@ -206,6 +206,40 @@ function semComentarios(blob) {
   return blob.replace(/\/\/(?:(?!\\n).)*/g, '');
 }
 
+/**
+ * Todos os nodes que rodam ANTES de `alvo` — ou seja, de onde ele pode ler via $().
+ * Percorre as arestas ao contrário. Memoizado por workflow, que é percorrido várias vezes.
+ */
+const _cacheAncestrais = new WeakMap();
+function ancestrais(wf, alvo) {
+  let porWf = _cacheAncestrais.get(wf);
+  if (!porWf) {
+    const entrada = new Map();
+    for (const [src, spec] of Object.entries(wf.connections || {})) {
+      for (const saida of spec.main || []) {
+        for (const e of saida) {
+          if (!entrada.has(e.node)) entrada.set(e.node, []);
+          entrada.get(e.node).push(src);
+        }
+      }
+    }
+    porWf = { entrada, memo: new Map() };
+    _cacheAncestrais.set(wf, porWf);
+  }
+  if (porWf.memo.has(alvo)) return porWf.memo.get(alvo);
+
+  const vistos = new Set();
+  const fila = [...(porWf.entrada.get(alvo) || [])];
+  while (fila.length) {
+    const n = fila.pop();
+    if (vistos.has(n)) continue;
+    vistos.add(n);
+    for (const p of porWf.entrada.get(n) || []) if (!vistos.has(p)) fila.push(p);
+  }
+  porWf.memo.set(alvo, vistos);
+  return vistos;
+}
+
 function validarReferenciasANodes(wf, achados, vocabulario = new Set()) {
   const existentes = new Set((wf.nodes || []).map((n) => n.name));
   const conhecidos = new Set([...existentes, ...vocabulario]);
@@ -242,6 +276,16 @@ function validarReferenciasANodes(wf, achados, vocabulario = new Set()) {
           nivel: 'AVISO',
           node: node.name,
           msg: `referencia o node "${alvo}", que existe mas nada alimenta — nunca executa, então a referência vem vazia`,
+        });
+      } else if (alcancavel.has(node.name) && !ancestrais(wf, node.name).has(alvo)) {
+        // Existir e ser alcançável não basta: se o node citado roda DEPOIS, a execução
+        // estoura com "hasn't been executed". Foi o que aconteceu quando a gravação da
+        // planilha foi movida pra antes da criação do e-mail e uma leitura continuou
+        // apontando pro node de consolidação, que passou a rodar no fim do fluxo.
+        achados.push({
+          nivel: 'ERRO',
+          node: node.name,
+          msg: `referencia o node "${alvo}", que só roda DEPOIS deste — em execução vira "Node '${alvo}' hasn't been executed"`,
         });
       }
     }
