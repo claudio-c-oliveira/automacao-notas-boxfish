@@ -105,19 +105,15 @@ function removerInalcancaveis(wf) {
     n.type === 'n8n-nodes-base.manualTrigger' ||
     n.type === 'n8n-nodes-base.executeWorkflowTrigger';
 
-  const porNome = new Map(wf.nodes.map((n) => [n.name, n]));
-  const refsDe = (n) => {
-    const code = (n.parameters && n.parameters.jsCode) || '';
-    return [...code.matchAll(/\$\('([^']+)'\)/g)].map((m) => m[1]);
-  };
-
-  // Ponto fixo a partir dos triggers, propagando por arestas E por referência $('...').
+  // Alcance PURO por arestas, a partir dos triggers.
   //
-  // A referência SÓ conta se vier de um node que sobrevive. Antes as referências eram
-  // coletadas de TODOS os nodes, inclusive dos que seriam removidos — então um node do Box
-  // citado apenas pelo ramo de produção sobrevivia no arquivo de HOMOLOG, órfão e levando
-  // junto a credencial do Box. Isso furava a garantia de que o arquivo de homolog é
-  // estruturalmente incapaz de tocar em produção.
+  // Não se preserva node por ser citado em $('...'): sem aresta de entrada ele nunca
+  // executa, e $() sobre um node que não rodou não devolve nada de qualquer jeito — o
+  // código que cita nodes do outro ambiente já trata a ausência (ex.: o try/catch de
+  // fileIdHomolog em "Aplicar mudanças"). Preservar por citação causava dois estragos
+  // reais: mantinha um node do Box vivo no arquivo de HOMOLOG, com a credencial do Box
+  // junto, e — ao seguir as arestas de saída do node preservado — arrastava a cadeia
+  // inteira dele pro ambiente errado.
   const alcancados = new Set(wf.nodes.filter(ehTrigger).map((n) => n.name));
   let mudou = true;
   while (mudou) {
@@ -130,14 +126,6 @@ function removerInalcancaveis(wf) {
             alcancados.add(e.node);
             mudou = true;
           }
-        }
-      }
-      const n = porNome.get(nome);
-      if (!n) continue;
-      for (const ref of refsDe(n)) {
-        if (porNome.has(ref) && !alcancados.has(ref)) {
-          alcancados.add(ref);
-          mudou = true;
         }
       }
     }
