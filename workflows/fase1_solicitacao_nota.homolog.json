@@ -1983,6 +1983,95 @@
       "parameters": {
         "jsCode": "// So chega aqui se a gravacao da planilha subiu (ou se nao havia nada a gravar).\n// Reemite os itens montados, que seguem pro Switch e dai pro Gmail.\nreturn $('Merge — rotas (cobrança/colaborador/fornecedor)').all();"
       }
+    },
+    {
+      "id": "drive-reler-pos",
+      "name": "Drive (homolog) — Reler após gravar",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        4540,
+        660
+      ],
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Escolher arquivo-alvo (homolog)').first().json.fileId }}"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "cred-gdrive-particular-michelle",
+          "name": "Google Drive - Michelle (michelle.mimiaguia@gmail.com)"
+        }
+      }
+    },
+    {
+      "id": "confirmar-escrita",
+      "name": "Confirmar escrita na planilha",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4720,
+        740
+      ],
+      "parameters": {
+        "jsCode": "// Confirmação pós-escrita (spec 3.1.5). Relê o arquivo COMO ELE FICOU SALVO — não o\n// workbook em memória — e confere cada célula que a automação diz ter escrito.\n//\n// A verificação em memória (no node \"Aplicar mudanças\") continua valendo: ela pega aba ou\n// linha erradas antes de subir. Esta aqui pega o que aquela não alcança: upload que\n// responde OK sem persistir, upload no arquivo errado, ou versão sobrescrita no meio.\nconst ExcelJS = require('exceljs');\n\nconst contexto = $('Aplicar mudanças (exceljs) e preparar upload').first().json;\nconst mudancas = $('Preparar gravação da planilha').first().json;\nconst esperados = []\n  .concat((mudancas.mudancasColunaN || []).map((m) => ({ celula: 'N' + m.linha, valor: m.valor })))\n  .concat((mudancas.mudancasColunaL || []).map((m) => ({ celula: 'L' + m.linha, valor: m.valor })));\n\nconst buffer = await this.helpers.getBinaryDataBuffer(0, 'data');\nconst wb = new ExcelJS.Workbook();\nawait wb.xlsx.load(buffer);\nconst ws = wb.worksheets.find((w) => String(w.name).trim().toUpperCase() === 'NOTAS');\n\nconst divergencias = [];\nif (!ws) {\n  divergencias.push('aba \"NOTAS\" nao existe no arquivo relido (abas: ' + wb.worksheets.map((w) => w.name).join(', ') + ')');\n} else {\n  for (const e of esperados) {\n    const bruto = ws.getCell(e.celula).value;\n    const lido = bruto === null || bruto === undefined ? '' : String(bruto).trim();\n    if (lido !== String(e.valor).trim()) {\n      divergencias.push(e.celula + ': tentou gravar \"' + e.valor + '\", releitura encontrou \"' + (lido || '(vazio)') + '\"');\n    }\n  }\n}\n\nconst confirmado = divergencias.length === 0;\nconst textoAlerta = confirmado ? null : [\n  '🚨 Escrita na planilha NAO confirmada — processamento abortado',\n  '',\n  'Nenhum e-mail foi criado nesta execução.',\n  'Arquivo: ' + (contexto.fileIdHomolog || contexto.fileIdBox || '(id desconhecido)'),\n  'Aba: NOTAS',\n  '',\n  'Divergências (' + divergencias.length + '):',\n].concat(divergencias.map((d) => '• ' + d)).join('\\n');\n\nreturn [{ json: { confirmado, divergencias, celulasConferidas: esperados.length, textoAlerta } }];"
+      }
+    },
+    {
+      "id": "if-escrita-ok",
+      "name": "IF — Escrita confirmada?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        4860,
+        740
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.confirmado }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "tg-escrita-nok",
+      "name": "Telegram — Escrita não confirmada",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        5000,
+        880
+      ],
+      "parameters": {
+        "chatId": "749277207",
+        "text": "={{ $json.textoAlerta }}",
+        "additionalFields": {}
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "cred-telegram-account",
+          "name": "Telegram account"
+        }
+      }
     }
   ],
   "connections": {
@@ -3033,7 +3122,7 @@
       "main": [
         [
           {
-            "node": "Merge — gravação concluída",
+            "node": "Drive (homolog) — Reler após gravar",
             "type": "main",
             "index": 0
           }
@@ -3056,6 +3145,46 @@
         [
           {
             "node": "Switch — ação",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Drive (homolog) — Reler após gravar": {
+      "main": [
+        [
+          {
+            "node": "Confirmar escrita na planilha",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Confirmar escrita na planilha": {
+      "main": [
+        [
+          {
+            "node": "IF — Escrita confirmada?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — Escrita confirmada?": {
+      "main": [
+        [
+          {
+            "node": "Merge — gravação concluída",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Telegram — Escrita não confirmada",
             "type": "main",
             "index": 0
           }
