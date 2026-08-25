@@ -901,7 +901,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Captura o threadId retornado pelo Gmail e monta a 1a entrada de cobrancas.json\n// (secao 3.1.1: \"O threadId e gravado assim que o e-mail de pedido e criado\").\n// Le a resposta do Gmail pelo NOME do node — a entrada direta aqui e a resposta\n// do node de marcadores, que nao carrega threadId.\nreturn $input.all().map((item, i) => {\n  const original = $('Merge — rotas (cobrança/colaborador/fornecedor)').all()[i].json;\n  const respostaGmail = $('Gmail — Criar rascunho (pedido)').all()[i].json;\n  const threadId = respostaGmail.threadId\n    || (respostaGmail.message && respostaGmail.message.threadId)\n    || null;\n  const hoje = new Date();\n  return { json: { ...original, novoEstadoCobranca: { threadId, data_ultima_cobranca: hoje.toISOString().slice(0,10), contagem_cobrancas: 0, status_ciclo: 'em_andamento' } } };\n});"
+        "jsCode": "// Monta a 1a entrada de cobrancas.json (secao 3.1.1: \"o threadId e gravado assim que o\n// e-mail de pedido e criado\"). O payload e o threadId ja vem casados do node anterior,\n// entao aqui o indice e dentro da propria ramificacao — 1:1, sem risco de trocar item.\nconst pedidos = $('Casar resposta do Gmail (rascunho pedido)').all();\n\nreturn $input.all().map((item, i) => {\n  const d = (pedidos[i] || {}).json || {};\n  const hoje = new Date();\n  return { json: {\n    ...d,\n    novoEstadoCobranca: {\n      threadId: d.threadIdGmail || null,\n      data_ultima_cobranca: hoje.toISOString().slice(0, 10),\n      contagem_cobrancas: 0,\n      status_ciclo: 'em_andamento',\n    },\n  } };\n});"
       },
       "id": "n_capturar_thread_rascunho",
       "name": "Capturar threadId (rascunho)",
@@ -915,7 +915,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Captura o threadId retornado pelo Gmail e monta a 1a entrada de cobrancas.json\n// (secao 3.1.1: \"O threadId e gravado assim que o e-mail de pedido e criado\").\n// Le a resposta do Gmail pelo NOME do node — a entrada direta aqui e a resposta\n// do node de marcadores, que nao carrega threadId.\nreturn $input.all().map((item, i) => {\n  const original = $('Merge — rotas (cobrança/colaborador/fornecedor)').all()[i].json;\n  const respostaGmail = $('Gmail — Enviar direto (automático)').all()[i].json;\n  const threadId = respostaGmail.threadId\n    || (respostaGmail.message && respostaGmail.message.threadId)\n    || null;\n  const hoje = new Date();\n  return { json: { ...original, novoEstadoCobranca: { threadId, data_ultima_cobranca: hoje.toISOString().slice(0,10), contagem_cobrancas: 0, status_ciclo: 'em_andamento' } } };\n});"
+        "jsCode": "// Monta a 1a entrada de cobrancas.json (secao 3.1.1: \"o threadId e gravado assim que o\n// e-mail de pedido e criado\"). O payload e o threadId ja vem casados do node anterior,\n// entao aqui o indice e dentro da propria ramificacao — 1:1, sem risco de trocar item.\nconst pedidos = $('Casar resposta do Gmail (envio pedido)').all();\n\nreturn $input.all().map((item, i) => {\n  const d = (pedidos[i] || {}).json || {};\n  const hoje = new Date();\n  return { json: {\n    ...d,\n    novoEstadoCobranca: {\n      threadId: d.threadIdGmail || null,\n      data_ultima_cobranca: hoje.toISOString().slice(0, 10),\n      contagem_cobrancas: 0,\n      status_ciclo: 'em_andamento',\n    },\n  } };\n});"
       },
       "id": "n_capturar_thread_envio",
       "name": "Capturar threadId (envio direto)",
@@ -2011,8 +2011,8 @@
       "parameters": {
         "resource": "message",
         "operation": "addLabels",
-        "messageId": "={{ $json.message ? $json.message.id : $json.id }}",
-        "labelIds": "={{ ($('Merge — rotas (cobrança/colaborador/fornecedor)').item.json.marcadores || []).map(nome => $('Mapear marcadores').first().json.mapa[nome]).filter(Boolean) }}"
+        "messageId": "={{ $json.messageId }}",
+        "labelIds": "={{ ($json.marcadores || []).map(nome => $('Mapear marcadores').first().json.mapa[nome]).filter(Boolean) }}"
       },
       "id": "gmail-marcar-rascunho-pedido",
       "name": "Gmail — Aplicar marcadores (rascunho pedido)",
@@ -2036,8 +2036,8 @@
       "parameters": {
         "resource": "message",
         "operation": "addLabels",
-        "messageId": "={{ $json.message ? $json.message.id : $json.id }}",
-        "labelIds": "={{ ($('Merge — rotas (cobrança/colaborador/fornecedor)').item.json.marcadores || []).map(nome => $('Mapear marcadores').first().json.mapa[nome]).filter(Boolean) }}"
+        "messageId": "={{ $json.messageId }}",
+        "labelIds": "={{ ($json.marcadores || []).map(nome => $('Mapear marcadores').first().json.mapa[nome]).filter(Boolean) }}"
       },
       "id": "gmail-marcar-envio-pedido",
       "name": "Gmail — Aplicar marcadores (envio pedido)",
@@ -2061,8 +2061,8 @@
       "parameters": {
         "resource": "message",
         "operation": "addLabels",
-        "messageId": "={{ $json.message ? $json.message.id : $json.id }}",
-        "labelIds": "={{ ($('Merge — rotas (cobrança/colaborador/fornecedor)').item.json.marcadores || []).map(nome => $('Mapear marcadores').first().json.mapa[nome]).filter(Boolean) }}"
+        "messageId": "={{ $json.messageId }}",
+        "labelIds": "={{ ($json.marcadores || []).map(nome => $('Mapear marcadores').first().json.mapa[nome]).filter(Boolean) }}"
       },
       "id": "gmail-marcar-cobranca-rascunho",
       "name": "Gmail — Aplicar marcadores (cobrança rascunho)",
@@ -2086,8 +2086,8 @@
       "parameters": {
         "resource": "message",
         "operation": "addLabels",
-        "messageId": "={{ $json.message ? $json.message.id : $json.id }}",
-        "labelIds": "={{ ($('Merge — rotas (cobrança/colaborador/fornecedor)').item.json.marcadores || []).map(nome => $('Mapear marcadores').first().json.mapa[nome]).filter(Boolean) }}"
+        "messageId": "={{ $json.messageId }}",
+        "labelIds": "={{ ($json.marcadores || []).map(nome => $('Mapear marcadores').first().json.mapa[nome]).filter(Boolean) }}"
       },
       "id": "gmail-marcar-cobranca-envio",
       "name": "Gmail — Aplicar marcadores (cobrança envio)",
@@ -2109,7 +2109,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// A resposta do addLabels nao carrega os campos que o consolidador usa\n// (acao, chaveCobranca, novoEstadoCobranca...). Restaura o payload original.\nreturn $input.all().map((item, i) => ({ json: $('Merge — rotas (cobrança/colaborador/fornecedor)').all()[i].json }));"
+        "jsCode": "// A resposta do addLabels nao carrega os campos que o consolidador usa (acao,\n// chaveCobranca, novoEstadoCobranca...). Restaura o payload ja casado no node anterior —\n// indice dentro da propria ramificacao, 1:1.\nconst pedidos = $('Casar resposta do Gmail (cobrança rascunho)').all();\nreturn $input.all().map((item, i) => ({ json: (pedidos[i] || {}).json || {} }));"
       },
       "id": "restaurar-payload-cobranca-rascunho",
       "name": "Restaurar payload (cobrança rascunho)",
@@ -2122,7 +2122,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// A resposta do addLabels nao carrega os campos que o consolidador usa\n// (acao, chaveCobranca, novoEstadoCobranca...). Restaura o payload original.\nreturn $input.all().map((item, i) => ({ json: $('Merge — rotas (cobrança/colaborador/fornecedor)').all()[i].json }));"
+        "jsCode": "// A resposta do addLabels nao carrega os campos que o consolidador usa (acao,\n// chaveCobranca, novoEstadoCobranca...). Restaura o payload ja casado no node anterior —\n// indice dentro da propria ramificacao, 1:1.\nconst pedidos = $('Casar resposta do Gmail (cobrança envio)').all();\nreturn $input.all().map((item, i) => ({ json: (pedidos[i] || {}).json || {} }));"
       },
       "id": "restaurar-payload-cobranca-envio",
       "name": "Restaurar payload (cobrança envio)",
@@ -2577,6 +2577,58 @@
       ],
       "parameters": {
         "jsCode": "const d = $('Confirmar escrita na planilha').first().json;\nconst linhas = (d.divergencias || []).map((x) => '• ' + x);\n\n// A revisão anterior foi restaurada logo antes deste alerta (baixar a revisão + subir de\n// volta — o Drive não tem \"promover revisão\" como o Box). O node de restauração usa\n// neverError, então o resultado real vem no corpo e é reportado aqui: se a reversão\n// falhar, o alerta diz isso, em vez de dar a impressão de que o arquivo está limpo.\nconst resp = $input.first().json || {};\nconst status = resp.statusCode;\nconst corpo = resp.body || resp;\nconst reverteu = status >= 200 && status < 300;\n\nlet idRevisao = '(desconhecida)';\ntry {\n  const revs = $('Drive (homolog) — Guardar revisão anterior').first().json.revisions || [];\n  if (revs.length) idRevisao = revs[revs.length - 1].id;\n} catch (e) { /* sem lista de revisões */ }\n\nconst texto = [\n  '🚨 Escrita na planilha NAO confirmada — processamento abortado',\n  '',\n  'Nenhum e-mail foi criado nesta execução.',\n  'Ambiente: homologação (Drive)',\n  'Arquivo: ' + d.arquivoId,\n  'Aba: NOTAS',\n  '',\n  reverteu\n    ? '✅ Arquivo REVERTIDO para a revisão anterior (' + idRevisao + ').'\n    : '⚠️ FALHOU a reversão automática (HTTP ' + status + ' ' + (((corpo || {}).error || {}).message || (corpo || {}).message || '') + '). O arquivo pode ter ficado com a escrita não confirmada — conferir manualmente.',\n  '',\n  'Divergências (' + linhas.length + '):',\n].concat(linhas).join('\\n');\n\nreturn [{ json: { textoAlerta: texto } }];"
+      }
+    },
+    {
+      "id": "casar-rascunho-pedido",
+      "name": "Casar resposta do Gmail (rascunho pedido)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5450,
+        130
+      ],
+      "parameters": {
+        "jsCode": "// A resposta do Gmail substitui o json do item pelos ids do rascunho/mensagem, levando\n// embora o payload do pedido (marcadores, acao, chaveCobranca...). Aqui os dois sao casados.\n//\n// O pareamento e por indice contra a SAIDA 0 do Switch — e nao contra\n// $('Merge — rotas...').all()[i]. O Switch DIVIDE os itens entre as saidas, entao o indice\n// desta ramificacao nao corresponde ao indice no Merge: com um mix de acoes na mesma\n// execucao, a correlacao antiga devolvia o payload de OUTRA linha.\nconst pedidos = $('Switch — ação').all(0).map((i) => i.json);\n\nreturn $input.all().map((item, i) => {\n  const j = item.json || {};\n  const msg = j.message || {};\n  return { json: {\n    ...(pedidos[i] || {}),\n    draftId: j.id || null,\n    messageId: msg.id || j.id || null,\n    threadIdGmail: msg.threadId || j.threadId || null,\n  } };\n});"
+      }
+    },
+    {
+      "id": "casar-envio-pedido",
+      "name": "Casar resposta do Gmail (envio pedido)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5450,
+        250
+      ],
+      "parameters": {
+        "jsCode": "// A resposta do Gmail substitui o json do item pelos ids do rascunho/mensagem, levando\n// embora o payload do pedido (marcadores, acao, chaveCobranca...). Aqui os dois sao casados.\n//\n// O pareamento e por indice contra a SAIDA 1 do Switch — e nao contra\n// $('Merge — rotas...').all()[i]. O Switch DIVIDE os itens entre as saidas, entao o indice\n// desta ramificacao nao corresponde ao indice no Merge: com um mix de acoes na mesma\n// execucao, a correlacao antiga devolvia o payload de OUTRA linha.\nconst pedidos = $('Switch — ação').all(1).map((i) => i.json);\n\nreturn $input.all().map((item, i) => {\n  const j = item.json || {};\n  const msg = j.message || {};\n  return { json: {\n    ...(pedidos[i] || {}),\n    draftId: j.id || null,\n    messageId: msg.id || j.id || null,\n    threadIdGmail: msg.threadId || j.threadId || null,\n  } };\n});"
+      }
+    },
+    {
+      "id": "casar-cobranca-rascunho",
+      "name": "Casar resposta do Gmail (cobrança rascunho)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5450,
+        490
+      ],
+      "parameters": {
+        "jsCode": "// A resposta do Gmail substitui o json do item pelos ids do rascunho/mensagem, levando\n// embora o payload do pedido (marcadores, acao, chaveCobranca...). Aqui os dois sao casados.\n//\n// O pareamento e por indice contra a SAIDA 3 do Switch — e nao contra\n// $('Merge — rotas...').all()[i]. O Switch DIVIDE os itens entre as saidas, entao o indice\n// desta ramificacao nao corresponde ao indice no Merge: com um mix de acoes na mesma\n// execucao, a correlacao antiga devolvia o payload de OUTRA linha.\nconst pedidos = $('Switch — ação').all(3).map((i) => i.json);\n\nreturn $input.all().map((item, i) => {\n  const j = item.json || {};\n  const msg = j.message || {};\n  return { json: {\n    ...(pedidos[i] || {}),\n    draftId: j.id || null,\n    messageId: msg.id || j.id || null,\n    threadIdGmail: msg.threadId || j.threadId || null,\n  } };\n});"
+      }
+    },
+    {
+      "id": "casar-cobranca-envio",
+      "name": "Casar resposta do Gmail (cobrança envio)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5450,
+        570
+      ],
+      "parameters": {
+        "jsCode": "// A resposta do Gmail substitui o json do item pelos ids do rascunho/mensagem, levando\n// embora o payload do pedido (marcadores, acao, chaveCobranca...). Aqui os dois sao casados.\n//\n// O pareamento e por indice contra a SAIDA 4 do Switch — e nao contra\n// $('Merge — rotas...').all()[i]. O Switch DIVIDE os itens entre as saidas, entao o indice\n// desta ramificacao nao corresponde ao indice no Merge: com um mix de acoes na mesma\n// execucao, a correlacao antiga devolvia o payload de OUTRA linha.\nconst pedidos = $('Switch — ação').all(4).map((i) => i.json);\n\nreturn $input.all().map((item, i) => {\n  const j = item.json || {};\n  const msg = j.message || {};\n  return { json: {\n    ...(pedidos[i] || {}),\n    draftId: j.id || null,\n    messageId: msg.id || j.id || null,\n    threadIdGmail: msg.threadId || j.threadId || null,\n  } };\n});"
       }
     }
   ],
@@ -3489,7 +3541,7 @@
       "main": [
         [
           {
-            "node": "Gmail — Aplicar marcadores (rascunho pedido)",
+            "node": "Casar resposta do Gmail (rascunho pedido)",
             "type": "main",
             "index": 0
           }
@@ -3500,7 +3552,7 @@
       "main": [
         [
           {
-            "node": "Gmail — Aplicar marcadores (envio pedido)",
+            "node": "Casar resposta do Gmail (envio pedido)",
             "type": "main",
             "index": 0
           }
@@ -3511,7 +3563,7 @@
       "main": [
         [
           {
-            "node": "Gmail — Aplicar marcadores (cobrança rascunho)",
+            "node": "Casar resposta do Gmail (cobrança rascunho)",
             "type": "main",
             "index": 0
           }
@@ -3522,7 +3574,7 @@
       "main": [
         [
           {
-            "node": "Gmail — Aplicar marcadores (cobrança envio)",
+            "node": "Casar resposta do Gmail (cobrança envio)",
             "type": "main",
             "index": 0
           }
@@ -3940,6 +3992,50 @@
         [
           {
             "node": "Telegram — Escrita não confirmada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Casar resposta do Gmail (rascunho pedido)": {
+      "main": [
+        [
+          {
+            "node": "Gmail — Aplicar marcadores (rascunho pedido)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Casar resposta do Gmail (envio pedido)": {
+      "main": [
+        [
+          {
+            "node": "Gmail — Aplicar marcadores (envio pedido)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Casar resposta do Gmail (cobrança rascunho)": {
+      "main": [
+        [
+          {
+            "node": "Gmail — Aplicar marcadores (cobrança rascunho)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Casar resposta do Gmail (cobrança envio)": {
+      "main": [
+        [
+          {
+            "node": "Gmail — Aplicar marcadores (cobrança envio)",
             "type": "main",
             "index": 0
           }
