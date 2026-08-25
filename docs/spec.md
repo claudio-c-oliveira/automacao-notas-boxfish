@@ -252,17 +252,19 @@ No AREP, o "Ref." fica só "SMTC", sem sufixo — o restante da estrutura é o m
 Confirmado: o link no e-mail do Danilo também leva o mesmo grifo azul-claro usado na data de vencimento do e-mail de pedido — comparei com os prints ampliados enviados por Claudio.
 
 ### 3.5 Especificação técnica de formatação (cores exatas, fonte e emojis)
-Detalhamento técnico do modelo de e-mail (seções 3.2, 3.3, 3.4), com valores exatos extraídos por inspeção do HTML de um e-mail real de produção (thread Reunion/Gabriel Cabral, 21/08/2026) — refina "mesmo negrito, grifo amarelo, cor do aviso e emoji" (seção 3.3) com os códigos precisos que a automação deve replicar, inclusive em homologação (o e-mail de teste deve ser visualmente idêntico ao de produção, mudando apenas destinatário/credencial):
+Detalhamento técnico do modelo de e-mail (seções 3.2, 3.3, 3.4), com valores exatos extraídos por inspeção do HTML de e-mails reais de produção — refina "mesmo negrito, grifo amarelo, cor do aviso e emoji" (seção 3.3) com os códigos precisos que a automação deve replicar, inclusive em homologação (o e-mail de teste deve ser visualmente idêntico ao de produção, mudando apenas destinatário/credencial). **Fonte de referência oficial (25/08): thread Paulo Bento/Reunion** — confirmada por Claudio como o modelo padrão real, usada para resolver toda divergência pontual encontrada entre e-mails diferentes (ex.: cor da data, dois-pontos em rótulos, espaçamento):
 - **Fonte**: Verdana em todo o corpo do e-mail.
 - **Saudação (fixa, não varia por e-mail)**: "Olá [NOME]! Tudo bem?" seguido do emoji 😊.
 - **Fechamento (fixo, não varia por e-mail)**: emoji 🌷 (a palavra que acompanha — "Beijo", "Bjs", "Muito obrigada" — pode variar; o emoji não).
 - **Bloco "N- Emitir nota fiscal no valor de R$ X..."**: destaque (highlight) na cor exata `#FFE599`; o valor em R$ em negrito.
-- **"...que deverá ser enviada até o dia DD/MM"**: cor `#990000` (vermelho escuro), aplicada somente à data — o restante da frase sem cor especial.
+- **"...que deverá ser enviada até o dia DD/MM"**: cor `#cc0000` (vermelho vivo) e negrito, aplicados somente à data — o restante da frase sem cor/negrito especial.
 - **"vencimento em DD/MM/AAAA."**: trecho inteiro em negrito; destaque (highlight) azul-acinzentado `#CFE2F3` aplicado somente aos números da data.
-- **Negrito fixo**: "Tomador", "Serviço Prestado como:", "Colaborador:", "Período de", "Dados bancários:", "Chave pix:".
+- **Negrito fixo**: "Tomador", "Serviço Prestado como" (sem dois-pontos), "Colaborador:", "Período de", "Dados bancários:", "Chave pix:".
 - **"Importante: Peço a gentileza de enviar a sua nota nestes e-mails:"**: cor `#FF0000` (vermelho) e negrito.
 - **Parágrafo final** (dados bancários/ficha cadastral — texto já documentado nos modelos das seções 3.2.1/3.3/3.4): itálico, sem nenhum destaque/highlight.
-- **Espaçamento**: cada campo (Ref., Serviço Prestado como, Colaborador, Período de, Dados bancários, Chave pix) é um parágrafo `<p>` separado — não usa `line-height` de bloco único; há um parágrafo vazio extra entre "Período de" e "Dados bancários" (espaçamento adicional deliberado).
+- **Espaçamento**: cada campo (Ref., Serviço Prestado como, Colaborador, Período de, Dados bancários, Chave pix) é um parágrafo `<p>` separado, sequenciais, **sem nenhuma linha em branco extra entre eles** — o espaçamento vem só da margem padrão do `<p>`.
+- **Padrão de assunto**: usar sempre hífen com espaços ao redor — `SMTC - S01` (não `SMTC-S01`) — conforme já usado nos exemplos das seções 3.3/3.4/6.
+
 
 ## 4. Fase 2 — Recebimento e validação da nota
 - Monitorar e-mails recebidos com nota fiscal (ou recibo) anexada.
