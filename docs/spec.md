@@ -38,7 +38,7 @@ As Fases 3 e 4 acontecem juntas, não uma depois da outra — confirmado por Cla
     - Essa aba também tem uma legenda de cores (linha 3, coluna F) indicando o estágio do contrato (amarelo = em preparação, verde = assinado pela contratada, roxo = assinado por todas as partes, azul marinho = assinado e arquivado, etc.) — não faz parte do critério de liberação hoje (que usa só o texto "ASSINADO"), registrado aqui como referência caso a regra precise refinar por cor no futuro.
   - **ORDEM entre as duas checagens (Contratos vs. ficha cadastral no Gmail) — rodam em PARALELO, sem prioridade entre si**: não há uma checagem "primeiro" e outra "de fallback". As duas fontes são consultadas ao mesmo tempo, e a **primeira que retornar confirmação positiva** (seja o cruzamento com a planilha de Contratos encontrando "ASSINADO", seja a busca no Gmail encontrando a ficha cadastral respondida) já libera o fluxo — preenche a coluna N como "OK - ASSINADO" e segue para a criação do e-mail. Não é necessário esperar as duas terminarem nem tentar uma antes da outra.
 - 2º Filtrar Status Box = "PROGRAMAR ATÉ [data]" (texto exato). Se a checagem de contrato acima liberar → monta e programa o e-mail de pedido, informando prazo de envio até data+5 dias, e deixa em RASCUNHO no Gmail (modo MVP) ou envia direto (modo automático — ver seção 3.1.3). Status Box deste passo: ver regra de MVP abaixo.
-- 3º Filtrar Status Box = "SOLICITAR"/"SOLICITAR URG"/qualquer variante de "SOLICITAR". Mesma checagem de contrato do passo 1º se aplica aqui também. Se liberar → monta e-mail para envio imediato (RASCUNHO no MVP, envio direto no modo automático). Mesma regra de Status Box.
+- 3º Filtrar Status Box = "SOLICITAR"/"SOLICITAR URG"/qualquer variante de "SOLICITAR". Mesma checagem de contrato do passo 1º se aplica aqui também. Se liberar → monta e-mail para envio imediato (RASCUNHO no MVP, envio direto no modo automático). Mesma regra de Status Box. Dentro dessas variantes existe uma escala de urgência que define ordem de processamento, prefixo do assunto e comportamento de envio — detalhada na seção 3.1.4.
 - Quando o colaborador enviar a NF (pela thread original ou por e-mail avulso identificado — seção 4): Status Box = "RECEBIDA MI" + preenchimento das demais colunas correspondentes. Esta atualização é SEMPRE automática, inclusive no MVP.
 
 ### 3.1.1 Monitoramento e cobrança (a partir do dia "PROGRAMAR ATÉ")
@@ -91,6 +91,19 @@ Nova variável de ambiente **`MODO_EXECUCAO`**, além das já existentes de homo
 - `"rascunho"` (padrão do MVP atual): e-mails ficam em RASCUNHO no Gmail; Status Box dos pontos acima é manual.
 - `"automatico"`: quando Status Box = "SOLICITAR"/"SOLICITAR URG"/variantes → envia o e-mail direto (sem rascunho); quando Status Box = "PROGRAMAR ATÉ [data]" → programa a data de disparo do e-mail em vez de deixar em rascunho; Status Box dos pontos acima passa a ser 100% automático.
 - Alterável via comando no Telegram (ex.: `/modo automatico`), do mesmo jeito que o comando de apelidos (seção 6.1).
+
+### 3.1.4 Escala de urgência dentro de "SOLICITAR" (Status Box)
+O texto do Status Box (coluna L) para o filtro "SOLICITAR" (passo 3º, seção 3.1) varia — confirmado por Claudio, exemplos reais já vistos: `SOLICITAR URG`, `SOLICITAR MI`, `SOLICITAR`, `SOLICITAR / AGUARDAR DOCS`, entre outros. Cada variante corresponde a um nível de urgência numa escala de 0 (mais urgente) a 5 (menos urgente, mas ainda mais urgente que `PROGRAMAR ATÉ`):
+
+| Status Box | Escala | Prefixo no assunto | Comportamento de envio |
+|---|---|---|---|
+| `SOLICITAR URG` | 0 (máxima) | `URG \|` no início do assunto (seção 3.5) | Processado PRIMEIRO dentro da categoria SOLICITAR. Em modo automático, enviado direto. |
+| `SOLICITAR` ou `SOLICITAR <qualquer outro sufixo>` (exceto os dois casos acima/abaixo) | 1 | Nenhum | Processado logo após os de escala 0. Em modo automático, enviado direto. |
+| `SOLICITAR / AGUARDAR DOCS` | 5 | Nenhum | Processado por último dentro da categoria SOLICITAR. O e-mail SEMPRE fica em rascunho — mesmo em `MODO_EXECUCAO = automatico` e ambiente `produção` (única exceção à regra da seção 3.1.3/7.4). A Michelle envia manualmente. |
+
+Dentro da categoria de prioridade 1 ("SOLICITAR", seção 7.4), a ordem de processamento segue esta escala (0 → 1 → 5), antes de passar para a categoria 2 ("PROGRAMAR ATÉ"). Em ambiente `homolog`, independentemente da escala, o e-mail sempre fica em rascunho (regra de ambiente, seção 7.4) — isso não altera a escala em si, só o efeito final de envio.
+
+O Status Box `SOLICITADA MI` (seção 3.1.1) não faz parte desta escala — é um valor de outra natureza (marca que a solicitação já foi feita, usado no monitoramento de cobrança), e continua sujeito à regra manual da seção 3.1.3 enquanto a automação não for autorizada a escrevê-lo automaticamente.
 
 ### 3.2 Dados de origem e tipos de emissão
 Usar apenas as colunas: G (Vencimento), H (Fornecedor), J (Descrição), K (Valor a pagar), L (Status Box), R (E-mail do colaborador).
@@ -237,6 +250,19 @@ Mesma estrutura, só troca "REUNION" por "SOFT PRE" no assunto e no "Ref." — t
 
 No AREP, o "Ref." fica só "SMTC", sem sufixo — o restante da estrutura é o mesmo.
 Confirmado: o link no e-mail do Danilo também leva o mesmo grifo azul-claro usado na data de vencimento do e-mail de pedido — comparei com os prints ampliados enviados por Claudio.
+
+### 3.5 Especificação técnica de formatação (cores exatas, fonte e emojis)
+Detalhamento técnico do modelo de e-mail (seções 3.2, 3.3, 3.4), com valores exatos extraídos por inspeção do HTML de um e-mail real de produção (thread Reunion/Gabriel Cabral, 21/08/2026) — refina "mesmo negrito, grifo amarelo, cor do aviso e emoji" (seção 3.3) com os códigos precisos que a automação deve replicar, inclusive em homologação (o e-mail de teste deve ser visualmente idêntico ao de produção, mudando apenas destinatário/credencial):
+- **Fonte**: Verdana em todo o corpo do e-mail.
+- **Saudação (fixa, não varia por e-mail)**: "Olá [NOME]! Tudo bem?" seguido do emoji 😊.
+- **Fechamento (fixo, não varia por e-mail)**: emoji 🌷 (a palavra que acompanha — "Beijo", "Bjs", "Muito obrigada" — pode variar; o emoji não).
+- **Bloco "N- Emitir nota fiscal no valor de R$ X..."**: destaque (highlight) na cor exata `#FFE599`; o valor em R$ em negrito.
+- **"...que deverá ser enviada até o dia DD/MM"**: cor `#990000` (vermelho escuro), aplicada somente à data — o restante da frase sem cor especial.
+- **"vencimento em DD/MM/AAAA."**: trecho inteiro em negrito; destaque (highlight) azul-acinzentado `#CFE2F3` aplicado somente aos números da data.
+- **Negrito fixo**: "Tomador", "Serviço Prestado como:", "Colaborador:", "Período de", "Dados bancários:", "Chave pix:".
+- **"Importante: Peço a gentileza de enviar a sua nota nestes e-mails:"**: cor `#FF0000` (vermelho) e negrito.
+- **Parágrafo final** (dados bancários/ficha cadastral — texto já documentado nos modelos das seções 3.2.1/3.3/3.4): itálico, sem nenhum destaque/highlight.
+- **Espaçamento**: cada campo (Ref., Serviço Prestado como, Colaborador, Período de, Dados bancários, Chave pix) é um parágrafo `<p>` separado — não usa `line-height` de bloco único; há um parágrafo vazio extra entre "Período de" e "Dados bancários" (espaçamento adicional deliberado).
 
 ## 4. Fase 2 — Recebimento e validação da nota
 - Monitorar e-mails recebidos com nota fiscal (ou recibo) anexada.
@@ -462,7 +488,7 @@ Por serem independentes, existem 4 combinações possíveis:
 **Terceiro controle, independente dos dois eixos acima — limite de execução ("modo assistido")**: para acompanhar a validação em produção com mais controle, Claudio pode limitar quantas linhas são processadas numa única execução, em qualquer fase. Ex.: se o filtro "PROGRAMAR ATÉ" bater 20 linhas, mas o limite estiver setado em 5, o workflow processa só as 5 primeiras linhas dentro da ordem de prioridade abaixo (não simplesmente a ordem em que aparecem na planilha) e ignora o restante naquela execução — as demais entram na próxima.
 - Implementação: campo `limite_linhas_execucao` no `config_execucao.json` (número inteiro; `null` ou `0` = sem limite, processa tudo que bateu no filtro).
 - **Ordem de prioridade dentro do limite (Fase 1 — vale para homolog E produção)**: quando o limite corta o total de linhas, a seleção segue esta ordem, preenchendo o limite nesta sequência:
-  1. **SOLICITAR** (e variantes, ex. "SOLICITAR URG") — e-mails urgentes, disparo imediato. Nem sempre existem linhas nessa categoria.
+  1. **SOLICITAR** (e variantes) — e-mails urgentes, disparo imediato (exceto escala 5 — ver abaixo). Nem sempre existem linhas nessa categoria. Internamente, segue a escala de urgência da seção 3.1.4: escala 0 (`SOLICITAR URG`) primeiro, depois escala 1 (demais variantes de `SOLICITAR`), depois escala 5 (`SOLICITAR / AGUARDAR DOCS`, que sempre fica em rascunho).
   2. **PROGRAMAR ATÉ [data]** — e-mails programados pra disparar na data.
   3. **Monitoramento** (linhas já em `SOLICITADA MI`, checando se é hora de cobrar) — só entra na seleção se sobrar espaço no limite depois das categorias 1 e 2. Isso evita que, num teste com limite baixo, uma vaga seja "gasta" numa linha de monitoramento sem nenhuma ação real (ex.: linha marcada manualmente, sem entrada em `cobrancas.json` ainda), sobrando menos vagas pra testar a criação de pedidos novos de verdade.
   Dentro de uma mesma prioridade, vale a ordem em que as linhas aparecem na planilha (ordenação estável).
