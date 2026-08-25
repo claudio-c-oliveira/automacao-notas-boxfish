@@ -106,10 +106,10 @@ Dentro da categoria de prioridade 1 ("SOLICITAR", seção 7.4), a ordem de proce
 O Status Box `SOLICITADA MI` (seção 3.1.1) não faz parte desta escala — é um valor de outra natureza (marca que a solicitação já foi feita, usado no monitoramento de cobrança), e continua sujeito à regra manual da seção 3.1.3 enquanto a automação não for autorizada a escrevê-lo automaticamente.
 
 ### 3.1.5 Confirmação pós-escrita (segurança contra escrita na aba/linha/coluna errada)
-Toda escrita feita pela automação na planilha Cost (coluna N — Status do Contrato, seção 3.1; e qualquer outra escrita futura nas demais fases) deve ser seguida de uma releitura de confirmação, antes de prosseguir para o próximo passo (ex.: antes de criar o e-mail):
-- Reler exatamente a célula que acabou de ser escrita (mesma aba "Notas", mesma linha, mesma coluna).
-- Confirmar que o valor lido bate com o valor que deveria ter sido escrito.
-- Se não bater (aba errada, linha errada, valor diferente do esperado, ou erro de leitura): ABORTAR o processamento daquela linha imediatamente — não prosseguir para a criação do e-mail — e enviar alerta via Telegram para a Michelle/Claudio descrevendo o que foi tentado escrever, onde, e o que foi encontrado na releitura.
+Toda escrita feita pela automação na planilha Cost (coluna N — Status do Contrato, seção 3.1; e qualquer outra escrita futura nas demais fases) passa por DUAS camadas de verificação, complementares, antes de prosseguir para o próximo passo (ex.: antes de criar o e-mail):
+- **Camada 1 — em memória, logo após escrever, antes do upload**: reler a célula recém-escrita no workbook em memória (mesma aba "Notas", mesma linha, mesma coluna) e comparar com o valor esperado. Pega erros de aba/linha/coluna errada antes de subir o arquivo.
+- **Camada 2 — no arquivo salvo, após o upload**: reler o arquivo já persistido (Drive ou Box) e confirmar que o valor está lá. Pega falhas que a camada 1 não alcança (upload que não persistiu, arquivo sobrescrito no meio do caminho, etc.) — "verificar o efeito real após a escrita" só é garantido nesta camada.
+- **Se qualquer uma das duas camadas encontrar divergência**: como a escrita é uma única operação no arquivo cobrindo todas as linhas da execução, uma divergência torna o arquivo salvo não confiável como um todo — a automação ABORTA A EXECUÇÃO INTEIRA (não só a linha divergente), não cria nenhum e-mail, e envia alerta via Telegram descrevendo célula, valor esperado e valor encontrado para cada divergência.
 Esta é uma camada de segurança independente da causa do erro: ela não depende de prever todos os cenários possíveis de bug — verifica o efeito real após cada escrita, então continua protegendo mesmo diante de um cenário não mapeado em homologação.
 
 
@@ -636,6 +636,7 @@ NUNCA apagar o volume `n8n_data`.
 ## 9. Pendências e itens em aberto
 PENDENTE: Confirmar com teste real, na implementação, se o campo "lock" da API do Box reflete também o indicador de coautoria do Excel Online, ou só o lock manual.
 PENDENTE: Escopo de Recibos de Reembolso (RDP'S) — fora desta automação por enquanto, será tratado numa etapa futura separada.
+PENDENTE (verificado em 25/08): o workflow de Rollback via Telegram (seção 13.3) NÃO existe — nem publicado, nem no repositório. Além disso, o pré-requisito descrito na própria seção 13.3 ("cada execução registra um recibo das ações feitas": IDs de rascunho, caminhos antes/depois no Drive, versão da planilha antes da edição) também não existe — hoje só é gravado `threadId` (`cobrancas.json`) e um resumo agregado (`log_diario.json`). Rollback depende de construir esse recibo primeiro. Tratado como item de backlog, a priorizar antes da liberação para produção — não bloqueia os testes atuais em homologação.
 
 ## 10. Regras resolvidas nesta rodada
 - Identificar de qual colaborador é uma nota quando o remetente do e-mail não é óbvio (Fase 2): abrir a nota fiscal em anexo, extrair dela o nome do colaborador, a razão social e o projeto (Ref.), e usar essas informações para localizar a linha correspondente na aba Notas.
