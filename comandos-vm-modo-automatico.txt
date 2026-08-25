@@ -1,0 +1,43 @@
+================================================================================
+TROCAR O MODO_EXECUCAO PARA "automatico" (o comando /modo do Telegram NAO existe)
+================================================================================
+O comando /modo automatico ainda nao foi implementado — nem o /apelido. O unico
+comando de Telegram que existe hoje e o /resumo (workflow resumo_diario), e ele
+tambem ainda nao esta publicado na instancia.
+
+Ate existir, a troca e editando o arquivo direto no host. Cole UM comando por vez.
+
+--------------------------------------------------------------------------------
+TROCAR PARA AUTOMATICO
+--------------------------------------------------------------------------------
+sudo sed -i 's/"modo": "rascunho"/"modo": "automatico"/' /opt/box-fish-config/config_execucao.json
+
+sudo cat /opt/box-fish-config/config_execucao.json
+
+  Esperado:
+    "ambiente": "homolog",
+    "modo": "automatico",
+    "limite_linhas_execucao": 5,
+
+  Nao precisa reiniciar o container: o workflow le o arquivo a cada execucao.
+
+--------------------------------------------------------------------------------
+VOLTAR PARA RASCUNHO (depois do teste)
+--------------------------------------------------------------------------------
+sudo sed -i 's/"modo": "automatico"/"modo": "rascunho"/' /opt/box-fish-config/config_execucao.json
+
+--------------------------------------------------------------------------------
+SE PREFERIR EDITAR A MAO
+--------------------------------------------------------------------------------
+sudo nano /opt/box-fish-config/config_execucao.json
+
+  (trocar a linha "modo" e salvar com Ctrl+O, Enter, Ctrl+X)
+
+--------------------------------------------------------------------------------
+O QUE ESPERAR EM homolog + automatico
+--------------------------------------------------------------------------------
+- E-mail ENVIADO de verdade (nao rascunho), para o endereco de teste
+  grandesnegocioseoportunidades+colaborador@gmail.com — nunca para o colaborador real.
+- Status Box (coluna L) atualizado automaticamente para "SOLICITADA MI".
+- Excecao: linhas com Status Box "SOLICITAR / AGUARDAR DOCS" (escala 5) continuam em
+  RASCUNHO mesmo em automatico — e a unica excecao do sistema (spec 3.1.4).
