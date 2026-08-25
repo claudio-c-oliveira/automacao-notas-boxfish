@@ -105,7 +105,14 @@ Dentro da categoria de prioridade 1 ("SOLICITAR", seção 7.4), a ordem de proce
 
 O Status Box `SOLICITADA MI` (seção 3.1.1) não faz parte desta escala — é um valor de outra natureza (marca que a solicitação já foi feita, usado no monitoramento de cobrança), e continua sujeito à regra manual da seção 3.1.3 enquanto a automação não for autorizada a escrevê-lo automaticamente.
 
-### 3.2 Dados de origem e tipos de emissão
+### 3.1.5 Confirmação pós-escrita (segurança contra escrita na aba/linha/coluna errada)
+Toda escrita feita pela automação na planilha Cost (coluna N — Status do Contrato, seção 3.1; e qualquer outra escrita futura nas demais fases) deve ser seguida de uma releitura de confirmação, antes de prosseguir para o próximo passo (ex.: antes de criar o e-mail):
+- Reler exatamente a célula que acabou de ser escrita (mesma aba "Notas", mesma linha, mesma coluna).
+- Confirmar que o valor lido bate com o valor que deveria ter sido escrito.
+- Se não bater (aba errada, linha errada, valor diferente do esperado, ou erro de leitura): ABORTAR o processamento daquela linha imediatamente — não prosseguir para a criação do e-mail — e enviar alerta via Telegram para a Michelle/Claudio descrevendo o que foi tentado escrever, onde, e o que foi encontrado na releitura.
+Esta é uma camada de segurança independente da causa do erro: ela não depende de prever todos os cenários possíveis de bug — verifica o efeito real após cada escrita, então continua protegendo mesmo diante de um cenário não mapeado em homologação.
+
+
 Usar apenas as colunas: G (Vencimento), H (Fornecedor), J (Descrição), K (Valor a pagar), L (Status Box), R (E-mail do colaborador).
 A coluna J se separa em 3 partes: [CARGO] - [NOME DO COLABORADOR] - [DE "DATA" A "DATA"]. O nome vem daqui; se não achar, cai para a coluna H (Fornecedor).
 
