@@ -117,6 +117,10 @@ Toda escrita feita pela automação na planilha Cost (coluna N — Status do Con
 - **Se qualquer uma das duas camadas encontrar divergência**: como a escrita é uma única operação no arquivo cobrindo todas as linhas da execução, uma divergência torna o arquivo salvo não confiável como um todo — a automação ABORTA A EXECUÇÃO INTEIRA (não só a linha divergente), não cria nenhum e-mail, e envia alerta via Telegram descrevendo célula, valor esperado e valor encontrado para cada divergência.
 Esta é uma camada de segurança independente da causa do erro: ela não depende de prever todos os cenários possíveis de bug — verifica o efeito real após cada escrita, então continua protegendo mesmo diante de um cenário não mapeado em homologação.
 
+**Duas escritas distintas, duas posições distintas no fluxo — não confundir:**
+- **Coluna N (Status do Contrato)**: escrita ANTES da criação do e-mail, com as duas camadas de verificação acima. É pré-requisito para o e-mail sair com o Ref./assunto corretos (seção 3.1).
+- **Coluna L (Status Box, ex. "SOLICITADA MI")**: escrita **SOMENTE DEPOIS** do envio do e-mail ser confirmado com sucesso (em `MODO_EXECUCAO = automatico`). NUNCA antes. Se a coluna L fosse escrita antes e o envio falhasse depois, a planilha afirmaria que a nota foi solicitada sem que nenhum e-mail tenha realmente saído — confundindo quem acompanha a planilha (ex.: alguém vendo "SOLICITADA MI" e procurando um e-mail que nunca foi disparado). Esta regra já existia na seção 3.1 antes da 3.1.5 e continua valendo integralmente: a reordenação da gravação para antes do e-mail (motivada pela 3.1.5) se aplica apenas à coluna N, nunca à coluna L.
+
 
 Usar apenas as colunas: G (Vencimento), H (Fornecedor), J (Descrição), K (Valor a pagar), L (Status Box), R (E-mail do colaborador).
 A coluna J se separa em 3 partes: [CARGO] - [NOME DO COLABORADOR] - [DE "DATA" A "DATA"]. O nome vem daqui; se não achar, cai para a coluna H (Fornecedor).
