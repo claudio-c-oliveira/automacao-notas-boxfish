@@ -2019,7 +2019,7 @@
         740
       ],
       "parameters": {
-        "jsCode": "// Confirmação pós-escrita (spec 3.1.5). Relê o arquivo COMO ELE FICOU SALVO — não o\n// workbook em memória — e confere cada célula que a automação diz ter escrito.\n//\n// A verificação em memória (no node \"Aplicar mudanças\") continua valendo: ela pega aba ou\n// linha erradas antes de subir. Esta aqui pega o que aquela não alcança: upload que\n// responde OK sem persistir, upload no arquivo errado, ou versão sobrescrita no meio.\nconst ExcelJS = require('exceljs');\n\nconst contexto = $('Aplicar mudanças (exceljs) e preparar upload').first().json;\nconst mudancas = $('Preparar gravação da planilha').first().json;\nconst esperados = []\n  .concat((mudancas.mudancasColunaN || []).map((m) => ({ celula: 'N' + m.linha, valor: m.valor })))\n  .concat((mudancas.mudancasColunaL || []).map((m) => ({ celula: 'L' + m.linha, valor: m.valor })));\n\nconst buffer = await this.helpers.getBinaryDataBuffer(0, 'data');\nconst wb = new ExcelJS.Workbook();\nawait wb.xlsx.load(buffer);\nconst ws = wb.worksheets.find((w) => String(w.name).trim().toUpperCase() === 'NOTAS');\n\nconst divergencias = [];\nif (!ws) {\n  divergencias.push('aba \"NOTAS\" nao existe no arquivo relido (abas: ' + wb.worksheets.map((w) => w.name).join(', ') + ')');\n} else {\n  for (const e of esperados) {\n    const bruto = ws.getCell(e.celula).value;\n    const lido = bruto === null || bruto === undefined ? '' : String(bruto).trim();\n    if (lido !== String(e.valor).trim()) {\n      divergencias.push(e.celula + ': tentou gravar \"' + e.valor + '\", releitura encontrou \"' + (lido || '(vazio)') + '\"');\n    }\n  }\n}\n\nconst confirmado = divergencias.length === 0;\nconst textoAlerta = confirmado ? null : [\n  '🚨 Escrita na planilha NAO confirmada — processamento abortado',\n  '',\n  'Nenhum e-mail foi criado nesta execução.',\n  'Arquivo: ' + (contexto.fileIdHomolog || contexto.fileIdBox || '(id desconhecido)'),\n  'Aba: NOTAS',\n  '',\n  'Divergências (' + divergencias.length + '):',\n].concat(divergencias.map((d) => '• ' + d)).join('\\n');\n\nreturn [{ json: { confirmado, divergencias, celulasConferidas: esperados.length, textoAlerta } }];"
+        "jsCode": "// Confirmação pós-escrita (spec 3.1.5). Relê o arquivo COMO ELE FICOU SALVO — não o\n// workbook em memória — e confere cada célula que a automação diz ter escrito.\n//\n// A verificação em memória (no node \"Aplicar mudanças\") continua valendo: ela pega aba ou\n// linha erradas antes de subir. Esta aqui pega o que aquela não alcança: upload que\n// responde OK sem persistir, upload no arquivo errado, ou versão sobrescrita no meio.\nconst ExcelJS = require('exceljs');\n\nconst contexto = $('Aplicar mudanças (exceljs) e preparar upload').first().json;\nconst mudancas = $('Preparar gravação da planilha').first().json;\nconst esperados = []\n  .concat((mudancas.mudancasColunaN || []).map((m) => ({ celula: 'N' + m.linha, valor: m.valor })))\n  .concat((mudancas.mudancasColunaL || []).map((m) => ({ celula: 'L' + m.linha, valor: m.valor })));\n\nconst buffer = await this.helpers.getBinaryDataBuffer(0, 'data');\nconst wb = new ExcelJS.Workbook();\nawait wb.xlsx.load(buffer);\nconst ws = wb.worksheets.find((w) => String(w.name).trim().toUpperCase() === 'NOTAS');\n\nconst divergencias = [];\nif (!ws) {\n  divergencias.push('aba \"NOTAS\" nao existe no arquivo relido (abas: ' + wb.worksheets.map((w) => w.name).join(', ') + ')');\n} else {\n  for (const e of esperados) {\n    const bruto = ws.getCell(e.celula).value;\n    const lido = bruto === null || bruto === undefined ? '' : String(bruto).trim();\n    if (lido !== String(e.valor).trim()) {\n      divergencias.push(e.celula + ': tentou gravar \"' + e.valor + '\", releitura encontrou \"' + (lido || '(vazio)') + '\"');\n    }\n  }\n}\n\nconst confirmado = divergencias.length === 0;\n\n// O texto do alerta é montado depois, por ambiente: em produção ele precisa dizer se a\n// reversão para a versão anterior deu certo; em homolog, que NÃO há reversão automática.\nreturn [{ json: {\n  confirmado,\n  divergencias,\n  celulasConferidas: esperados.length,\n  arquivoId: contexto.fileIdHomolog || contexto.fileIdBox || '(id desconhecido)',\n} }];"
       }
     },
     {
@@ -2071,6 +2071,19 @@
           "id": "cred-telegram-account",
           "name": "Telegram account"
         }
+      }
+    },
+    {
+      "id": "alerta-homolog",
+      "name": "Montar alerta — sem reversão (homolog)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4820,
+        920
+      ],
+      "parameters": {
+        "jsCode": "const d = $('Confirmar escrita na planilha').first().json;\nconst linhas = (d.divergencias || []).map((x) => '• ' + x);\n\n// Homologação (Drive): sem reversão automática, por decisão do Claudio. O alerta precisa\n// deixar explícito que o arquivo FICOU com a escrita não confirmada.\nconst texto = [\n  '🚨 Escrita na planilha NAO confirmada — processamento abortado',\n  '',\n  'Nenhum e-mail foi criado nesta execução.',\n  'Ambiente: homologação (Drive)',\n  'Arquivo: ' + d.arquivoId,\n  'Aba: NOTAS',\n  '',\n  '⚠️ O ARQUIVO FICOU COM A ESCRITA NAO CONFIRMADA DENTRO DELE.',\n  'Não há reversão automática neste ambiente — precisa de correção manual.',\n  '',\n  'Divergências (' + linhas.length + '):',\n].concat(linhas).join('\\n');\n\nreturn [{ json: { textoAlerta: texto } }];"
       }
     }
   ],
@@ -3182,6 +3195,17 @@
             "index": 0
           }
         ],
+        [
+          {
+            "node": "Montar alerta — sem reversão (homolog)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Montar alerta — sem reversão (homolog)": {
+      "main": [
         [
           {
             "node": "Telegram — Escrita não confirmada",

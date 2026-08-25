@@ -105,20 +105,26 @@ function removerInalcancaveis(wf) {
     n.type === 'n8n-nodes-base.manualTrigger' ||
     n.type === 'n8n-nodes-base.executeWorkflowTrigger';
 
-  const alcancados = new Set(wf.nodes.filter(ehTrigger).map((n) => n.name));
-  // Nodes lidos só por referência ($('...')) não têm aresta de entrada; preserva-os.
-  const referenciadosPorCodigo = new Set();
-  for (const n of wf.nodes) {
+  const porNome = new Map(wf.nodes.map((n) => [n.name, n]));
+  const refsDe = (n) => {
     const code = (n.parameters && n.parameters.jsCode) || '';
-    for (const m of code.matchAll(/\$\('([^']+)'\)/g)) referenciadosPorCodigo.add(m[1]);
-  }
+    return [...code.matchAll(/\$\('([^']+)'\)/g)].map((m) => m[1]);
+  };
 
+  // Ponto fixo a partir dos triggers, propagando por arestas E por referência $('...').
+  //
+  // A referência SÓ conta se vier de um node que sobrevive. Antes as referências eram
+  // coletadas de TODOS os nodes, inclusive dos que seriam removidos — então um node do Box
+  // citado apenas pelo ramo de produção sobrevivia no arquivo de HOMOLOG, órfão e levando
+  // junto a credencial do Box. Isso furava a garantia de que o arquivo de homolog é
+  // estruturalmente incapaz de tocar em produção.
+  const alcancados = new Set(wf.nodes.filter(ehTrigger).map((n) => n.name));
   let mudou = true;
   while (mudou) {
     mudou = false;
-    for (const [src, spec] of Object.entries(wf.connections)) {
-      if (!alcancados.has(src)) continue;
-      for (const saida of spec.main || []) {
+    for (const nome of [...alcancados]) {
+      const spec = wf.connections[nome];
+      for (const saida of (spec && spec.main) || []) {
         for (const e of saida) {
           if (!alcancados.has(e.node)) {
             alcancados.add(e.node);
@@ -126,10 +132,18 @@ function removerInalcancaveis(wf) {
           }
         }
       }
+      const n = porNome.get(nome);
+      if (!n) continue;
+      for (const ref of refsDe(n)) {
+        if (porNome.has(ref) && !alcancados.has(ref)) {
+          alcancados.add(ref);
+          mudou = true;
+        }
+      }
     }
   }
 
-  const removidos = wf.nodes.filter((n) => !alcancados.has(n.name) && !referenciadosPorCodigo.has(n.name));
+  const removidos = wf.nodes.filter((n) => !alcancados.has(n.name));
   const nomesRemovidos = new Set(removidos.map((n) => n.name));
   wf.nodes = wf.nodes.filter((n) => !nomesRemovidos.has(n.name));
   for (const nome of nomesRemovidos) delete wf.connections[nome];

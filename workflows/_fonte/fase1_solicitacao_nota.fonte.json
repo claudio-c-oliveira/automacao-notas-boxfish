@@ -2327,7 +2327,7 @@
         740
       ],
       "parameters": {
-        "jsCode": "// Confirmação pós-escrita (spec 3.1.5). Relê o arquivo COMO ELE FICOU SALVO — não o\n// workbook em memória — e confere cada célula que a automação diz ter escrito.\n//\n// A verificação em memória (no node \"Aplicar mudanças\") continua valendo: ela pega aba ou\n// linha erradas antes de subir. Esta aqui pega o que aquela não alcança: upload que\n// responde OK sem persistir, upload no arquivo errado, ou versão sobrescrita no meio.\nconst ExcelJS = require('exceljs');\n\nconst contexto = $('Aplicar mudanças (exceljs) e preparar upload').first().json;\nconst mudancas = $('Preparar gravação da planilha').first().json;\nconst esperados = []\n  .concat((mudancas.mudancasColunaN || []).map((m) => ({ celula: 'N' + m.linha, valor: m.valor })))\n  .concat((mudancas.mudancasColunaL || []).map((m) => ({ celula: 'L' + m.linha, valor: m.valor })));\n\nconst buffer = await this.helpers.getBinaryDataBuffer(0, 'data');\nconst wb = new ExcelJS.Workbook();\nawait wb.xlsx.load(buffer);\nconst ws = wb.worksheets.find((w) => String(w.name).trim().toUpperCase() === 'NOTAS');\n\nconst divergencias = [];\nif (!ws) {\n  divergencias.push('aba \"NOTAS\" nao existe no arquivo relido (abas: ' + wb.worksheets.map((w) => w.name).join(', ') + ')');\n} else {\n  for (const e of esperados) {\n    const bruto = ws.getCell(e.celula).value;\n    const lido = bruto === null || bruto === undefined ? '' : String(bruto).trim();\n    if (lido !== String(e.valor).trim()) {\n      divergencias.push(e.celula + ': tentou gravar \"' + e.valor + '\", releitura encontrou \"' + (lido || '(vazio)') + '\"');\n    }\n  }\n}\n\nconst confirmado = divergencias.length === 0;\nconst textoAlerta = confirmado ? null : [\n  '🚨 Escrita na planilha NAO confirmada — processamento abortado',\n  '',\n  'Nenhum e-mail foi criado nesta execução.',\n  'Arquivo: ' + (contexto.fileIdHomolog || contexto.fileIdBox || '(id desconhecido)'),\n  'Aba: NOTAS',\n  '',\n  'Divergências (' + divergencias.length + '):',\n].concat(divergencias.map((d) => '• ' + d)).join('\\n');\n\nreturn [{ json: { confirmado, divergencias, celulasConferidas: esperados.length, textoAlerta } }];"
+        "jsCode": "// Confirmação pós-escrita (spec 3.1.5). Relê o arquivo COMO ELE FICOU SALVO — não o\n// workbook em memória — e confere cada célula que a automação diz ter escrito.\n//\n// A verificação em memória (no node \"Aplicar mudanças\") continua valendo: ela pega aba ou\n// linha erradas antes de subir. Esta aqui pega o que aquela não alcança: upload que\n// responde OK sem persistir, upload no arquivo errado, ou versão sobrescrita no meio.\nconst ExcelJS = require('exceljs');\n\nconst contexto = $('Aplicar mudanças (exceljs) e preparar upload').first().json;\nconst mudancas = $('Preparar gravação da planilha').first().json;\nconst esperados = []\n  .concat((mudancas.mudancasColunaN || []).map((m) => ({ celula: 'N' + m.linha, valor: m.valor })))\n  .concat((mudancas.mudancasColunaL || []).map((m) => ({ celula: 'L' + m.linha, valor: m.valor })));\n\nconst buffer = await this.helpers.getBinaryDataBuffer(0, 'data');\nconst wb = new ExcelJS.Workbook();\nawait wb.xlsx.load(buffer);\nconst ws = wb.worksheets.find((w) => String(w.name).trim().toUpperCase() === 'NOTAS');\n\nconst divergencias = [];\nif (!ws) {\n  divergencias.push('aba \"NOTAS\" nao existe no arquivo relido (abas: ' + wb.worksheets.map((w) => w.name).join(', ') + ')');\n} else {\n  for (const e of esperados) {\n    const bruto = ws.getCell(e.celula).value;\n    const lido = bruto === null || bruto === undefined ? '' : String(bruto).trim();\n    if (lido !== String(e.valor).trim()) {\n      divergencias.push(e.celula + ': tentou gravar \"' + e.valor + '\", releitura encontrou \"' + (lido || '(vazio)') + '\"');\n    }\n  }\n}\n\nconst confirmado = divergencias.length === 0;\n\n// O texto do alerta é montado depois, por ambiente: em produção ele precisa dizer se a\n// reversão para a versão anterior deu certo; em homolog, que NÃO há reversão automática.\nreturn [{ json: {\n  confirmado,\n  divergencias,\n  celulasConferidas: esperados.length,\n  arquivoId: contexto.fileIdHomolog || contexto.fileIdBox || '(id desconhecido)',\n} }];"
       }
     },
     {
@@ -2379,6 +2379,121 @@
           "id": "cred-telegram-account",
           "name": "Telegram account"
         }
+      }
+    },
+    {
+      "id": "box-guardar-versao",
+      "name": "Box — Guardar versão anterior",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        6540,
+        340
+      ],
+      "parameters": {
+        "url": "=https://api.box.com/2.0/files/{{ $('Resolver arquivo-alvo da escrita').first().json.fileId }}?fields=name,version_number,file_version",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "boxOAuth2Api",
+        "options": {}
+      },
+      "credentials": {
+        "boxOAuth2Api": {
+          "id": "cred-box-account",
+          "name": "Box account"
+        }
+      }
+    },
+    {
+      "id": "if-amb-reversao",
+      "name": "IF — Ambiente = homolog? (reversão)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        4640,
+        1000
+      ],
+      "__ifAmbiente": {
+        "saida0": "homolog",
+        "saida1": "producao"
+      },
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $('Aplicar mudanças (exceljs) e preparar upload').first().json.ambiente }}",
+              "rightValue": "homolog",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "alerta-homolog",
+      "name": "Montar alerta — sem reversão (homolog)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4820,
+        920
+      ],
+      "parameters": {
+        "jsCode": "const d = $('Confirmar escrita na planilha').first().json;\nconst linhas = (d.divergencias || []).map((x) => '• ' + x);\n\n// Homologação (Drive): sem reversão automática, por decisão do Claudio. O alerta precisa\n// deixar explícito que o arquivo FICOU com a escrita não confirmada.\nconst texto = [\n  '🚨 Escrita na planilha NAO confirmada — processamento abortado',\n  '',\n  'Nenhum e-mail foi criado nesta execução.',\n  'Ambiente: homologação (Drive)',\n  'Arquivo: ' + d.arquivoId,\n  'Aba: NOTAS',\n  '',\n  '⚠️ O ARQUIVO FICOU COM A ESCRITA NAO CONFIRMADA DENTRO DELE.',\n  'Não há reversão automática neste ambiente — precisa de correção manual.',\n  '',\n  'Divergências (' + linhas.length + '):',\n].concat(linhas).join('\\n');\n\nreturn [{ json: { textoAlerta: texto } }];"
+      }
+    },
+    {
+      "id": "box-restaurar",
+      "name": "Box — Restaurar versão anterior",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4640,
+        1140
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.box.com/2.0/files/{{ $('Resolver arquivo-alvo da escrita').first().json.fileId }}/versions/current",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "boxOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ type: 'file_version', id: $('Box — Guardar versão anterior').first().json.file_version.id }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "credentials": {
+        "boxOAuth2Api": {
+          "id": "cred-box-account",
+          "name": "Box account"
+        }
+      }
+    },
+    {
+      "id": "alerta-producao",
+      "name": "Montar alerta — pós-reversão (produção)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4820,
+        1140
+      ],
+      "parameters": {
+        "jsCode": "const d = $('Confirmar escrita na planilha').first().json;\nconst linhas = (d.divergencias || []).map((x) => '• ' + x);\n\n// Produção (Box): a versão anterior foi promovida de volta antes deste alerta. O node de\n// restauração usa neverError, então o resultado vem no corpo e é reportado aqui — se a\n// reversão falhar, o alerta diz isso em vez de dar a impressão de que o arquivo está limpo.\nconst resp = $input.first().json || {};\nconst status = resp.statusCode;\nconst corpo = resp.body || resp;\nconst reverteu = status >= 200 && status < 300;\nconst versao = $('Box — Guardar versão anterior').first().json;\nconst idVersao = (versao && versao.file_version && versao.file_version.id) || '(desconhecida)';\n\nconst texto = [\n  '🚨 Escrita na planilha NAO confirmada — processamento abortado',\n  '',\n  'Nenhum e-mail foi criado nesta execução.',\n  'Ambiente: produção (Box)',\n  'Arquivo: ' + d.arquivoId,\n  'Aba: NOTAS',\n  '',\n  reverteu\n    ? '✅ Arquivo REVERTIDO para a versão anterior (' + idVersao + ').'\n    : '⚠️ FALHOU a reversão automática (HTTP ' + status + ' ' + ((corpo && corpo.message) || '') + '). O arquivo pode ter ficado com a escrita não confirmada — conferir manualmente.',\n  '',\n  'Divergências (' + linhas.length + '):',\n].concat(linhas).join('\\n');\n\nreturn [{ json: { textoAlerta: texto } }];"
       }
     }
   ],
@@ -2848,7 +2963,7 @@
       "main": [
         [
           {
-            "node": "Box — Reler (pós-lock)",
+            "node": "Box — Guardar versão anterior",
             "type": "main",
             "index": 0
           }
@@ -3644,6 +3759,68 @@
             "index": 0
           }
         ],
+        [
+          {
+            "node": "IF — Ambiente = homolog? (reversão)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Box — Guardar versão anterior": {
+      "main": [
+        [
+          {
+            "node": "Box — Reler (pós-lock)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — Ambiente = homolog? (reversão)": {
+      "main": [
+        [
+          {
+            "node": "Montar alerta — sem reversão (homolog)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Box — Restaurar versão anterior",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Montar alerta — sem reversão (homolog)": {
+      "main": [
+        [
+          {
+            "node": "Telegram — Escrita não confirmada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Box — Restaurar versão anterior": {
+      "main": [
+        [
+          {
+            "node": "Montar alerta — pós-reversão (produção)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Montar alerta — pós-reversão (produção)": {
+      "main": [
         [
           {
             "node": "Telegram — Escrita não confirmada",
