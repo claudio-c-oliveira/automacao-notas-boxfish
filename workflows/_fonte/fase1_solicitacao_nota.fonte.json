@@ -766,7 +766,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Aplica as mudanças de coluna N e L em memória (exceljs) e prepara o binário pra upload.\n// Preserva ambiente + fileId no output pra o node seguinte decidir Drive vs Box.\n// Leitura de binário: esta instância do n8n guarda binário no disco (filesystem-v2),\n// então item.binary.data.data NÃO é o conteúdo, e sim o rótulo do modo de armazenamento.\n// O único acesso liberado no Code Node é helpers.getBinaryDataBuffer, que lê pelo ÍNDICE\n// do item no input DIRETO — daí localizarmos o item pelo id do binário. Cobre os 2 modos.\nconst helpers = this.helpers;\nconst entradasDoNode = $input.all();\nasync function bufferDe(item, prop) {\n  prop = prop || 'data';\n  const b = item && item.binary && item.binary[prop];\n  if (!b) return null;\n  if (!b.id) return Buffer.from(b.data, 'base64'); // modo embutido\n  const i = entradasDoNode.findIndex((e) => e.binary && e.binary[prop] && e.binary[prop].id === b.id);\n  if (i < 0) throw new Error('binario \"' + (b.fileName || prop) + '\" nao esta no input direto deste node — o Code Node so consegue le-lo por ai');\n  return await helpers.getBinaryDataBuffer(i, prop);\n}\n\nconst ExcelJS = require('exceljs');\n\n// As mudanças vêm de \"Preparar gravação da planilha\", que roda ANTES da escrita.\n// Antes isto lia de \"Consolidar mudanças e cobrancas.json\" — e ficou obsoleto quando a\n// gravação foi movida pra antes da criação do e-mail: aquele node passou a rodar no FIM do\n// fluxo, depois do Gmail, e a leitura estourava com \"hasn't been executed\". O node existe e\n// é alcançável; o problema era a ORDEM.\nconst consolidado = $('Preparar gravação da planilha').first().json;\nconst mudancasN = consolidado.mudancasColunaN || [];\nconst mudancasL = consolidado.mudancasColunaL || [];\nconst contexto = $('Resolver arquivo-alvo da escrita').first().json;\n\n// Nao citamos aqui o node de escolha do arquivo de homolog: ele so existe no arquivo de\n// homologacao, e a citacao ficava pendurada no de producao — funcionava por acidente, presa\n// a um try/catch. Quem precisa do id do arquivo do Drive e o proprio node de upload de\n// homolog, que le direto da fonte e so existe naquele ambiente.\n\nconst item = $input.first();\nconst buffer = await bufferDe(item);\nconst wb = new ExcelJS.Workbook();\nawait wb.xlsx.load(buffer);\n// A aba chama-se \"NOTAS\". getWorksheet() do exceljs e SENSIVEL A MAIUSCULAS, e o\n// fallback silencioso \"|| wb.worksheets[0]\" mandava a escrita pra \"DETALHADO MÃE\" — foi\n// o que aconteceu na execucao 86: os \"OK - ASSINADO\" foram parar na aba errada, nas\n// mesmas linhas 293/404/631. Mesmo bug que ja tinha sido corrigido no node de LEITURA e\n// que passou batido aqui. Sem fallback: se a aba nao existir, estoura.\nconst ws = wb.worksheets.find((w) => String(w.name).trim().toUpperCase() === 'NOTAS');\nif (!ws) {\n  throw new Error('aba \"NOTAS\" nao encontrada no arquivo-alvo. Abas: ' + wb.worksheets.map((w) => w.name).join(', '));\n}\n\nfor (const m of mudancasN) {\n  ws.getCell('N' + m.linha).value = m.valor;\n}\nfor (const m of mudancasL) {\n  ws.getCell('L' + m.linha).value = m.valor;\n}\n\n// Confere celula a celula que o valor entrou onde devia, na aba certa. Uma escrita em\n// aba/linha errada volta a passar despercebida sem isto.\nconst divergentes = [];\nfor (const m of mudancasN) {\n  const lido = ws.getCell('N' + m.linha).value;\n  if (String(lido === null || lido === undefined ? '' : lido).trim() !== String(m.valor).trim()) {\n    divergentes.push('N' + m.linha + ' esperava \"' + m.valor + '\" e ficou \"' + lido + '\"');\n  }\n}\nfor (const m of mudancasL) {\n  const lido = ws.getCell('L' + m.linha).value;\n  if (String(lido === null || lido === undefined ? '' : lido).trim() !== String(m.valor).trim()) {\n    divergentes.push('L' + m.linha + ' esperava \"' + m.valor + '\" e ficou \"' + lido + '\"');\n  }\n}\nif (divergentes.length) {\n  throw new Error('gravacao na aba NOTAS nao conferiu: ' + divergentes.join('; '));\n}\n\nconst novoBuffer = await wb.xlsx.writeBuffer();\nreturn [{\n  json: { ambiente: contexto.config.ambiente, fileIdBox: contexto.fileId, nomeArquivo: contexto.nomeArquivoHomolog },\n  binary: { data: { data: Buffer.from(novoBuffer).toString('base64'), mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', fileName: 'cost_report_atualizado.xlsx' } },\n}];"
+        "jsCode": "// Aplica as mudanças de coluna N e L em memória (exceljs) e prepara o binário pra upload.\n// Preserva ambiente + fileId no output pra o node seguinte decidir Drive vs Box.\n// Leitura de binário: esta instância do n8n guarda binário no disco (filesystem-v2),\n// então item.binary.data.data NÃO é o conteúdo, e sim o rótulo do modo de armazenamento.\n// O único acesso liberado no Code Node é helpers.getBinaryDataBuffer, que lê pelo ÍNDICE\n// do item no input DIRETO — daí localizarmos o item pelo id do binário. Cobre os 2 modos.\nconst helpers = this.helpers;\nconst entradasDoNode = $input.all();\nasync function bufferDe(item, prop) {\n  prop = prop || 'data';\n  const b = item && item.binary && item.binary[prop];\n  if (!b) return null;\n  if (!b.id) return Buffer.from(b.data, 'base64'); // modo embutido\n  const i = entradasDoNode.findIndex((e) => e.binary && e.binary[prop] && e.binary[prop].id === b.id);\n  if (i < 0) throw new Error('binario \"' + (b.fileName || prop) + '\" nao esta no input direto deste node — o Code Node so consegue le-lo por ai');\n  return await helpers.getBinaryDataBuffer(i, prop);\n}\n\nconst ExcelJS = require('exceljs');\n\n// As mudanças vêm de \"Preparar gravação da coluna N\", que roda ANTES da escrita.\n// Antes isto lia de \"Consolidar mudanças e cobrancas.json\" — e ficou obsoleto quando a\n// gravação foi movida pra antes da criação do e-mail: aquele node passou a rodar no FIM do\n// fluxo, depois do Gmail, e a leitura estourava com \"hasn't been executed\". O node existe e\n// é alcançável; o problema era a ORDEM.\nconst consolidado = $('Preparar gravação da coluna N').first().json;\nconst mudancasN = consolidado.mudancasColunaN || [];\nconst mudancasL = consolidado.mudancasColunaL || [];\nconst contexto = $('Resolver arquivo-alvo da escrita').first().json;\n\n// Nao citamos aqui o node de escolha do arquivo de homolog: ele so existe no arquivo de\n// homologacao, e a citacao ficava pendurada no de producao — funcionava por acidente, presa\n// a um try/catch. Quem precisa do id do arquivo do Drive e o proprio node de upload de\n// homolog, que le direto da fonte e so existe naquele ambiente.\n\nconst item = $input.first();\nconst buffer = await bufferDe(item);\nconst wb = new ExcelJS.Workbook();\nawait wb.xlsx.load(buffer);\n// A aba chama-se \"NOTAS\". getWorksheet() do exceljs e SENSIVEL A MAIUSCULAS, e o\n// fallback silencioso \"|| wb.worksheets[0]\" mandava a escrita pra \"DETALHADO MÃE\" — foi\n// o que aconteceu na execucao 86: os \"OK - ASSINADO\" foram parar na aba errada, nas\n// mesmas linhas 293/404/631. Mesmo bug que ja tinha sido corrigido no node de LEITURA e\n// que passou batido aqui. Sem fallback: se a aba nao existir, estoura.\nconst ws = wb.worksheets.find((w) => String(w.name).trim().toUpperCase() === 'NOTAS');\nif (!ws) {\n  throw new Error('aba \"NOTAS\" nao encontrada no arquivo-alvo. Abas: ' + wb.worksheets.map((w) => w.name).join(', '));\n}\n\nfor (const m of mudancasN) {\n  ws.getCell('N' + m.linha).value = m.valor;\n}\nfor (const m of mudancasL) {\n  ws.getCell('L' + m.linha).value = m.valor;\n}\n\n// Confere celula a celula que o valor entrou onde devia, na aba certa. Uma escrita em\n// aba/linha errada volta a passar despercebida sem isto.\nconst divergentes = [];\nfor (const m of mudancasN) {\n  const lido = ws.getCell('N' + m.linha).value;\n  if (String(lido === null || lido === undefined ? '' : lido).trim() !== String(m.valor).trim()) {\n    divergentes.push('N' + m.linha + ' esperava \"' + m.valor + '\" e ficou \"' + lido + '\"');\n  }\n}\nfor (const m of mudancasL) {\n  const lido = ws.getCell('L' + m.linha).value;\n  if (String(lido === null || lido === undefined ? '' : lido).trim() !== String(m.valor).trim()) {\n    divergentes.push('L' + m.linha + ' esperava \"' + m.valor + '\" e ficou \"' + lido + '\"');\n  }\n}\nif (divergentes.length) {\n  throw new Error('gravacao na aba NOTAS nao conferiu: ' + divergentes.join('; '));\n}\n\nconst novoBuffer = await wb.xlsx.writeBuffer();\nreturn [{\n  json: { ambiente: contexto.config.ambiente, fileIdBox: contexto.fileId, nomeArquivo: contexto.nomeArquivoHomolog },\n  binary: { data: { data: Buffer.from(novoBuffer).toString('base64'), mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', fileName: 'cost_report_atualizado.xlsx' } },\n}];"
       },
       "id": "n33-aplicar-mudancas",
       "name": "Aplicar mudanças (exceljs) e preparar upload",
@@ -2200,7 +2200,7 @@
     },
     {
       "id": "prep-grav-planilha",
-      "name": "Preparar gravação da planilha",
+      "name": "Preparar gravação da coluna N",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
@@ -2208,7 +2208,7 @@
         640
       ],
       "parameters": {
-        "jsCode": "// Junta as mudancas de planilha dos itens JA montados (o e-mail so foi montado em\n// memoria ate aqui — nada foi criado no Gmail ainda). Roda antes do \"Switch — ação\"\n// justamente pra que a gravacao aconteca ANTES da criacao do e-mail: se a escrita\n// falhar, a execucao para aqui e nenhum rascunho e criado.\n//\n// A regra (secao 3.1): e-mail so pode existir com contrato confirmado E coluna N\n// efetivamente gravada. Antes, a gravacao rodava no fim do fluxo — os e-mails ja\n// existiam quando ela falhava.\nconst itens = $input.all().map((i) => i.json);\n\nconst mudancasColunaN = [];\nconst mudancasColunaL = [];\nfor (const d of itens) {\n  if (Array.isArray(d.linhasAfetadas)) {\n    for (const la of d.linhasAfetadas) {\n      if (la.atualizarColunaNPara) mudancasColunaN.push({ projetoId: la.projetoId, linha: la.linha, valor: la.atualizarColunaNPara });\n      if (d.atualizarColunaL && d.novoValorColunaL) mudancasColunaL.push({ projetoId: la.projetoId, linha: la.linha, valor: d.novoValorColunaL });\n    }\n    continue;\n  }\n  if (!d.nota) continue;\n  if (d.atualizarColunaNPara) mudancasColunaN.push({ projetoId: d.nota.projetoId, linha: d.nota.linha, valor: d.atualizarColunaNPara });\n  if (d.atualizarColunaL && d.novoValorColunaL) mudancasColunaL.push({ projetoId: d.nota.projetoId, linha: d.nota.linha, valor: d.novoValorColunaL });\n}\n\nreturn [{ json: { mudancasColunaN, mudancasColunaL } }];"
+        "jsCode": "// Junta as mudancas de planilha dos itens JA montados (o e-mail so foi montado em\n// memoria ate aqui — nada foi criado no Gmail ainda). Roda antes do \"Switch — ação\"\n// justamente pra que a gravacao aconteca ANTES da criacao do e-mail: se a escrita\n// falhar, a execucao para aqui e nenhum rascunho e criado.\n//\n// A regra (secao 3.1): e-mail so pode existir com contrato confirmado E coluna N\n// efetivamente gravada. Antes, a gravacao rodava no fim do fluxo — os e-mails ja\n// existiam quando ela falhava.\nconst itens = $input.all().map((i) => i.json);\n\nconst mudancasColunaN = [];\nconst mudancasColunaL = [];\nfor (const d of itens) {\n  if (Array.isArray(d.linhasAfetadas)) {\n    for (const la of d.linhasAfetadas) {\n      if (la.atualizarColunaNPara) mudancasColunaN.push({ projetoId: la.projetoId, linha: la.linha, valor: la.atualizarColunaNPara });\n      if (d.atualizarColunaL && d.novoValorColunaL) mudancasColunaL.push({ projetoId: la.projetoId, linha: la.linha, valor: d.novoValorColunaL });\n    }\n    continue;\n  }\n  if (!d.nota) continue;\n  if (d.atualizarColunaNPara) mudancasColunaN.push({ projetoId: d.nota.projetoId, linha: d.nota.linha, valor: d.atualizarColunaNPara });\n  if (d.atualizarColunaL && d.novoValorColunaL) mudancasColunaL.push({ projetoId: d.nota.projetoId, linha: d.nota.linha, valor: d.novoValorColunaL });\n}\n\n// A coluna L NÃO vai junto: ela só pode ser escrita depois do envio confirmado\n// (spec 3.1.5). Quem cuida dela é a cadeia \"...(coluna L)\", lá no fim do fluxo.\nreturn [{ json: { mudancasColunaN, mudancasColunaL: [] } }];"
       }
     },
     {
@@ -2327,7 +2327,7 @@
         740
       ],
       "parameters": {
-        "jsCode": "// Confirmação pós-escrita (spec 3.1.5). Relê o arquivo COMO ELE FICOU SALVO — não o\n// workbook em memória — e confere cada célula que a automação diz ter escrito.\n//\n// A verificação em memória (no node \"Aplicar mudanças\") continua valendo: ela pega aba ou\n// linha erradas antes de subir. Esta aqui pega o que aquela não alcança: upload que\n// responde OK sem persistir, upload no arquivo errado, ou versão sobrescrita no meio.\nconst ExcelJS = require('exceljs');\n\nconst contexto = $('Aplicar mudanças (exceljs) e preparar upload').first().json;\nconst mudancas = $('Preparar gravação da planilha').first().json;\nconst esperados = []\n  .concat((mudancas.mudancasColunaN || []).map((m) => ({ celula: 'N' + m.linha, valor: m.valor })))\n  .concat((mudancas.mudancasColunaL || []).map((m) => ({ celula: 'L' + m.linha, valor: m.valor })));\n\nconst buffer = await this.helpers.getBinaryDataBuffer(0, 'data');\nconst wb = new ExcelJS.Workbook();\nawait wb.xlsx.load(buffer);\nconst ws = wb.worksheets.find((w) => String(w.name).trim().toUpperCase() === 'NOTAS');\n\nconst divergencias = [];\nif (!ws) {\n  divergencias.push('aba \"NOTAS\" nao existe no arquivo relido (abas: ' + wb.worksheets.map((w) => w.name).join(', ') + ')');\n} else {\n  for (const e of esperados) {\n    const bruto = ws.getCell(e.celula).value;\n    const lido = bruto === null || bruto === undefined ? '' : String(bruto).trim();\n    if (lido !== String(e.valor).trim()) {\n      divergencias.push(e.celula + ': tentou gravar \"' + e.valor + '\", releitura encontrou \"' + (lido || '(vazio)') + '\"');\n    }\n  }\n}\n\nconst confirmado = divergencias.length === 0;\n\n// O texto do alerta é montado depois, por ambiente: em produção ele precisa dizer se a\n// reversão para a versão anterior deu certo; em homolog, que NÃO há reversão automática.\nreturn [{ json: {\n  confirmado,\n  divergencias,\n  celulasConferidas: esperados.length,\n  arquivoId: contexto.nomeArquivo || contexto.fileIdBox || '(desconhecido)',\n} }];"
+        "jsCode": "// Confirmação pós-escrita (spec 3.1.5). Relê o arquivo COMO ELE FICOU SALVO — não o\n// workbook em memória — e confere cada célula que a automação diz ter escrito.\n//\n// A verificação em memória (no node \"Aplicar mudanças\") continua valendo: ela pega aba ou\n// linha erradas antes de subir. Esta aqui pega o que aquela não alcança: upload que\n// responde OK sem persistir, upload no arquivo errado, ou versão sobrescrita no meio.\nconst ExcelJS = require('exceljs');\n\nconst contexto = $('Aplicar mudanças (exceljs) e preparar upload').first().json;\nconst mudancas = $('Preparar gravação da coluna N').first().json;\nconst esperados = []\n  .concat((mudancas.mudancasColunaN || []).map((m) => ({ celula: 'N' + m.linha, valor: m.valor })))\n  .concat((mudancas.mudancasColunaL || []).map((m) => ({ celula: 'L' + m.linha, valor: m.valor })));\n\nconst buffer = await this.helpers.getBinaryDataBuffer(0, 'data');\nconst wb = new ExcelJS.Workbook();\nawait wb.xlsx.load(buffer);\nconst ws = wb.worksheets.find((w) => String(w.name).trim().toUpperCase() === 'NOTAS');\n\nconst divergencias = [];\nif (!ws) {\n  divergencias.push('aba \"NOTAS\" nao existe no arquivo relido (abas: ' + wb.worksheets.map((w) => w.name).join(', ') + ')');\n} else {\n  for (const e of esperados) {\n    const bruto = ws.getCell(e.celula).value;\n    const lido = bruto === null || bruto === undefined ? '' : String(bruto).trim();\n    if (lido !== String(e.valor).trim()) {\n      divergencias.push(e.celula + ': tentou gravar \"' + e.valor + '\", releitura encontrou \"' + (lido || '(vazio)') + '\"');\n    }\n  }\n}\n\nconst confirmado = divergencias.length === 0;\n\n// O texto do alerta é montado depois, por ambiente: em produção ele precisa dizer se a\n// reversão para a versão anterior deu certo; em homolog, que NÃO há reversão automática.\nreturn [{ json: {\n  confirmado,\n  divergencias,\n  celulasConferidas: esperados.length,\n  arquivoId: contexto.nomeArquivo || contexto.fileIdBox || '(desconhecido)',\n} }];"
       }
     },
     {
@@ -2630,6 +2630,481 @@
       "parameters": {
         "jsCode": "// A resposta do Gmail substitui o json do item pelos ids do rascunho/mensagem, levando\n// embora o payload do pedido (marcadores, acao, chaveCobranca...). Aqui os dois sao casados.\n//\n// O pareamento e por indice contra a SAIDA 4 do Switch — e nao contra\n// $('Merge — rotas...').all()[i]. O Switch DIVIDE os itens entre as saidas, entao o indice\n// desta ramificacao nao corresponde ao indice no Merge: com um mix de acoes na mesma\n// execucao, a correlacao antiga devolvia o payload de OUTRA linha.\nconst pedidos = $('Switch — ação').all(4).map((i) => i.json);\n\nreturn $input.all().map((item, i) => {\n  const j = item.json || {};\n  const msg = j.message || {};\n  return { json: {\n    ...(pedidos[i] || {}),\n    draftId: j.id || null,\n    messageId: msg.id || j.id || null,\n    threadIdGmail: msg.threadId || j.threadId || null,\n  } };\n});"
       }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Resolve QUAL arquivo receberá a escrita, e reanexa o contexto que se perde antes daqui.\n//\n// O \"Consolidar mudanças e cobrancas.json\" monta um item NOVO (mudancas + resumo + log) e\n// deixa o config pra tras. Sem ele:\n//   - homolog: a busca do arquivo-alvo montava \"'' in parents\" e o Drive respondia\n//     404 \"File not found: .\" (foi o erro da execucao 82);\n//   - producao: \"Box — Lock\" receberia fileId undefined;\n//   - os dois: \"Aplicar mudancas\" quebraria em contexto.config.ambiente.\n// Esse ramo so executa quando ha mudanca de coluna N/L pra gravar, e ate a execucao 82\n// nunca tinha havido nenhuma — por isso o problema so apareceu agora.\n//\n// LIMITACAO CONHECIDA (pre-existente): resolve so 1 arquivo-alvo por execucao, a partir do\n// projetoId da 1a mudanca. Se houver mudancas em S01 E S02 na mesma execucao, so o do\n// primeiro projetoId e escrito nesta versao.\n\n// ATENCAO: estes ids repetem os que estao fixos nos nodes \"Box — Download Cost Report\".\n// Se o arquivo do Box mudar, os dois lugares precisam ser atualizados juntos.\nconst BOX_FILE_ID = {\n  AREP: '2028817453680',      // S01 — mesmo arquivo do Reunion (spec secao 6)\n  REUNION: '2028817453680',\n  SOFT_PRE: '2366859928452',  // S02\n};\nconst NOME_HOMOLOG = {\n  SOFT_PRE: 'BR_SMTC_S02_SOFTPRE_PROVISÓRIO.xlsx',\n};\nconst NOME_HOMOLOG_PADRAO = 'BR_SMTC_S01__COST REPORT_VS_EXECUÇÃO_1201.xlsx';\n\nconst d = $input.first().json;\nconst config = $('Carregar config + perfis').first().json.config;\n\nconst primeira = (d.mudancasColunaN && d.mudancasColunaN[0]) || (d.mudancasColunaL && d.mudancasColunaL[0]);\nconst projetoId = primeira ? primeira.projetoId : 'REUNION';\n\nreturn [{ json: {\n  ...d,\n  config,\n  projetoId,\n  nomeArquivoHomolog: NOME_HOMOLOG[projetoId] || NOME_HOMOLOG_PADRAO,\n  fileId: BOX_FILE_ID[projetoId] || BOX_FILE_ID.AREP,\n} }];"
+      },
+      "id": "resolver-arquivo-alvo-l",
+      "name": "Resolver arquivo-alvo da escrita (coluna L)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5800,
+        1400
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $json.config.ambiente }}",
+              "rightValue": "homolog",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      },
+      "id": "if-ambiente-escrita-leitura-l",
+      "name": "IF — Ambiente = homolog? (reler p/ escrita) (coluna L)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        6020,
+        1490
+      ],
+      "__ifAmbiente": {
+        "saida0": "homolog",
+        "saida1": "producao"
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://www.googleapis.com/drive/v3/files",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "sendQuery": true,
+        "specifyQuery": "keypair",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "=name = '{{ $json.nomeArquivoHomolog }}' and '{{ $json.config.homolog.drive_michelle_pasta_raiz }}' in parents and mimeType != 'application/vnd.google-apps.folder' and trashed = false"
+            },
+            {
+              "name": "spaces",
+              "value": "drive"
+            },
+            {
+              "name": "fields",
+              "value": "files(id,name,mimeType)"
+            },
+            {
+              "name": "pageSize",
+              "value": "10"
+            },
+            {
+              "name": "supportsAllDrives",
+              "value": "true"
+            },
+            {
+              "name": "includeItemsFromAllDrives",
+              "value": "true"
+            }
+          ]
+        }
+      },
+      "id": "drive-busca-alvo-escrita-l",
+      "name": "Drive (homolog) — Buscar arquivo-alvo (coluna L)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        6240,
+        1580
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "cred-gdrive-particular-michelle",
+          "name": "Google Drive - Michelle (michelle.mimiaguia@gmail.com)"
+        }
+      },
+      "notes": "Busca feita via HTTP Request, e não pelo node nativo do Drive, de propósito: o node nativo envia spaces=\"appDataFolder, drive\" sempre que há filtro de pasta, exigindo o escopo drive.appdata que esta automação nunca usa. Aqui pedimos só spaces=drive. A resposta vem como {files:[...]}, mesmo formato que os nodes \"Escolher ...\" já esperavam."
+    },
+    {
+      "parameters": {
+        "jsCode": "const r = $input.first().json; const arquivo = (r.files && r.files[0]) || r; return [{ json: { ...$('Resolver arquivo-alvo da escrita (coluna L)').first().json, fileId: arquivo && arquivo.id } }];"
+      },
+      "id": "drive-pick-alvo-escrita-l",
+      "name": "Escolher arquivo-alvo (homolog) (coluna L)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6460,
+        1400
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Escolher arquivo-alvo (homolog) (coluna L)').first().json.fileId }}"
+        }
+      },
+      "id": "drive-download-alvo-escrita-l",
+      "name": "Drive (homolog) — Reler arquivo-alvo (coluna L)",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        6680,
+        1490
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "cred-gdrive-particular-michelle",
+          "name": "Google Drive - Michelle (michelle.mimiaguia@gmail.com)"
+        }
+      },
+      "notes": "Sem lock — pasta de teste pessoal do Claudio, uso único, sem risco de edição concorrente (diferente do Box de produção, seção 7.2)."
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://api.box.com/2.0/files/{{ $json.fileId }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "boxOAuth2Api",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "lock",
+              "value": "={{ { type: 'lock', is_download_prevented: false } }}"
+            }
+          ]
+        }
+      },
+      "id": "n31-box-lock-l",
+      "name": "Box — Lock (HTTP Request) (coluna L)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        6400,
+        1580
+      ],
+      "notes": "spec.md seção 7.2 — o node nativo do Box não expõe lock/unlock, então usamos HTTP Request com a credencial Box OAuth2 predefinida. Rodar 1x por arquivo Cost Report que tiver mudança (S01 e/ou S02, conforme mudancasColunaN/L.projetoId). fileId placeholder — resolver dinamicamente por projeto."
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "download",
+        "fileId": "={{ $json.fileId }}"
+      },
+      "id": "n32-box-reler-l",
+      "name": "Box — Reler (pós-lock) (coluna L)",
+      "type": "n8n-nodes-base.box",
+      "typeVersion": 1,
+      "position": [
+        6620,
+        1400
+      ],
+      "credentials": {
+        "boxOAuth2Api": {
+          "id": "cred-box-account",
+          "name": "Box account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Aplica as mudanças de coluna N e L em memória (exceljs) e prepara o binário pra upload.\n// Preserva ambiente + fileId no output pra o node seguinte decidir Drive vs Box.\n// Leitura de binário: esta instância do n8n guarda binário no disco (filesystem-v2),\n// então item.binary.data.data NÃO é o conteúdo, e sim o rótulo do modo de armazenamento.\n// O único acesso liberado no Code Node é helpers.getBinaryDataBuffer, que lê pelo ÍNDICE\n// do item no input DIRETO — daí localizarmos o item pelo id do binário. Cobre os 2 modos.\nconst helpers = this.helpers;\nconst entradasDoNode = $input.all();\nasync function bufferDe(item, prop) {\n  prop = prop || 'data';\n  const b = item && item.binary && item.binary[prop];\n  if (!b) return null;\n  if (!b.id) return Buffer.from(b.data, 'base64'); // modo embutido\n  const i = entradasDoNode.findIndex((e) => e.binary && e.binary[prop] && e.binary[prop].id === b.id);\n  if (i < 0) throw new Error('binario \"' + (b.fileName || prop) + '\" nao esta no input direto deste node — o Code Node so consegue le-lo por ai');\n  return await helpers.getBinaryDataBuffer(i, prop);\n}\n\nconst ExcelJS = require('exceljs');\n\n// As mudanças vêm de \"Preparar gravação da coluna L\", que roda ANTES da escrita.\n// Antes isto lia de \"Consolidar mudanças e cobrancas.json\" — e ficou obsoleto quando a\n// gravação foi movida pra antes da criação do e-mail: aquele node passou a rodar no FIM do\n// fluxo, depois do Gmail, e a leitura estourava com \"hasn't been executed\". O node existe e\n// é alcançável; o problema era a ORDEM.\nconst consolidado = $('Preparar gravação da coluna L').first().json;\nconst mudancasN = consolidado.mudancasColunaN || [];\nconst mudancasL = consolidado.mudancasColunaL || [];\nconst contexto = $('Resolver arquivo-alvo da escrita (coluna L)').first().json;\n\n// Nao citamos aqui o node de escolha do arquivo de homolog: ele so existe no arquivo de\n// homologacao, e a citacao ficava pendurada no de producao — funcionava por acidente, presa\n// a um try/catch. Quem precisa do id do arquivo do Drive e o proprio node de upload de\n// homolog, que le direto da fonte e so existe naquele ambiente.\n\nconst item = $input.first();\nconst buffer = await bufferDe(item);\nconst wb = new ExcelJS.Workbook();\nawait wb.xlsx.load(buffer);\n// A aba chama-se \"NOTAS\". getWorksheet() do exceljs e SENSIVEL A MAIUSCULAS, e o\n// fallback silencioso \"|| wb.worksheets[0]\" mandava a escrita pra \"DETALHADO MÃE\" — foi\n// o que aconteceu na execucao 86: os \"OK - ASSINADO\" foram parar na aba errada, nas\n// mesmas linhas 293/404/631. Mesmo bug que ja tinha sido corrigido no node de LEITURA e\n// que passou batido aqui. Sem fallback: se a aba nao existir, estoura.\nconst ws = wb.worksheets.find((w) => String(w.name).trim().toUpperCase() === 'NOTAS');\nif (!ws) {\n  throw new Error('aba \"NOTAS\" nao encontrada no arquivo-alvo. Abas: ' + wb.worksheets.map((w) => w.name).join(', '));\n}\n\nfor (const m of mudancasN) {\n  ws.getCell('N' + m.linha).value = m.valor;\n}\nfor (const m of mudancasL) {\n  ws.getCell('L' + m.linha).value = m.valor;\n}\n\n// Confere celula a celula que o valor entrou onde devia, na aba certa. Uma escrita em\n// aba/linha errada volta a passar despercebida sem isto.\nconst divergentes = [];\nfor (const m of mudancasN) {\n  const lido = ws.getCell('N' + m.linha).value;\n  if (String(lido === null || lido === undefined ? '' : lido).trim() !== String(m.valor).trim()) {\n    divergentes.push('N' + m.linha + ' esperava \"' + m.valor + '\" e ficou \"' + lido + '\"');\n  }\n}\nfor (const m of mudancasL) {\n  const lido = ws.getCell('L' + m.linha).value;\n  if (String(lido === null || lido === undefined ? '' : lido).trim() !== String(m.valor).trim()) {\n    divergentes.push('L' + m.linha + ' esperava \"' + m.valor + '\" e ficou \"' + lido + '\"');\n  }\n}\nif (divergentes.length) {\n  throw new Error('gravacao na aba NOTAS nao conferiu: ' + divergentes.join('; '));\n}\n\nconst novoBuffer = await wb.xlsx.writeBuffer();\nreturn [{\n  json: { ambiente: contexto.config.ambiente, fileIdBox: contexto.fileId, nomeArquivo: contexto.nomeArquivoHomolog },\n  binary: { data: { data: Buffer.from(novoBuffer).toString('base64'), mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', fileName: 'cost_report_atualizado.xlsx' } },\n}];"
+      },
+      "id": "n33-aplicar-mudancas-l",
+      "name": "Aplicar mudanças (exceljs) e preparar upload (coluna L)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6840,
+        1490
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $json.ambiente }}",
+              "rightValue": "homolog",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      },
+      "id": "if-ambiente-upload-l",
+      "name": "IF — Ambiente = homolog? (upload) (coluna L)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        6900,
+        1580
+      ],
+      "__ifAmbiente": {
+        "saida0": "homolog",
+        "saida1": "producao"
+      }
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "update",
+        "fileId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Escolher arquivo-alvo (homolog) (coluna L)').first().json.fileId }}"
+        },
+        "inputDataFieldName": "data",
+        "changeFileContent": true
+      },
+      "id": "drive-upload-alvo-escrita-l",
+      "name": "Drive (homolog) — Upload nova versão (coluna L)",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        7120,
+        1400
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "cred-gdrive-particular-michelle",
+          "name": "Google Drive - Michelle (michelle.mimiaguia@gmail.com)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://upload.box.com/api/2.0/files/{{ $json.fileIdBox }}/content",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "boxOAuth2Api",
+        "contentType": "multipart-form-data",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "data"
+            }
+          ]
+        }
+      },
+      "id": "n34-box-upload-l",
+      "name": "Box — Upload nova versão (coluna L)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        7060,
+        1490
+      ],
+      "notes": "O node nativo do Box NÃO tem operação de \"subir nova versão\" (as válidas são copy, delete, download, get, search, share, upload — e \"upload\" cria arquivo novo). Nova versão exige POST em upload.box.com/api/2.0/files/{id}/content, por isso HTTP Request com a credencial Box OAuth2. Ver spec.md seção 7.2."
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://api.box.com/2.0/files/{{ $json.fileId }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "boxOAuth2Api",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "lock",
+              "value": "={{ null }}"
+            }
+          ]
+        }
+      },
+      "id": "n35-box-unlock-l",
+      "name": "Box — Unlock (sempre, mesmo em erro) (coluna L)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        7280,
+        1580
+      ],
+      "notes": "onError=continueRegularOutput: mesmo se o upload (n34) falhar, este node precisa rodar pra não deixar o arquivo travado (spec.md seção 7.2, 'destravar sempre, mesmo em falha no meio do processo'). Ligação de erro de n31/n32/n33/n34 -> aqui deve ser configurada também nas 'connections' (ver settings do workflow).",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "if-amb-reler-pos-l",
+      "name": "IF — Ambiente = homolog? (reler pós-gravação) (coluna L)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        4360,
+        1400
+      ],
+      "__ifAmbiente": {
+        "saida0": "homolog",
+        "saida1": "producao"
+      },
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.ambiente }}",
+              "rightValue": "homolog",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "drive-reler-pos-l",
+      "name": "Drive (homolog) — Reler após gravar (coluna L)",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        4540,
+        1490
+      ],
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Escolher arquivo-alvo (homolog) (coluna L)').first().json.fileId }}"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "cred-gdrive-particular-michelle",
+          "name": "Google Drive - Michelle (michelle.mimiaguia@gmail.com)"
+        }
+      }
+    },
+    {
+      "id": "box-reler-pos-l",
+      "name": "Box — Reler após gravar (coluna L)",
+      "type": "n8n-nodes-base.box",
+      "typeVersion": 1,
+      "position": [
+        4540,
+        1580
+      ],
+      "parameters": {
+        "resource": "file",
+        "operation": "download",
+        "fileId": "={{ $('Resolver arquivo-alvo da escrita (coluna L)').first().json.fileId }}"
+      },
+      "credentials": {
+        "boxOAuth2Api": {
+          "id": "cred-box-account",
+          "name": "Box account"
+        }
+      }
+    },
+    {
+      "id": "confirmar-escrita-l",
+      "name": "Confirmar escrita na planilha (coluna L)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4720,
+        1400
+      ],
+      "parameters": {
+        "jsCode": "// Confirmação pós-escrita (spec 3.1.5). Relê o arquivo COMO ELE FICOU SALVO — não o\n// workbook em memória — e confere cada célula que a automação diz ter escrito.\n//\n// A verificação em memória (no node \"Aplicar mudanças\") continua valendo: ela pega aba ou\n// linha erradas antes de subir. Esta aqui pega o que aquela não alcança: upload que\n// responde OK sem persistir, upload no arquivo errado, ou versão sobrescrita no meio.\nconst ExcelJS = require('exceljs');\n\nconst contexto = $('Aplicar mudanças (exceljs) e preparar upload (coluna L)').first().json;\nconst mudancas = $('Preparar gravação da coluna L').first().json;\nconst esperados = []\n  .concat((mudancas.mudancasColunaN || []).map((m) => ({ celula: 'N' + m.linha, valor: m.valor })))\n  .concat((mudancas.mudancasColunaL || []).map((m) => ({ celula: 'L' + m.linha, valor: m.valor })));\n\nconst buffer = await this.helpers.getBinaryDataBuffer(0, 'data');\nconst wb = new ExcelJS.Workbook();\nawait wb.xlsx.load(buffer);\nconst ws = wb.worksheets.find((w) => String(w.name).trim().toUpperCase() === 'NOTAS');\n\nconst divergencias = [];\nif (!ws) {\n  divergencias.push('aba \"NOTAS\" nao existe no arquivo relido (abas: ' + wb.worksheets.map((w) => w.name).join(', ') + ')');\n} else {\n  for (const e of esperados) {\n    const bruto = ws.getCell(e.celula).value;\n    const lido = bruto === null || bruto === undefined ? '' : String(bruto).trim();\n    if (lido !== String(e.valor).trim()) {\n      divergencias.push(e.celula + ': tentou gravar \"' + e.valor + '\", releitura encontrou \"' + (lido || '(vazio)') + '\"');\n    }\n  }\n}\n\nconst confirmado = divergencias.length === 0;\n\n// O texto do alerta é montado depois, por ambiente: em produção ele precisa dizer se a\n// reversão para a versão anterior deu certo; em homolog, que NÃO há reversão automática.\nreturn [{ json: {\n  confirmado,\n  divergencias,\n  celulasConferidas: esperados.length,\n  arquivoId: contexto.nomeArquivo || contexto.fileIdBox || '(desconhecido)',\n} }];"
+      }
+    },
+    {
+      "id": "if-escrita-ok-l",
+      "name": "IF — Escrita confirmada? (coluna L)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        4860,
+        1490
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.confirmado }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "prep-coluna-l",
+      "name": "Preparar gravação da coluna L",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6160,
+        1400
+      ],
+      "parameters": {
+        "jsCode": "// Segunda escrita da planilha: SÓ a coluna L (Status Box), e SÓ aqui — depois do envio.\n//\n// Este node fica pendurado em \"Consolidar mudanças e cobrancas.json\", que só roda depois\n// dos nodes de envio do Gmail. Chegar aqui já significa que o e-mail saiu: se o envio\n// falhasse, a execução teria parado antes e a coluna L não seria tocada (spec 3.1.5).\n//\n// Em MODO_EXECUCAO=rascunho a lista vem vazia (atualizarColunaL é false), então o IF\n// seguinte corta o caminho e nada é gravado.\nconst d = $input.first().json;\nreturn [{ json: { mudancasColunaN: [], mudancasColunaL: d.mudancasColunaL || [] } }];"
+      }
+    },
+    {
+      "id": "alerta-coluna-l",
+      "name": "Montar alerta — coluna L não confirmada",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4820,
+        1700
+      ],
+      "parameters": {
+        "jsCode": "const d = $('Confirmar escrita na planilha (coluna L)').first().json;\nconst linhas = (d.divergencias || []).map((x) => '• ' + x);\n\n// Alerta da SEGUNDA escrita (coluna L), que acontece depois do e-mail já ter saído.\n// Por isso o texto é diferente do alerta da coluna N: aqui não há e-mail a evitar — o\n// que importa é avisar que o Status Box pode não refletir o envio que já aconteceu.\nconst texto = [\n  '🚨 Escrita da coluna L (Status Box) NAO confirmada',\n  '',\n  'O e-mail JÁ FOI ENVIADO — o que falhou foi a atualização do Status Box.',\n  'Arquivo: ' + d.arquivoId,\n  'Aba: NOTAS',\n  '',\n  '⚠️ Conferir e corrigir o Status Box à mão nas linhas abaixo.',\n  '',\n  'Divergências (' + linhas.length + '):',\n].concat(linhas).join('\\n');\n\nreturn [{ json: { textoAlerta: texto } }];"
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $json.mudancasColunaN.length + $json.mudancasColunaL.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ]
+        }
+      },
+      "id": "if-mud-l",
+      "name": "IF — Há mudanças pra escrever no Box? (coluna L)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        6180,
+        1310
+      ]
     }
   ],
   "connections": {
@@ -2926,7 +3401,7 @@
       "main": [
         [
           {
-            "node": "Preparar gravação da planilha",
+            "node": "Preparar gravação da coluna N",
             "type": "main",
             "index": 0
           }
@@ -3070,6 +3545,11 @@
           },
           {
             "node": "Ler log_diario.json",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Preparar gravação da coluna L",
             "type": "main",
             "index": 0
           }
@@ -3779,17 +4259,6 @@
         ]
       ]
     },
-    "Preparar gravação da planilha": {
-      "main": [
-        [
-          {
-            "node": "IF — Há mudanças pra escrever no Box?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Drive (homolog) — Upload nova versão": {
       "main": [
         [
@@ -4036,6 +4505,260 @@
         [
           {
             "node": "Gmail — Aplicar marcadores (cobrança envio)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar gravação da coluna N": {
+      "main": [
+        [
+          {
+            "node": "IF — Há mudanças pra escrever no Box?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar gravação da coluna L": {
+      "main": [
+        [
+          {
+            "node": "IF — Há mudanças pra escrever no Box? (coluna L)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolver arquivo-alvo da escrita (coluna L)": {
+      "main": [
+        [
+          {
+            "node": "IF — Ambiente = homolog? (reler p/ escrita) (coluna L)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — Ambiente = homolog? (reler p/ escrita) (coluna L)": {
+      "main": [
+        [
+          {
+            "node": "Drive (homolog) — Buscar arquivo-alvo (coluna L)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Box — Lock (HTTP Request) (coluna L)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Drive (homolog) — Buscar arquivo-alvo (coluna L)": {
+      "main": [
+        [
+          {
+            "node": "Escolher arquivo-alvo (homolog) (coluna L)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Escolher arquivo-alvo (homolog) (coluna L)": {
+      "main": [
+        [
+          {
+            "node": "Drive (homolog) — Reler arquivo-alvo (coluna L)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Drive (homolog) — Reler arquivo-alvo (coluna L)": {
+      "main": [
+        [
+          {
+            "node": "Aplicar mudanças (exceljs) e preparar upload (coluna L)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Box — Lock (HTTP Request) (coluna L)": {
+      "main": [
+        [
+          {
+            "node": "Box — Reler (pós-lock) (coluna L)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Box — Reler (pós-lock) (coluna L)": {
+      "main": [
+        [
+          {
+            "node": "Aplicar mudanças (exceljs) e preparar upload (coluna L)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aplicar mudanças (exceljs) e preparar upload (coluna L)": {
+      "main": [
+        [
+          {
+            "node": "IF — Ambiente = homolog? (upload) (coluna L)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — Ambiente = homolog? (upload) (coluna L)": {
+      "main": [
+        [
+          {
+            "node": "Drive (homolog) — Upload nova versão (coluna L)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Box — Upload nova versão (coluna L)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Drive (homolog) — Upload nova versão (coluna L)": {
+      "main": [
+        [
+          {
+            "node": "IF — Ambiente = homolog? (reler pós-gravação) (coluna L)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Box — Upload nova versão (coluna L)": {
+      "main": [
+        [
+          {
+            "node": "Box — Unlock (sempre, mesmo em erro) (coluna L)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Box — Unlock (sempre, mesmo em erro) (coluna L)": {
+      "main": [
+        [
+          {
+            "node": "IF — Ambiente = homolog? (reler pós-gravação) (coluna L)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — Ambiente = homolog? (reler pós-gravação) (coluna L)": {
+      "main": [
+        [
+          {
+            "node": "Drive (homolog) — Reler após gravar (coluna L)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Box — Reler após gravar (coluna L)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Drive (homolog) — Reler após gravar (coluna L)": {
+      "main": [
+        [
+          {
+            "node": "Confirmar escrita na planilha (coluna L)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Box — Reler após gravar (coluna L)": {
+      "main": [
+        [
+          {
+            "node": "Confirmar escrita na planilha (coluna L)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Confirmar escrita na planilha (coluna L)": {
+      "main": [
+        [
+          {
+            "node": "IF — Escrita confirmada? (coluna L)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — Escrita confirmada? (coluna L)": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Montar alerta — coluna L não confirmada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — Há mudanças pra escrever no Box? (coluna L)": {
+      "main": [
+        [
+          {
+            "node": "Resolver arquivo-alvo da escrita (coluna L)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Montar alerta — coluna L não confirmada": {
+      "main": [
+        [
+          {
+            "node": "Telegram — Escrita não confirmada",
             "type": "main",
             "index": 0
           }
