@@ -426,7 +426,8 @@
         "chatId": "749277207",
         "text": "={{ '✅ Correção automática de contrato (Fase 1)\\n\\nFornecedor: ' + ($json.fornecedor || '?') + '\\n\\nLinhas corrigidas pra \"OK - ASSINADO\" (estavam pendentes/vazias, mas outra linha do mesmo fornecedor/vencimento já estava assinada):\\n' + (($json.linhasCorrigidas || []).map(l => '- Linha ' + (l?.linha ?? '?') + ': R$ ' + (typeof l?.valor === 'number' ? l.valor.toLocaleString('pt-BR', {minimumFractionDigits:2}) : '?')).join('\\n') || '- (sem detalhe)') }}",
         "additionalFields": {
-          "parse_mode": "Markdown"
+          "parse_mode": "Markdown",
+          "appendAttribution": false
         }
       },
       "id": "n_telegram_correcao_contrato",
@@ -450,7 +451,8 @@
         "chatId": "749277207",
         "text": "={{ $json.textoAlerta }}",
         "additionalFields": {
-          "parse_mode": "Markdown"
+          "parse_mode": "Markdown",
+          "appendAttribution": false
         }
       },
       "id": "n_telegram_alerta_nao_mapeada",
@@ -852,7 +854,8 @@
         "chatId": "749277207",
         "text": "={{ '📋 Relatório Fase 1 — Solicitação de Nota\\n\\nRascunhos criados: ' + ($json.resumo?.rascunhosCriados ?? '?') + '\\nEnvios diretos: ' + ($json.resumo?.enviosDiretos ?? '?') + '\\nPendentes de contrato: ' + ($json.resumo?.pendentesContrato ?? '?') + '\\nCom lacuna de informação (FALTA INFORMAÇÃO): ' + ($json.resumo?.comLacunaInformacao ?? '?') + '\\nCorreções de contrato aplicadas: ' + ($json.resumo?.correcoesContrato ?? '?') + '\\nSituações não mapeadas (alertadas): ' + ($json.resumo?.alertasSituacaoNaoMapeada ?? '?') + '\\nCiclos encerrados sem resposta: ' + ($json.resumo?.alertasEncerramento?.length ?? '?') }}",
         "additionalFields": {
-          "parse_mode": "Markdown"
+          "parse_mode": "Markdown",
+          "appendAttribution": false
         }
       },
       "id": "n37-telegram-relatorio",
@@ -1912,7 +1915,9 @@
       "parameters": {
         "chatId": "749277207",
         "text": "={{ $json.textoAlerta }}",
-        "additionalFields": {}
+        "additionalFields": {
+          "appendAttribution": false
+        }
       },
       "credentials": {
         "telegramApi": {

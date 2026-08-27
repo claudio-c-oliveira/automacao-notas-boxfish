@@ -130,7 +130,8 @@
         "chatId": "={{ $json.chatId }}",
         "text": "={{ $json.texto }}",
         "additionalFields": {
-          "parse_mode": "Markdown"
+          "parse_mode": "Markdown",
+          "appendAttribution": false
         }
       },
       "id": "r09-telegram-enviar",
