@@ -2287,6 +2287,72 @@
         6180,
         1310
       ]
+    },
+    {
+      "id": "montar-alerta-solicitar",
+      "name": "Montar alerta — SOLICITAR pendente de contrato",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6400,
+        700
+      ],
+      "parameters": {
+        "jsCode": "// Alerta de \"SOLICITAR pendente de contrato\" (spec 3.1). Uma mensagem por execução,\n// agrupando todas as linhas — no estilo do relatório final, e não uma mensagem por linha.\n//\n// Só entra SOLICITAR (qualquer variante/escala da 3.1.4). \"PROGRAMAR ATÉ\" tem prazo e fica\n// de fora de propósito.\nfunction formatarValor(v) {\n  const n = Number(v);\n  return isFinite(n) ? n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : String(v || '?');\n}\nfunction formatarData(d) {\n  const dt = new Date(d);\n  return isNaN(dt.getTime()) ? String(d || '?') : dt.toLocaleDateString('pt-BR', { timeZone: 'UTC' });\n}\n\nconst itens = $('Merge — resultados consolidados').all().map((i) => i.json);\nconst pendentes = itens.filter((d) => d.acao === 'pendente_contrato' && d.gatilho === 'SOLICITAR');\n\nconst linhas = pendentes.map((d) => {\n  const n = d.nota || {};\n  const quem = d.nomeColaborador || n.colunaH || '?';\n  const urgente = d.escalaUrgencia === 0 ? ' 🔴 URG' : '';\n  return '• ' + (n.projetoId || '?') + ' L' + (n.linha || '?') + urgente + '\\n' +\n    '   ' + quem + '\\n' +\n    '   R$ ' + formatarValor(n.colunaK) + ' · venc. ' + formatarData(n.colunaG) + ' · Status Box: \"' + (n.colunaL || '') + '\"';\n});\n\nconst texto = [\n  '⚠️ SOLICITAR pendente de contrato — nenhum e-mail foi enviado',\n  '',\n  pendentes.length + ' linha(s) com Status Box \"SOLICITAR\" não tiveram o contrato confirmado',\n  'nesta execução: nem a planilha de Contratos nem a ficha cadastral no Gmail liberaram.',\n  '',\n].concat(linhas).concat([\n  '',\n  'Como \"SOLICITAR\" é pedido urgente, essas linhas precisam de ação manual — elas',\n  'continuam paradas até o contrato ser confirmado.',\n]).join('\\n');\n\nreturn [{ json: { quantidade: pendentes.length, textoAlerta: texto } }];"
+      }
+    },
+    {
+      "id": "if-solicitar-pendente",
+      "name": "IF — Há SOLICITAR pendente?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        6580,
+        700
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.quantidade }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "tg-solicitar-pendente",
+      "name": "Telegram — SOLICITAR pendente de contrato",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        6760,
+        700
+      ],
+      "parameters": {
+        "chatId": "749277207",
+        "text": "={{ $json.textoAlerta }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "cred-telegram-account",
+          "name": "Telegram account"
+        }
+      }
     }
   ],
   "connections": {
@@ -2737,6 +2803,11 @@
           },
           {
             "node": "Preparar gravação da coluna L",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Montar alerta — SOLICITAR pendente de contrato",
             "type": "main",
             "index": 0
           }
@@ -3576,6 +3647,29 @@
             "index": 0
           }
         ]
+      ]
+    },
+    "Montar alerta — SOLICITAR pendente de contrato": {
+      "main": [
+        [
+          {
+            "node": "IF — Há SOLICITAR pendente?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — Há SOLICITAR pendente?": {
+      "main": [
+        [
+          {
+            "node": "Telegram — SOLICITAR pendente de contrato",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
       ]
     }
   },
