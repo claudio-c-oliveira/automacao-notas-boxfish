@@ -97,6 +97,23 @@ Enquanto o Status Box de uma linha permanecer "SOLICITAR" (porque a Michelle ain
 - Antes de criar o e-mail de pedido, checar se já existe uma entrada em `cobrancas.json` para aquela chave (projeto + linha, seção 3.1.1) com `threadId` já preenchido — se existir, a linha já teve um pedido criado antes; pular a criação de um novo e-mail para ela nesta execução (ela pode voltar a ser considerada pela lógica de monitoramento/cobrança da seção 3.1.1, se for o caso, mas não gera um pedido novo).
 - Esta regra vale apenas para `ambiente = produção`. Em `homolog`, não é necessária — Claudio controla manualmente quais linhas processar mudando o Status Box na planilha de teste conforme quiser gerar novos rascunhos.
 
+### 3.1.7 Destinatários e cópia (To/CC) por ambiente
+O e-mail de pedido de nota (seção 3.1, passo 3º) sempre leva um destinatário principal (colaborador) e uma cópia (controller), variando por ambiente:
+
+**Homologação**: destinatário = `grandesnegocioseoportunidades+colaborador@gmail.com` (fixo, independe de quem é o colaborador real da linha); cópia (CC) = `grandesnegocioseoportunidades+danielle@gmail.com`.
+
+**Produção**: destinatário = e-mail do colaborador real (coluna R da planilha Cost); cópia (CC) = `financeiro@novorealitybox.com` (Danielle/Controller).
+
+Tabela De-Para completa dos papéis envolvidos no processo (referência para outros pontos do sistema que também endereçam essas pessoas — cobrança, alertas, etc.):
+
+| Papel | Pessoa | E-mail homologação | E-mail produção |
+|---|---|---|---|
+| Assistente de Controller | Michelle | `imperialdiamondlead@gmail.com` | `financeiro1@novorealitybox.com` |
+| Controller | Danielle | `grandesnegocioseoportunidades+danielle@gmail.com` | `financeiro@novorealitybox.com` |
+| Assistente Executiva | Bruna | `grandesnegocioseoportunidades+bruna@gmail.com` | `assistente.executiva@novorealitybox.com` |
+| Coordenadora Executiva | Vanessa | `grandesnegocioseoportunidades+vanessa@gmail.com` | `executiva@novorealitybox.com` |
+| Financeiro | Danilo | `grandesnegocioseoportunidades+danilo@gmail.com` | `dgneris@boxfishtv.com` |
+
 ### 3.1.4 Escala de urgência dentro de "SOLICITAR" (Status Box)
 O texto do Status Box (coluna L) para o filtro "SOLICITAR" (passo 3º, seção 3.1) varia — confirmado por Claudio, exemplos reais já vistos: `SOLICITAR URG`, `SOLICITAR MI`, `SOLICITAR`, `SOLICITAR / AGUARDAR DOCS`, entre outros. Cada variante corresponde a um nível de urgência numa escala de 0 (mais urgente) a 5 (menos urgente, mas ainda mais urgente que `PROGRAMAR ATÉ`):
 
@@ -131,6 +148,7 @@ A coluna J se separa em 3 partes: [CARGO] - [NOME DO COLABORADOR] - [DE "DATA" A
 3. Dos blocos restantes (excluindo data e a palavra-chave de tipo): identificar semanticamente qual é o Cargo e qual é o Nome do colaborador (não por posição fixa — casos como "AGENCIAMENTO DE FIGURAÇÃO" mostram que a ordem pode não ser confiável).
 4. Reconhecer e REMOVER do texto qualquer menção ao nome do projeto (REUNION, AREP, SOFT PRE, PNS/PNL etc.) antes de montar o corpo do e-mail — esse nome não deve ser replicado no corpo, pois já aparece no assunto.
 5. Se a coluna J não tiver informação suficiente pra preencher Cargo e/ou Nome do colaborador com confiança: marca a lacuna como **"FALTA INFORMAÇÃO"** no campo correspondente do corpo (Serviço Prestado como / Colaborador), monta o e-mail mesmo assim, e envia um alerta via Telegram para a Michelle avisando que existe e-mail em rascunho (ou já enviado, no modo automático) com dado faltante no corpo — ela interage manualmente depois. Vale tanto para modo rascunho quanto automático.
+6. **Cargo sem numeração**: ao extrair o Cargo da coluna J, remover qualquer numeração ao final (ex.: "ASS. DE CONTROLLER 1" → "ASS. DE CONTROLLER"; "CONTRARREGRA 1", "CONTRARREGRA 2" → "CONTRARREGRA"), independentemente de como o número aparece na planilha Cost — vale para qualquer cargo, sem exceção. O número na planilha é só um identificador interno de controle (ex. distinguir múltiplos colaboradores no mesmo cargo), não faz parte do nome do cargo e nunca deve aparecer no corpo do e-mail. *(Adicionado em 26/08 — encontrado um caso real com "ASS. DE CONTROLLER 1" vazando pro e-mail.)*
 6. **Regra geral de segurança**: sempre que a IA encontrar uma situação que não está mapeada nesta especificação, ela NUNCA pode inventar ou adivinhar um valor. Para o processamento daquela linha, envia um alerta via Telegram para a Michelle descrevendo o ponto de indecisão, onde foi encontrado (projeto/linha da planilha) e o que já foi feito até ali — ela resolve manualmente.
 
 | Tipo | Quando usar | Assunto |
@@ -273,7 +291,7 @@ Detalhamento técnico do modelo de e-mail (seções 3.2, 3.3, 3.4), com valores 
 - **Saudação (fixa, não varia por e-mail)**: "Olá [NOME]! Tudo bem?" seguido do emoji 😊.
 - **Fechamento (fixo, não varia por e-mail)**: duas linhas separadas — a primeira com a palavra de agradecimento ("Muito obrigada!", pode variar), a segunda com a despedida seguida do emoji 🌷 ("Bjs 🌷", "Beijo 🌷" — a palavra pode variar, o emoji e a separação em linha própria não). *(Corrigido em 25/08 — confirmado por comparação direta com e-mail padrão de produção; a versão anterior desta seção não especificava a separação em duas linhas.)*
 - **Bloco "N- Emitir nota fiscal no valor de R$ X..."**: destaque (highlight) na cor exata `#FFE599`; o valor em R$ em negrito.
-- **"...que deverá ser enviada até o dia DD/MM"**: formato de data SEM ano (`DD/MM`, ex. "25/08") — diferente de "vencimento em DD/MM/AAAA" logo depois, que tem ano completo; são dois formatos distintos de propósito, confirmados por e-mail padrão de produção. A frase "até o dia DD/MM" INTEIRA (não só os números da data) em cor `#cc0000` (vermelho vivo); dentro dela, somente os números da data em negrito — "até o dia" fica vermelho mas sem negrito. O restante da frase ("...que deverá ser enviada") sem cor/negrito especial.
+- **"...que deverá ser enviada até o dia DD/MM"**: formato de data SEM ano (`DD/MM`, ex. "25/08") — diferente de "vencimento em DD/MM/AAAA" logo depois, que tem ano completo; são dois formatos distintos de propósito, confirmados por e-mail padrão de produção. A frase "até o dia DD/MM" INTEIRA (não só os números da data) em cor `#cc0000` (vermelho vivo) E em negrito. *(Corrigido em 26/08 — Claudio e Michelle decidiram que "até o dia" também fica em negrito, não só a data; a versão anterior desta seção deixava "até o dia" vermelho mas sem negrito.)* O restante da frase ("...que deverá ser enviada") sem cor/negrito especial.
 - **"vencimento em DD/MM/AAAA."**: a frase "vencimento em DD/MM/AAAA" INTEIRA (não só os números da data) em negrito e com destaque (highlight) azul-acinzentado `#CFE2F3`; o ponto final fica dentro do highlight mas fora do negrito.
 - **Atenção — três formatos de data distintos no mesmo e-mail, propositais, não intercambiáveis**: assunto usa `DD.MM` com ponto (ex. "ENVIAR ATÉ 25.08"); "até o dia" no corpo usa `DD/MM` com barra e sem ano (ex. "até o dia 25/08"); "vencimento em" no corpo usa `DD/MM/AAAA` com barra e ano completo (ex. "vencimento em 10/09/2026"). São gerados por helpers de formatação separados no código — não reaproveitar um formato no lugar do outro.
 - **Negrito fixo**: "Tomador", "Serviço Prestado como" (sem dois-pontos), "Colaborador:", "Período de", "Dados bancários:", "Chave pix:".
@@ -281,6 +299,7 @@ Detalhamento técnico do modelo de e-mail (seções 3.2, 3.3, 3.4), com valores 
 - **Parágrafo final** (dados bancários/ficha cadastral — texto já documentado nos modelos das seções 3.2.1/3.3/3.4): itálico, sem nenhum destaque/highlight.
 - **Espaçamento**: cada campo (Ref., Serviço Prestado como, Colaborador, Período de, Dados bancários, Chave pix) é um parágrafo `<p>` separado, sequenciais, **sem nenhuma linha em branco extra entre eles** — o espaçamento vem só da margem padrão do `<p>`.
 - **Padrão de assunto**: usar sempre hífen com espaços ao redor — `SMTC - S01` (não `SMTC-S01`) — conforme já usado nos exemplos das seções 3.3/3.4/6.
+- **PROIBIDO — assinatura automática do n8n**: nenhum e-mail enviado pela automação (rascunho ou envio direto, em nenhum ambiente) pode conter a frase "This email was sent automatically with n8n" nem o link de referência do n8n que o node de Gmail insere por padrão. Essa assinatura precisa ser removida/desabilitada na configuração do node de envio — o e-mail final deve ser indistinguível de um escrito manualmente. *(Adicionado em 26/08 — encontrado num e-mail real enviado pelo modo automático.)*
 
 
 ## 4. Fase 2 — Recebimento e validação da nota
