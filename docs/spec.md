@@ -122,6 +122,19 @@ Tabela De-Para completa dos papéis envolvidos no processo (referência para out
 | Coordenadora Executiva | Vanessa | `grandesnegocioseoportunidades+vanessa@gmail.com` | `executiva@novorealitybox.com` |
 | Financeiro | Danilo | `grandesnegocioseoportunidades+danilo@gmail.com` | `dgneris@boxfishtv.com` |
 
+### 3.1.8 Comportamento de "PROGRAMAR ATÉ" (redesenhado em 27/08 — corrige bug crítico)
+**Bug encontrado antes de ir para produção**: a implementação anterior tratava toda linha "PROGRAMAR ATÉ" como `acao: 'agendar_envio'`, que caía num node placeholder vazio (`NoOp — Agendar envio (TODO)`) — nenhum e-mail era criado, mas a coluna L era escrita como "SOLICITADA MI" mesmo assim, e sem checagem de data (rodava para TODAS as linhas "PROGRAMAR ATÉ" da planilha, vencidas ou não). Isso reproduzia exatamente a falha que a seção 3.1.5 existe para evitar. Motivo raiz: a API do Gmail (e o node de Gmail do n8n) NÃO possui recurso de envio agendado ("scheduled send") — esse recurso só existe na interface web do Gmail, não é alcançável via automação. O comportamento correto, desenhado para contornar essa limitação, é:
+
+1. **Criação antecipada do rascunho**: assim que a linha "PROGRAMAR ATÉ [data]" tem o contrato confirmado (mesma checagem da seção 3.1), a automação cria o e-mail já em RASCUNHO desde já — não espera a data-alvo chegar para montar o e-mail. Guarda o ID desse rascunho e a data-alvo associada (`cobrancas.json` ou estrutura equivalente).
+2. **Coluna L não muda neste momento**: continua refletindo que está programado, não enviado — evita a falha do bug original.
+3. **Execuções seguintes, antes da data-alvo**: a linha não deve gerar um novo rascunho duplicado a cada execução — precisa reconhecer que já tem um rascunho pendente para aquela data e não fazer nada até o dia chegar.
+4. **Quando a data-alvo chega** (numa execução no dia certo ou depois, dependendo da frequência do Schedule Trigger):
+   - **Modo automático**: checar via API se o rascunho (pelo ID guardado) AINDA EXISTE.
+     - **Existe**: enviar de verdade, aplicando a mesma dupla camada de verificação da seção 3.1.5, e só então atualizar a coluna L para "SOLICITADA MI".
+     - **NÃO existe mais** (a Michelle já enviou manualmente antes da automação agir — cenário real e esperado, não um erro): NÃO reenviar (evita duplicar o e-mail). **Antes de atualizar a coluna L, checar o valor ATUAL do Status Box na planilha**: só atualizar para "SOLICITADA MI" se o valor atual ainda for "PROGRAMAR ATÉ" (ou equivalente anterior no fluxo). Se o Status Box já avançou para um estágio posterior do processo (ex.: "ENTREGUE MI", "ENTREGUE MI R1", "ENTREGUE MI R2"... — seção 5.3, a Michelle já pegou a nota recebida e entregou ao Danilo), a automação NÃO pode regredir esse status — não escreve nada na coluna L nesse caso, preservando o estágio mais avançado já alcançado manualmente. Registrar a ocorrência (rascunho ausente, envio já feito manualmente) de forma auditável, sem precisar de alerta urgente — é um caminho normal.
+   - **Modo rascunho**: nunca envia sozinho, mesmo passando da data-alvo — fica aguardando revisão manual da Michelle.
+5. **Este redesenho substitui o `NoOp — Agendar envio (TODO)`** e a lógica de `acao: 'agendar_envio'` anterior — não deve mais existir um caminho que grava a coluna L sem um e-mail ter sido de fato criado (rascunho) e, no caso de envio automático, sem confirmação real de envio.
+
 ### 3.1.4 Escala de urgência dentro de "SOLICITAR" (Status Box)
 O texto do Status Box (coluna L) para o filtro "SOLICITAR" (passo 3º, seção 3.1) varia — confirmado por Claudio, exemplos reais já vistos: `SOLICITAR URG`, `SOLICITAR MI`, `SOLICITAR`, `SOLICITAR / AGUARDAR DOCS`, entre outros. Cada variante corresponde a um nível de urgência numa escala de 0 (mais urgente) a 5 (menos urgente, mas ainda mais urgente que `PROGRAMAR ATÉ`):
 
