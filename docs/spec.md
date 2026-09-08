@@ -20,7 +20,7 @@ Fora de escopo por enquanto: processo de Recibos de Reembolso (RDP'S) — reembo
 As Fases 3 e 4 acontecem juntas, não uma depois da outra — confirmado por Claudio: no momento em que o e-mail do Danilo é preparado, a nota já foi arquivada (na Fase 2, por função) e a pasta de remessa/Contas a Pagar é montada em paralelo à entrega.
 
 **IMPORTANTE — dois arquivamentos DIFERENTES, não confundir (detalhado na seção 4.2):**
-- **Arquivamento por função** (`FINANCEIRO > 08. NOTAS ARQUIVADAS > ARQUIVO DE NOTAS [PROJETO] > [código] - [CARGO]`): roda na Fase 2, assim que a nota é baixada e validada.
+- **Arquivamento por função** (`FINANCEIRO > 08. NOTAS ARQUIVADAS > ARQUIVO DE NOTAS [PROJETO] > [código] - [CARGO]`): roda na Fase 2, assim que a nota é baixada e validada. **Nomenclatura real de `[PROJETO]`, confirmada por Claudio (não é um padrão único — cada projeto usa a própria convenção)**: AREP = `ARQUIVO DE NOTAS S01` (por código); Reunion = `ARQUIVO DE NOTAS REUNION` (por nome); Soft Pré = `ARQUIVO DE NOTAS SOFT PRE` (decidido em 08/09, por nome — segue o padrão do Reunion, não o do AREP). Não inferir um padrão genérico a partir de um projeto só.
 - **Arquivamento da remessa/Danilo** (`09. CONTAS À PAGAR` / `11. CONTAS À PAGAR - [PROJETO]`, pasta de remessa com sufixo "_MI"): continua na Fase 3+4, só no momento da entrega.
 
 ## 3. Fase 1 — Solicitação de nota ao colaborador
