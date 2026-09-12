@@ -1,7 +1,7 @@
 {
-  "name": "Fase 2 — Recebimento e validação da nota",
+  "name": "Fase 2 — Recebimento e validação da nota (Homolog)",
   "meta": {
-    "description": "Monitora e-mails com NF/recibo anexado (spec.md seção 4): thread conhecida (via threadId em cobrancas.json) ou avulso (extração + match via IA). Chama fase2_finalizar_nota.json (Execute Workflow) pra atualizar a planilha e fazer os 2 salvamentos em paralelo. Sem match confiável: registra pendência e pergunta no Telegram (seção 4, ciclo 8h/18h tratado em fase2_verificar_pendencias.json). Branch dev/homolog x produção completado nos 2 pontos de chamada de IA (extração do anexo e casamento com a planilha) — espelha o padrão já usado na Fase 1 (seção 7.4)."
+    "description": "[GERADO AUTOMATICAMENTE — não edite este arquivo] Ambiente: homolog. Fonte: workflows/_fonte/fase2_recebimento_validacao.fonte.json. Regerar com: node scripts/gerar_workflows.js. Monitora e-mails com NF/recibo anexado (spec.md seção 4): thread conhecida (via threadId em cobrancas.json) ou avulso (extração + match via IA). Chama fase2_finalizar_nota.json (Execute Workflow) pra atualizar a planilha e fazer os 2 salvamentos em paralelo. Sem match confiável: registra pendência e pergunta no Telegram (seção 4, ciclo 8h/18h tratado em fase2_verificar_pendencias.json). Branch dev/homolog x produção completado nos 2 pontos de chamada de IA (extração do anexo e casamento com a planilha) — espelha o padrão já usado na Fase 1 (seção 7.4)."
   },
   "nodes": [
     {
@@ -22,7 +22,8 @@
         "returnAll": true,
         "filters": {
           "q": "has:attachment newer_than:2d"
-        }
+        },
+        "simple": false
       },
       "id": "f2r-02-buscar-recentes",
       "name": "Gmail — Buscar e-mails recentes com anexo",
@@ -34,8 +35,8 @@
       ],
       "credentials": {
         "gmailOAuth2": {
-          "id": "cred-gmail-producao",
-          "name": "Gmail account"
+          "id": "cred-gmail-homolog",
+          "name": "Gmail - Homolog (Claudio Pessoal)"
         }
       },
       "notes": "Caminho do Manual Trigger — janela de 2 dias é um valor razoável pra teste manual, ajustável. O gatilho automático de verdade é o Gmail Trigger abaixo."
@@ -64,8 +65,8 @@
       ],
       "credentials": {
         "gmailOAuth2": {
-          "id": "cred-gmail-producao",
-          "name": "Gmail account"
+          "id": "cred-gmail-homolog",
+          "name": "Gmail - Homolog (Claudio Pessoal)"
         }
       },
       "notes": "Gatilho automático (seção 13.2: além do agendamento, todo workflow tem gatilho manual). Polling a cada minuto — ajustável conforme volume real."
@@ -86,7 +87,7 @@
     {
       "parameters": {
         "operation": "read",
-        "fileSelector": "/home/node/.n8n-files/box-fish-config/config_execucao.json",
+        "fileSelector": "/home/node/.n8n-files/box-fish-config/config_execucao_hml.json",
         "options": {}
       },
       "id": "f2r-05-ler-config",
@@ -101,7 +102,7 @@
     {
       "parameters": {
         "operation": "read",
-        "fileSelector": "/home/node/.n8n-files/box-fish-config/cobrancas.json",
+        "fileSelector": "/home/node/.n8n-files/box-fish-config/cobrancas_hml.json",
         "options": {}
       },
       "id": "f2r-06-ler-cobrancas",
@@ -116,7 +117,7 @@
     {
       "parameters": {
         "operation": "read",
-        "fileSelector": "/home/node/.n8n-files/box-fish-config/pendencias_identificacao.json",
+        "fileSelector": "/home/node/.n8n-files/box-fish-config/pendencias_identificacao_hml.json",
         "options": {}
       },
       "id": "f2r-07-ler-pendencias",
@@ -143,7 +144,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Consolida config + cobrancas + pendencias (binario -> JSON) e embute os perfis\n// (mesma cópia usada na Fase 1 — seção 6 do spec.md).\n// Leitura de binário: esta instância do n8n guarda binário no disco (filesystem-v2),\n// então item.binary.data.data NÃO é o conteúdo, e sim o rótulo do modo de armazenamento.\n// O único acesso liberado no Code Node é helpers.getBinaryDataBuffer, que lê pelo ÍNDICE\n// do item no input DIRETO — daí localizarmos o item pelo id do binário. Cobre os 2 modos.\nconst helpers = this.helpers;\nconst entradasDoNode = $input.all();\nasync function bufferDe(item, prop) {\n  prop = prop || 'data';\n  const b = item && item.binary && item.binary[prop];\n  if (!b) return null;\n  if (!b.id) return Buffer.from(b.data, 'base64'); // modo embutido\n  const i = entradasDoNode.findIndex((e) => e.binary && e.binary[prop] && e.binary[prop].id === b.id);\n  if (i < 0) throw new Error('binario \"' + (b.fileName || prop) + '\" nao esta no input direto deste node — o Code Node so consegue le-lo por ai');\n  return await helpers.getBinaryDataBuffer(i, prop);\n}\n\nasync function parseBinaryJson(item) {\n  if (!item || !item.binary || !item.binary.data) return {};\n  return JSON.parse((await bufferDe(item)).toString('utf8'));\n}\nconst config = await parseBinaryJson($('Ler config_execucao.json').first());\nconst cobrancas = await parseBinaryJson($('Ler cobrancas.json').first());\nconst pendencias = await parseBinaryJson($('Ler pendencias_identificacao.json').first());\n\nconst perfis = {\n  AREP: { projeto: 'AREP (S01 antigo)', texto_ref: 'SMTC', retranca: 'S01' },\n  REUNION: { projeto: 'Reunion (S01)', texto_ref: 'SMTC - REUNION', retranca: 'REUNION_S01' },\n  SOFT_PRE: { projeto: 'Soft Pré (S02)', texto_ref: 'SMTC - SOFT PRE', retranca: 'SOFT PRE_S02' },\n};\n\nreturn [{ json: { config, cobrancas, pendencias, perfis, dominioEmpresa: 'novorealitybox.com' } }];"
+        "jsCode": "// Consolida config + cobrancas + pendencias (binario -> JSON) e embute os perfis\n// (mesma cópia usada na Fase 1 — seção 6 do spec.md).\n// Leitura de binário: esta instância do n8n guarda binário no disco (filesystem-v2),\n// então item.binary.data.data NÃO é o conteúdo, e sim o rótulo do modo de armazenamento.\n// O único acesso liberado no Code Node é helpers.getBinaryDataBuffer, que lê pelo ÍNDICE\n// do item no input DIRETO — daí localizarmos o item pelo id do binário. Cobre os 2 modos.\nconst helpers = this.helpers;\nconst entradasDoNode = $input.all();\nasync function bufferDe(item, prop) {\n  prop = prop || 'data';\n  const b = item && item.binary && item.binary[prop];\n  if (!b) return null;\n  if (!b.id) return Buffer.from(b.data, 'base64'); // modo embutido\n  const i = entradasDoNode.findIndex((e) => e.binary && e.binary[prop] && e.binary[prop].id === b.id);\n  if (i < 0) throw new Error('binario \"' + (b.fileName || prop) + '\" nao esta no input direto deste node — o Code Node so consegue le-lo por ai');\n  return await helpers.getBinaryDataBuffer(i, prop);\n}\n\nasync function parseBinaryJson(item) {\n  if (!item || !item.binary || !item.binary.data) return {};\n  return JSON.parse((await bufferDe(item)).toString('utf8'));\n}\nconst config = await parseBinaryJson($('Ler config_execucao.json').first());\nconst cobrancas = await parseBinaryJson($('Ler cobrancas.json').first());\nconst pendencias = await parseBinaryJson($('Ler pendencias_identificacao.json').first());\n\nconst perfis = {\n  AREP: { projeto: 'AREP (S01 antigo)', texto_ref: 'SMTC', retranca: 'S01' },\n  REUNION: { projeto: 'Reunion (S01)', texto_ref: 'SMTC - REUNION', retranca: 'REUNION_S01' },\n  SOFT_PRE: { projeto: 'Soft Pré (S02)', texto_ref: 'SMTC - SOFT PRE', retranca: 'SOFT PRE_S02' },\n};\n\n// [gerado] ambiente fixado em tempo de geração — este arquivo é \"homolog\" e se comporta como tal,\n// independente do que estiver no config_execucao.json da VM (evita, por exemplo,\n// o arquivo de homolog mandar e-mail pra destinatário real por config divergente).\nconfig.ambiente = 'homolog';\n\nreturn [{ json: { config, cobrancas, pendencias, perfis, dominioEmpresa: 'novorealitybox.com' } }];"
       },
       "id": "f2r-09-carregar-config",
       "name": "Carregar config + perfis",
@@ -158,7 +159,8 @@
       "parameters": {
         "resource": "file",
         "operation": "download",
-        "fileId": "2028817453680"
+        "fileId": "2028817453680",
+        "binaryPropertyName": "data"
       },
       "id": "f2r-10-box-s01",
       "name": "Box — Download Cost Report S01",
@@ -179,7 +181,8 @@
       "parameters": {
         "resource": "file",
         "operation": "download",
-        "fileId": "2366859928452"
+        "fileId": "2366859928452",
+        "binaryPropertyName": "data"
       },
       "id": "f2r-11-box-s02",
       "name": "Box — Download Cost Report S02 (Soft Pré)",
@@ -257,7 +260,8 @@
         "messageId": "={{ $json.email.id }}",
         "options": {
           "downloadAttachments": true
-        }
+        },
+        "simple": false
       },
       "id": "f2r-16-baixar-anexo",
       "name": "Gmail — Baixar anexo",
@@ -269,8 +273,8 @@
       ],
       "credentials": {
         "gmailOAuth2": {
-          "id": "cred-gmail-producao",
-          "name": "Gmail account"
+          "id": "cred-gmail-homolog",
+          "name": "Gmail - Homolog (Claudio Pessoal)"
         }
       }
     },
@@ -364,10 +368,10 @@
     {
       "parameters": {
         "chatId": "749277207",
-        "text": "={{ '❓ Não consegui identificar essa nota (Fase 2)\\n\\nNome/razão social: ' + ($json.extracao?.nomeOuRazaoSocial || '?') + '\\nProjeto (Ref.): ' + ($json.extracao?.projetoRef || '?') + '\\nValor: ' + ($json.extracao?.valor || '?') + '\\nCompetência: ' + ($json.extracao?.competencia || '?') + '\\n\\nResponda a ESTA mensagem (usando \"responder\") com a linha/colaborador correta.' }}",
+        "text": "={{ /* escapa-html */ String('❓ Não consegui identificar essa nota (Fase 2)\\n\\nNome/razão social: ' + ($json.extracao?.nomeOuRazaoSocial || '?') + '\\nProjeto (Ref.): ' + ($json.extracao?.projetoRef || '?') + '\\nValor: ' + ($json.extracao?.valor || '?') + '\\nCompetência: ' + ($json.extracao?.competencia || '?') + '\\n\\nResponda a ESTA mensagem (usando \"responder\") com a linha/colaborador correta.' ?? \"\").replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') }}",
         "additionalFields": {
-          "parse_mode": "Markdown",
-          "appendAttribution": false
+          "appendAttribution": false,
+          "parse_mode": "HTML"
         }
       },
       "id": "f2r-24-telegram-perguntar",
@@ -388,7 +392,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Grava mensagemIdOriginal (retornado pelo Telegram) na pendência recém-criada.\nconst enviado = $input.first().json;\nconst anterior = $('Registrar pendência de identificação').first().json;\nconst pendenciasAtualizadas = { ...anterior.pendenciasAtualizadas };\npendenciasAtualizadas[anterior.chavePendencia].mensagemIdOriginal = enviado.message_id || enviado.result?.message_id || null;\nreturn [{ json: {}, binary: { data: { data: Buffer.from(JSON.stringify(pendenciasAtualizadas, null, 2)).toString('base64'), mimeType: 'application/json', fileName: 'pendencias_identificacao.json' } } }];"
+        "jsCode": "// Grava mensagemIdOriginal (retornado pelo Telegram) na pendência recém-criada.\nconst enviado = $input.first().json;\nconst anterior = $('Registrar pendência de identificação').first().json;\nconst pendenciasAtualizadas = { ...anterior.pendenciasAtualizadas };\npendenciasAtualizadas[anterior.chavePendencia].mensagemIdOriginal = enviado.message_id || enviado.result?.message_id || null;\nreturn [{ json: {}, binary: { data: { data: Buffer.from(JSON.stringify(pendenciasAtualizadas, null, 2)).toString('base64'), mimeType: 'application/json', fileName: 'pendencias_identificacao_hml.json' } } }];"
       },
       "id": "f2r-25-preparar-grava-pendencias",
       "name": "Preparar pendencias_identificacao.json atualizado",
@@ -403,7 +407,7 @@
     {
       "parameters": {
         "operation": "write",
-        "fileName": "/home/node/.n8n-files/box-fish-config/pendencias_identificacao.json",
+        "fileName": "/home/node/.n8n-files/box-fish-config/pendencias_identificacao_hml.json",
         "dataPropertyName": "data"
       },
       "id": "f2r-26-gravar-pendencias",
@@ -431,7 +435,11 @@
     },
     {
       "parameters": {
-        "workflowId": "REPLACE_WITH_fase2_finalizar_nota_WORKFLOW_ID",
+        "workflowId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_fase2_finalizar_nota_WORKFLOW_ID",
+          "mode": "id"
+        },
         "mode": "each"
       },
       "id": "f2r-28-executar-finalizar",
@@ -456,31 +464,6 @@
     },
     {
       "parameters": {
-        "conditions": {
-          "conditions": [
-            {
-              "leftValue": "={{ $json.config.ambiente }}",
-              "rightValue": "homolog",
-              "operator": {
-                "type": "string",
-                "operation": "equals"
-              }
-            }
-          ]
-        }
-      },
-      "id": "f2r-17a-if-ambiente-extracao",
-      "name": "IF — Ambiente = homolog? (extração)",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
-      "position": [
-        2420,
-        80
-      ],
-      "notes": "Eixo 1 (spec.md seção 7.4) — decide qual credencial de IA usar. homolog usa 'Claude account (dev)', produção usa 'Claude account (produção)'."
-    },
-    {
-      "parameters": {
         "method": "POST",
         "url": "https://api.anthropic.com/v1/messages",
         "authentication": "predefinedCredentialType",
@@ -499,7 +482,7 @@
         "jsonBody": "={{ JSON.stringify({\n  model: 'claude-haiku-4-5', max_tokens: 1024,\n  system: \"Voce extrai dados de identificacao de uma nota fiscal ou recibo (PDF ou imagem) recebido por e-mail de um colaborador/fornecedor da produtora Box Fish.\\n\\nResponda SOMENTE com um objeto JSON (sem markdown, sem texto fora do JSON):\\n{\\\"nomeOuRazaoSocial\\\": string|null, \\\"projetoRef\\\": string|null, \\\"valor\\\": number|null, \\\"competencia\\\": string|null, \\\"numeroNota\\\": string|null, \\\"dataEmissao\\\": \\\"DD/MM/AAAA\\\"|null, \\\"tipoDocumento\\\": \\\"NF\\\"|\\\"RECIBO\\\"|\\\"FATURA\\\"|null, \\\"situacaoNaoMapeada\\\": string|null}\\n\\nRegras: nomeOuRazaoSocial e o nome do colaborador OU a razao social do fornecedor EMISSOR do documento (quem esta emitindo, nao a Box Fish, que e sempre a tomadora). projetoRef e o texto \\\"Ref.\\\" do documento, se houver. numeroNota so os digitos. Se nao conseguir ler algum campo com confianca, deixe null nesse campo especifico - nunca invente. Se o documento for ilegivel ou nao reconhecivel como nota/recibo, preencha situacaoNaoMapeada.\",\n  messages: [{ role: 'user', content: [\n    { type: $binary.data.mimeType === 'application/pdf' ? 'document' : 'image', source: { type: 'base64', media_type: $binary.data.mimeType, data: $binary.data.data } },\n    { type: 'text', text: 'Extraia os dados desta nota fiscal/recibo conforme as instruções do system prompt.' }\n  ] }]\n}) }}"
       },
       "id": "f2r-17b-ia-extracao-dev",
-      "name": "IA — Extrair dados do anexo (Claude, dev/homolog)",
+      "name": "IA — Extrair dados do anexo (Claude)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
@@ -530,82 +513,10 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({\n  model: 'claude-haiku-4-5', max_tokens: 1024,\n  system: \"Voce extrai dados de identificacao de uma nota fiscal ou recibo (PDF ou imagem) recebido por e-mail de um colaborador/fornecedor da produtora Box Fish.\\n\\nResponda SOMENTE com um objeto JSON (sem markdown, sem texto fora do JSON):\\n{\\\"nomeOuRazaoSocial\\\": string|null, \\\"projetoRef\\\": string|null, \\\"valor\\\": number|null, \\\"competencia\\\": string|null, \\\"numeroNota\\\": string|null, \\\"dataEmissao\\\": \\\"DD/MM/AAAA\\\"|null, \\\"tipoDocumento\\\": \\\"NF\\\"|\\\"RECIBO\\\"|\\\"FATURA\\\"|null, \\\"situacaoNaoMapeada\\\": string|null}\\n\\nRegras: nomeOuRazaoSocial e o nome do colaborador OU a razao social do fornecedor EMISSOR do documento (quem esta emitindo, nao a Box Fish, que e sempre a tomadora). projetoRef e o texto \\\"Ref.\\\" do documento, se houver. numeroNota so os digitos. Se nao conseguir ler algum campo com confianca, deixe null nesse campo especifico - nunca invente. Se o documento for ilegivel ou nao reconhecivel como nota/recibo, preencha situacaoNaoMapeada.\",\n  messages: [{ role: 'user', content: [\n    { type: $binary.data.mimeType === 'application/pdf' ? 'document' : 'image', source: { type: 'base64', media_type: $binary.data.mimeType, data: $binary.data.data } },\n    { type: 'text', text: 'Extraia os dados desta nota fiscal/recibo conforme as instruções do system prompt.' }\n  ] }]\n}) }}"
-      },
-      "id": "f2r-17c-ia-extracao-prod",
-      "name": "IA — Extrair dados do anexo (Claude, produção)",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        2640,
-        140
-      ],
-      "credentials": {
-        "anthropicApi": {
-          "id": "cred-claude-producao",
-          "name": "Claude account (produção)"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "numberInputs": 2
-      },
-      "id": "f2r-17d-merge-extracao",
-      "name": "Merge — resposta IA (extração)",
-      "type": "n8n-nodes-base.merge",
-      "typeVersion": 3,
-      "position": [
-        2860,
-        80
-      ]
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "conditions": [
-            {
-              "leftValue": "={{ $json.config.ambiente }}",
-              "rightValue": "homolog",
-              "operator": {
-                "type": "string",
-                "operation": "equals"
-              }
-            }
-          ]
-        }
-      },
-      "id": "f2r-20a-if-ambiente-casar",
-      "name": "IF — Ambiente = homolog? (casar)",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
-      "position": [
-        3080,
-        -60
-      ],
-      "notes": "Eixo 1 (spec.md seção 7.4) — decide qual credencial de IA usar. homolog usa 'Claude account (dev)', produção usa 'Claude account (produção)'."
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "https://api.anthropic.com/v1/messages",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "anthropicApi",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "anthropic-version",
-              "value": "2023-06-01"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({\n  model: 'claude-haiku-4-5', max_tokens: 512,\n  system: \"Voce recebe um nome de colaborador ou razao social extraido de uma nota fiscal, e uma lista de nomes/razoes sociais candidatos vindos de uma planilha (cada um com um identificador de linha).\\n\\nResponda SOMENTE com um objeto JSON (sem markdown, sem texto fora do JSON):\\n{\\\"linhaEncontrada\\\": <identificador da linha, do jeito que veio na lista>|null, \\\"confiavel\\\": boolean, \\\"situacaoNaoMapeada\\\": string|null}\\n\\nRegras: considere variacoes de acentuacao, maiusculas/minusculas, abreviacoes e pequena diferenca de escrita como o MESMO nome. confiavel so e true se voce tiver certeza razoavel - se houver ambiguidade real entre 2+ candidatos parecidos, ou nenhum candidato parecido, use confiavel=false e linhaEncontrada=null. Nunca invente uma linha que nao esteja na lista de candidatos.\",\n  messages: [{ role: 'user', content: JSON.stringify({ nomeExtraido: $json.extracao.nomeOuRazaoSocial, candidatos: $json.roster.map(r => ({chave: r.chave, nome: r.nome, fornecedor: r.fornecedor})) }) }]\n}) }}"
       },
       "id": "f2r-20b-ia-casar-dev",
-      "name": "IA — Casar com a planilha (Claude, dev/homolog)",
+      "name": "IA — Casar com a planilha (Claude)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
@@ -618,53 +529,6 @@
           "name": "Claude account (dev)"
         }
       }
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "https://api.anthropic.com/v1/messages",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "anthropicApi",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "anthropic-version",
-              "value": "2023-06-01"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({\n  model: 'claude-haiku-4-5', max_tokens: 512,\n  system: \"Voce recebe um nome de colaborador ou razao social extraido de uma nota fiscal, e uma lista de nomes/razoes sociais candidatos vindos de uma planilha (cada um com um identificador de linha).\\n\\nResponda SOMENTE com um objeto JSON (sem markdown, sem texto fora do JSON):\\n{\\\"linhaEncontrada\\\": <identificador da linha, do jeito que veio na lista>|null, \\\"confiavel\\\": boolean, \\\"situacaoNaoMapeada\\\": string|null}\\n\\nRegras: considere variacoes de acentuacao, maiusculas/minusculas, abreviacoes e pequena diferenca de escrita como o MESMO nome. confiavel so e true se voce tiver certeza razoavel - se houver ambiguidade real entre 2+ candidatos parecidos, ou nenhum candidato parecido, use confiavel=false e linhaEncontrada=null. Nunca invente uma linha que nao esteja na lista de candidatos.\",\n  messages: [{ role: 'user', content: JSON.stringify({ nomeExtraido: $json.extracao.nomeOuRazaoSocial, candidatos: $json.roster.map(r => ({chave: r.chave, nome: r.nome, fornecedor: r.fornecedor})) }) }]\n}) }}"
-      },
-      "id": "f2r-20c-ia-casar-prod",
-      "name": "IA — Casar com a planilha (Claude, produção)",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        3300,
-        0
-      ],
-      "credentials": {
-        "anthropicApi": {
-          "id": "cred-claude-producao",
-          "name": "Claude account (produção)"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "numberInputs": 2
-      },
-      "id": "f2r-20d-merge-casar",
-      "name": "Merge — resposta IA (casar)",
-      "type": "n8n-nodes-base.merge",
-      "typeVersion": 3,
-      "position": [
-        3520,
-        -60
-      ]
     }
   ],
   "connections": {
@@ -857,20 +721,9 @@
       "main": [
         [
           {
-            "node": "IF — Ambiente = homolog? (extração)",
+            "node": "IA — Extrair dados do anexo (Claude)",
             "type": "main",
             "index": 0
-          }
-        ]
-      ]
-    },
-    "IA — Extrair dados do anexo (Claude, produção)": {
-      "main": [
-        [
-          {
-            "node": "Merge — resposta IA (extração)",
-            "type": "main",
-            "index": 1
           }
         ]
       ]
@@ -897,20 +750,9 @@
         ],
         [
           {
-            "node": "IF — Ambiente = homolog? (casar)",
+            "node": "IA — Casar com a planilha (Claude)",
             "type": "main",
             "index": 0
-          }
-        ]
-      ]
-    },
-    "IA — Casar com a planilha (Claude, produção)": {
-      "main": [
-        [
-          {
-            "node": "Merge — resposta IA (casar)",
-            "type": "main",
-            "index": 1
           }
         ]
       ]
@@ -999,36 +841,7 @@
         ]
       ]
     },
-    "IF — Ambiente = homolog? (extração)": {
-      "main": [
-        [
-          {
-            "node": "IA — Extrair dados do anexo (Claude, dev/homolog)",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "IA — Extrair dados do anexo (Claude, produção)",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "IA — Extrair dados do anexo (Claude, dev/homolog)": {
-      "main": [
-        [
-          {
-            "node": "Merge — resposta IA (extração)",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Merge — resposta IA (extração)": {
+    "IA — Extrair dados do anexo (Claude)": {
       "main": [
         [
           {
@@ -1039,36 +852,7 @@
         ]
       ]
     },
-    "IF — Ambiente = homolog? (casar)": {
-      "main": [
-        [
-          {
-            "node": "IA — Casar com a planilha (Claude, dev/homolog)",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "IA — Casar com a planilha (Claude, produção)",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "IA — Casar com a planilha (Claude, dev/homolog)": {
-      "main": [
-        [
-          {
-            "node": "Merge — resposta IA (casar)",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Merge — resposta IA (casar)": {
+    "IA — Casar com a planilha (Claude)": {
       "main": [
         [
           {

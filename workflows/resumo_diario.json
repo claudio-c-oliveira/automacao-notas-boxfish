@@ -128,10 +128,10 @@
     {
       "parameters": {
         "chatId": "={{ $json.chatId }}",
-        "text": "={{ $json.texto }}",
+        "text": "={{ /* escapa-html */ String($json.texto ?? \"\").replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') }}",
         "additionalFields": {
-          "parse_mode": "Markdown",
-          "appendAttribution": false
+          "appendAttribution": false,
+          "parse_mode": "HTML"
         }
       },
       "id": "r09-telegram-enviar",

@@ -1,7 +1,7 @@
 {
-  "name": "Fase 2 — Verificar pendências de identificação",
+  "name": "Fase 2 — Verificar pendências de identificação (Homolog)",
   "meta": {
-    "description": "Ciclo 8h/18h de perguntas sem resposta (spec.md seção 4) + resolução da resposta da Michelle no Telegram. Correlação de resposta CORRIGIDA (commit 3db5653): reply é a forma principal, nunca adivinha entre pendências múltiplas."
+    "description": "[GERADO AUTOMATICAMENTE — não edite este arquivo] Ambiente: homolog. Fonte: workflows/_fonte/fase2_verificar_pendencias.fonte.json. Regerar com: node scripts/gerar_workflows.js. Ciclo 8h/18h de perguntas sem resposta (spec.md seção 4) + resolução da resposta da Michelle no Telegram. Correlação de resposta CORRIGIDA (commit 3db5653): reply é a forma principal, nunca adivinha entre pendências múltiplas."
   },
   "nodes": [
     {
@@ -27,7 +27,7 @@
     {
       "parameters": {
         "operation": "read",
-        "fileSelector": "/home/node/.n8n-files/box-fish-config/pendencias_identificacao.json",
+        "fileSelector": "/home/node/.n8n-files/box-fish-config/pendencias_identificacao_hml.json",
         "options": {}
       },
       "id": "f2p-02-ler-pendencias-a",
@@ -79,10 +79,10 @@
     {
       "parameters": {
         "chatId": "749277207",
-        "text": "={{ '⏰ Lembrete — ainda preciso identificar essa nota (Fase 2)\\n\\nNome/razão social: ' + ($json.pendencia?.dadosReferencia?.nomeOuRazaoSocial || '?') + '\\nValor: ' + ($json.pendencia?.dadosReferencia?.valor || '?') + '\\n\\nResponda a ESTA mensagem (usando \"responder\") com a linha/colaborador correta.' }}",
+        "text": "={{ /* escapa-html */ String('⏰ Lembrete — ainda preciso identificar essa nota (Fase 2)\\n\\nNome/razão social: ' + ($json.pendencia?.dadosReferencia?.nomeOuRazaoSocial || '?') + '\\nValor: ' + ($json.pendencia?.dadosReferencia?.valor || '?') + '\\n\\nResponda a ESTA mensagem (usando \"responder\") com a linha/colaborador correta.' ?? \"\").replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') }}",
         "additionalFields": {
-          "parse_mode": "Markdown",
-          "appendAttribution": false
+          "appendAttribution": false,
+          "parse_mode": "HTML"
         }
       },
       "id": "f2p-05-telegram-lembrete",
@@ -103,10 +103,10 @@
     {
       "parameters": {
         "chatId": "749277207",
-        "text": "={{ '🛑 Ciclo encerrado sem resposta (Fase 2)\\n\\nNome/razão social: ' + ($json.pendencia?.dadosReferencia?.nomeOuRazaoSocial || '?') + '\\nValor: ' + ($json.pendencia?.dadosReferencia?.valor || '?') + '\\n\\nPassaram 26h sem resposta — não vou mais perguntar automaticamente sobre essa nota. Fica pendente pra você resolver manualmente.' }}",
+        "text": "={{ /* escapa-html */ String('🛑 Ciclo encerrado sem resposta (Fase 2)\\n\\nNome/razão social: ' + ($json.pendencia?.dadosReferencia?.nomeOuRazaoSocial || '?') + '\\nValor: ' + ($json.pendencia?.dadosReferencia?.valor || '?') + '\\n\\nPassaram 26h sem resposta — não vou mais perguntar automaticamente sobre essa nota. Fica pendente pra você resolver manualmente.' ?? \"\").replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') }}",
         "additionalFields": {
-          "parse_mode": "Markdown",
-          "appendAttribution": false
+          "appendAttribution": false,
+          "parse_mode": "HTML"
         }
       },
       "id": "f2p-06-telegram-encerrar",
@@ -165,7 +165,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Consolida todas as atualizações desta execução (podem ser várias pendências\n// tratadas na mesma varredura) num único pendencias_identificacao.json.\nconst itens = $input.all().map((i) => i.json);\nlet consolidado = {};\nfor (const it of itens) {\n  consolidado = { ...consolidado, ...it.pendencias };\n}\nreturn [{ json: {}, binary: { data: { data: Buffer.from(JSON.stringify(consolidado, null, 2)).toString('base64'), mimeType: 'application/json', fileName: 'pendencias_identificacao.json' } } }];"
+        "jsCode": "// Consolida todas as atualizações desta execução (podem ser várias pendências\n// tratadas na mesma varredura) num único pendencias_identificacao.json.\nconst itens = $input.all().map((i) => i.json);\nlet consolidado = {};\nfor (const it of itens) {\n  consolidado = { ...consolidado, ...it.pendencias };\n}\nreturn [{ json: {}, binary: { data: { data: Buffer.from(JSON.stringify(consolidado, null, 2)).toString('base64'), mimeType: 'application/json', fileName: 'pendencias_identificacao_hml.json' } } }];"
       },
       "id": "f2p-10-consolidar",
       "name": "Consolidar atualizações de pendências",
@@ -179,7 +179,7 @@
     {
       "parameters": {
         "operation": "write",
-        "fileName": "/home/node/.n8n-files/box-fish-config/pendencias_identificacao.json",
+        "fileName": "/home/node/.n8n-files/box-fish-config/pendencias_identificacao_hml.json",
         "dataPropertyName": "data"
       },
       "id": "f2p-11-gravar",
@@ -215,7 +215,7 @@
     {
       "parameters": {
         "operation": "read",
-        "fileSelector": "/home/node/.n8n-files/box-fish-config/pendencias_identificacao.json",
+        "fileSelector": "/home/node/.n8n-files/box-fish-config/pendencias_identificacao_hml.json",
         "options": {}
       },
       "id": "f2p-13-ler-pendencias-b",
@@ -318,10 +318,10 @@
     {
       "parameters": {
         "chatId": "={{ $json.chatId }}",
-        "text": "={{ '⚠️ Tenho mais de uma nota pendente de identificação ao mesmo tempo — não vou adivinhar qual você quis responder.\\n\\nPra essa aqui (' + ($json.pendencia?.dadosReferencia?.nomeOuRazaoSocial || '?') + ', R$ ' + ($json.pendencia?.dadosReferencia?.valor || '?') + '), responda usando \"responder\" NESTA mensagem específica.' }}",
+        "text": "={{ /* escapa-html */ String('⚠️ Tenho mais de uma nota pendente de identificação ao mesmo tempo — não vou adivinhar qual você quis responder.\\n\\nPra essa aqui (' + ($json.pendencia?.dadosReferencia?.nomeOuRazaoSocial || '?') + ', R$ ' + ($json.pendencia?.dadosReferencia?.valor || '?') + '), responda usando \"responder\" NESTA mensagem específica.' ?? \"\").replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') }}",
         "additionalFields": {
-          "parse_mode": "Markdown",
-          "appendAttribution": false
+          "appendAttribution": false,
+          "parse_mode": "HTML"
         }
       },
       "id": "f2p-18-telegram-pedir-reply",
@@ -343,7 +343,8 @@
       "parameters": {
         "resource": "file",
         "operation": "download",
-        "fileId": "2028817453680"
+        "fileId": "2028817453680",
+        "binaryPropertyName": "data"
       },
       "id": "f2p-19-box-s01",
       "name": "Box — Download Cost Report S01",
@@ -364,7 +365,8 @@
       "parameters": {
         "resource": "file",
         "operation": "download",
-        "fileId": "2366859928452"
+        "fileId": "2366859928452",
+        "binaryPropertyName": "data"
       },
       "id": "f2p-20-box-s02",
       "name": "Box — Download Cost Report S02 (Soft Pré)",
@@ -447,7 +449,11 @@
     },
     {
       "parameters": {
-        "workflowId": "REPLACE_WITH_fase2_finalizar_nota_WORKFLOW_ID",
+        "workflowId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_fase2_finalizar_nota_WORKFLOW_ID",
+          "mode": "id"
+        },
         "mode": "each",
         "workflowInputs": {
           "value": "={{ $json.payload }}"
@@ -464,7 +470,7 @@
     },
     {
       "parameters": {
-        "jsCode": "return [{ json: {}, binary: { data: { data: Buffer.from(JSON.stringify($json.pendenciasAtualizadas, null, 2)).toString('base64'), mimeType: 'application/json', fileName: 'pendencias_identificacao.json' } } }];"
+        "jsCode": "return [{ json: {}, binary: { data: { data: Buffer.from(JSON.stringify($json.pendenciasAtualizadas, null, 2)).toString('base64'), mimeType: 'application/json', fileName: 'pendencias_identificacao_hml.json' } } }];"
       },
       "id": "f2p-26-preparar-grava-resolvida",
       "name": "Preparar gravação (resolvida)",
@@ -478,7 +484,7 @@
     {
       "parameters": {
         "operation": "write",
-        "fileName": "/home/node/.n8n-files/box-fish-config/pendencias_identificacao.json",
+        "fileName": "/home/node/.n8n-files/box-fish-config/pendencias_identificacao_hml.json",
         "dataPropertyName": "data"
       },
       "id": "f2p-27-gravar-resolvida",
@@ -495,7 +501,8 @@
         "chatId": "={{ $('Correlacionar resposta da Michelle').first().json.chatId }}",
         "text": "Não achei essa nem no roster comparando com o texto que você mandou — pode responder só com o nome do colaborador/fornecedor exatamente como aparece na planilha?",
         "additionalFields": {
-          "appendAttribution": false
+          "appendAttribution": false,
+          "parse_mode": "HTML"
         }
       },
       "id": "f2p-28-telegram-nao-achou",

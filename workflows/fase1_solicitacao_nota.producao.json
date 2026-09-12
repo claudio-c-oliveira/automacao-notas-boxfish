@@ -5,36 +5,24 @@
   },
   "nodes": [
     {
-      "parameters": {},
-      "id": "n01-manual-trigger",
-      "name": "Manual Trigger",
-      "type": "n8n-nodes-base.manualTrigger",
-      "typeVersion": 1,
-      "position": [
-        0,
-        0
-      ]
-    },
-    {
       "parameters": {
-        "rule": {
-          "interval": [
+        "workflowInputs": {
+          "values": [
             {
-              "field": "days",
-              "daysInterval": 1,
-              "triggerAtHour": 8
+              "name": "fonteId"
             }
           ]
         }
       },
-      "id": "n02-schedule-trigger",
-      "name": "Schedule Trigger (diário 08h)",
-      "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1.2,
+      "id": "n01-trigger-fonte",
+      "name": "Trigger — fonte a processar",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
       "position": [
         0,
-        160
-      ]
+        0
+      ],
+      "notes": "Recebe UMA fonte de Cost Report por execução (S01 ou S02). Quem dispara é o workflow despachante — spec.md 3.1.5, processamento sequencial por fonte."
     },
     {
       "parameters": {
@@ -112,7 +100,8 @@
       "parameters": {
         "resource": "file",
         "operation": "download",
-        "fileId": "2028817453680"
+        "fileId": "2028817453680",
+        "binaryPropertyName": "data"
       },
       "id": "n08-box-download-s01",
       "name": "Box — Download Cost Report S01",
@@ -134,7 +123,8 @@
       "parameters": {
         "resource": "file",
         "operation": "download",
-        "fileId": "2366859928452"
+        "fileId": "2366859928452",
+        "binaryPropertyName": "data"
       },
       "id": "n09-box-download-s02",
       "name": "Box — Download Cost Report S02 (Soft Pré)",
@@ -210,7 +200,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// 'Modo assistido' (secao 7.4): limite_linhas_execucao corta o numero de linhas\n// processadas nesta execucao. null/0 = sem limite.\n//\n// ORDEM DE PRIORIDADE dentro do limite (confirmada por Claudio):\n//   1o  SOLICITAR (e variantes) — pedido imediato, e o que a Michelle esta esperando sair\n//   2o  PROGRAMAR ATE          — tem data marcada, aguenta a proxima execucao\n//   3o  Monitoramento          — so se sobrar vaga; cobranca pode esperar\n// Vale igual em homolog e producao.\n//\n// O corte era pela ordem da planilha: com limite baixo, uma leva de linhas de\n// monitoramento no topo consumia as vagas e nenhum pedido saia.\n//\n// A ordenacao roda mesmo SEM limite. Nao muda o que e processado, so a ordem — e\n// mantem o comportamento previsivel entre uma execucao limitada e uma sem limite.\n\nfunction prioridade(d) {\n  if (d.fluxo === 'novo_pedido' && d.gatilho === 'SOLICITAR') return 0;\n  if (d.fluxo === 'novo_pedido' && d.gatilho === 'PROGRAMAR_ATE') return 1;\n  if (d.fluxo === 'monitoramento') return 2;\n  return 3; // nao previsto: fica por ultimo em vez de furar a fila\n}\n\n// Desempate DENTRO da categoria SOLICITAR: escala 0 -> 1 -> 5 (secao 3.1.4). Nas outras\n// categorias nao existe escala, entao todas empatam em 0 e a ordem da planilha decide.\nfunction subPrioridade(d) {\n  if (d.fluxo === 'novo_pedido' && d.gatilho === 'SOLICITAR') {\n    return typeof d.escalaUrgencia === 'number' ? d.escalaUrgencia : 1;\n  }\n  return 0;\n}\n\nconst config = $('Carregar config + perfis').first().json.config;\nconst limite = config && config.limite_linhas_execucao;\n\n// sort do JS e estavel: dentro da mesma prioridade, a ordem da planilha e preservada\nconst itens = $input.all().slice().sort((a, b) =>\n  (prioridade(a.json) - prioridade(b.json)) || (subPrioridade(a.json) - subPrioridade(b.json)));\n\nif (!limite || limite <= 0) return itens;\nreturn itens.slice(0, limite);"
+        "jsCode": "// 'Modo assistido' (secao 7.4): limite_linhas_execucao corta o numero de linhas\n// processadas nesta execucao. null/0 = sem limite.\n//\n// ORDEM DE PRIORIDADE dentro do limite (confirmada por Claudio):\n//   1o  SOLICITAR (e variantes) — pedido imediato, e o que a Michelle esta esperando sair\n//   2o  PROGRAMAR ATE          — tem data marcada, aguenta a proxima execucao\n//   3o  Monitoramento          — so se sobrar vaga; cobranca pode esperar\n// Vale igual em homolog e producao.\n//\n// O corte era pela ordem da planilha: com limite baixo, uma leva de linhas de\n// monitoramento no topo consumia as vagas e nenhum pedido saia.\n//\n// A ordenacao roda mesmo SEM limite. Nao muda o que e processado, so a ordem — e\n// mantem o comportamento previsivel entre uma execucao limitada e uma sem limite.\n//\n// MUDANCA (09/09, spec.md secao 7.4) — O LIMITE E UM TETO POR PROJETO.\n// Nao e cota fixa: se o projeto tiver menos linhas elegiveis que o teto, processa todas,\n// sem forcar chegar no numero. E o teto e POR PROJETO (AREP, Reunion, Soft Pre cada um com\n// o seu), nao por arquivo — importante porque AREP e Reunion dividem o MESMO arquivo fisico\n// (Cost Report S01, diferenciados por cor de linha, secao 6). Um teto por arquivo faria os\n// dois disputarem a mesma cota; por projeto, cada um e avaliado separadamente.\n// Ex.: com limite=20, AREP com 2 linhas e Reunion com 15 rodam por inteiro (2 e 15).\n\nfunction projetoDe(d) {\n  return (d && d.nota && d.nota.projetoId) || 'DESCONHECIDO';\n}\n\nfunction prioridade(d) {\n  if (d.fluxo === 'novo_pedido' && d.gatilho === 'SOLICITAR') return 0;\n  if (d.fluxo === 'novo_pedido' && d.gatilho === 'PROGRAMAR_ATE') return 1;\n  if (d.fluxo === 'monitoramento') return 2;\n  return 3; // nao previsto: fica por ultimo em vez de furar a fila\n}\n\n// Desempate DENTRO da categoria SOLICITAR: escala 0 -> 1 -> 5 (secao 3.1.4). Nas outras\n// categorias nao existe escala, entao todas empatam em 0 e a ordem da planilha decide.\nfunction subPrioridade(d) {\n  if (d.fluxo === 'novo_pedido' && d.gatilho === 'SOLICITAR') {\n    return typeof d.escalaUrgencia === 'number' ? d.escalaUrgencia : 1;\n  }\n  return 0;\n}\n\n// sort do JS e estavel: dentro da mesma prioridade, a ordem da planilha e preservada\nfunction ordenar(itens) {\n  return itens.slice().sort((a, b) =>\n    (prioridade(a.json) - prioridade(b.json)) || (subPrioridade(a.json) - subPrioridade(b.json)));\n}\n\nconst config = $('Carregar config + perfis').first().json.config;\nconst limite = config && config.limite_linhas_execucao;\n\nconst todos = ordenar($input.all());\nif (!limite || limite <= 0) return todos;\n\n// aplica o teto DENTRO de cada projeto, preservando a ordem de prioridade\nconst contagem = {};\nconst escolhidos = [];\nfor (const item of todos) {\n  const p = projetoDe(item.json);\n  contagem[p] = (contagem[p] || 0) + 1;\n  if (contagem[p] <= limite) escolhidos.push(item);\n}\nreturn escolhidos;\n"
       },
       "id": "n14b-limite-execucao",
       "name": "Aplicar limite de execução (modo assistido)",
@@ -267,7 +257,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Checagem B das duas paralelas (spec 3.1): ficha cadastral respondida na thread\n// marcada CONTRATAÇÃO. Sinal válido = mensagem de remetente FORA do domínio da empresa\n// com pelo menos 1 anexo (spec 3.1) — o anexo do pedido original não conta.\n//\n// As mensagens são reagrupadas POR LINHA via pairedItem. O node do Gmail roda uma busca\n// por linha e devolve tudo achatado num fluxo só; sem reagrupar, o anexo de um colaborador\n// validaria a linha de outro, e só a primeira linha sobreviveria.\n\nfunction normalizar(texto) {\n  if (!texto) return '';\n  return String(texto).normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toLowerCase().trim().replace(/\\s+/g, ' ');\n}\n\nfunction indiceDeOrigem(item) {\n  const p = item.pairedItem;\n  if (p === undefined || p === null) return null;\n  if (typeof p === 'number') return p;\n  if (Array.isArray(p)) return p.length && p[0] ? p[0].item : null;\n  return p.item === undefined ? null : p.item;\n}\n\nfunction validarFichaCadastral(mensagens, dominioEmpresa) {\n  const dominioNorm = normalizar(dominioEmpresa);\n  return (mensagens || []).some((msg) => {\n    const from = (msg.from || (msg.headers && msg.headers.from) || '');\n    const dominioRemetente = normalizar((from.split('@')[1] || '').replace('>', ''));\n    const externo = dominioRemetente !== '' && dominioRemetente !== dominioNorm;\n    const temAnexo = !!(msg.hasAttachment || (msg.payload && msg.payload.parts && msg.payload.parts.some((p) => p.filename)));\n    return externo && temAnexo;\n  });\n}\n\nconst origem = $('Preparar checagem paralela de contrato').all().map((i) => i.json);\n\nconst mensagensPorLinha = new Map();\nfor (const item of $input.all()) {\n  const i = indiceDeOrigem(item);\n  if (i === null || !origem[i]) continue;\n  const chave = origem[i].chaveLinha;\n  if (!mensagensPorLinha.has(chave)) mensagensPorLinha.set(chave, []);\n  mensagensPorLinha.get(chave).push(item.json);\n}\n\n// Devolve UMA linha por linha de origem, mesmo sem mensagem nenhuma — assim o\n// consolidador sempre recebe o par completo das duas checagens.\nreturn origem.map((linha) => {\n  const mensagens = mensagensPorLinha.get(linha.chaveLinha) || [];\n  const confirmado = validarFichaCadastral(mensagens, linha.dominioEmpresa || 'novorealitybox.com');\n  return { json: {\n    ...linha,\n    fonteChecagem: 'ficha_cadastral',\n    confirmado,\n    atualizarColunaNPara: confirmado ? 'OK - ASSINADO' : undefined,\n  } };\n});"
+        "jsCode": "// ETAPA 2 do spec 3.1 (simplificada em 11/09) — e a UNICA que confirma \"OK - ASSINADO\".\n//\n// A ficha cadastral real e SEMPRE .xlsx (confirmado por Claudio; exemplo real\n// \"BR_SMTC_S01_FICHA CADASTRAL....xlsx\"). Os PDFs anexados sao documentos de APOIO da empresa\n// (NIRE, CNPJ, contrato de locacao) — provam que a empresa existe, nao que a ficha e daquela\n// pessoa. Por isso so o .xlsx e lido aqui, com exceljs (ja disponivel na VM: sem IA, sem PDF).\n//\n// Se nenhum candidato tiver .xlsx, a linha fica PENDENTE — mesmo que a Etapa 1 tenha achado\n// algo \"quase certo\". Nunca liberar so pela Etapa 1: foi exatamente isso que produziu o falso\n// positivo do caso \"Vanessa Paes\".\n//\n// A correspondencia e a MESMA da checagem de Contratos: documento primeiro (identifica de\n// forma unica), nome com tolerancia de 1º/ultimo token depois.\n\nconst ExcelJS = require('exceljs');\n\nfunction normalizar(texto) {\n  if (!texto) return '';\n  return String(texto).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim().replace(/\\s+/g, ' ');\n}\n\nfunction digitosDeDocumento(texto) {\n  const m = String(texto || '').match(/\\d[\\d.\\-/]{7,}/);\n  if (!m) return null;\n  const d = m[0].replace(/\\D/g, '');\n  return d.length >= 8 ? d : null;\n}\n\nfunction documentosBatem(a, b) {\n  if (!a || !b) return false;\n  if (a === b) return true;\n  const curto = a.length <= b.length ? a : b;\n  const longo = a.length <= b.length ? b : a;\n  return curto.length >= 8 && longo.indexOf(curto) === 0;\n}\n\nfunction distanciaAte1(a, b) {\n  if (a === b) return true;\n  const dif = Math.abs(a.length - b.length);\n  if (dif > 1) return false;\n  const curta = a.length <= b.length ? a : b;\n  const longa = a.length <= b.length ? b : a;\n  let i = 0;\n  while (i < curta.length && curta[i] === longa[i]) i++;\n  let j = 0;\n  while (j < curta.length - i && curta[curta.length - 1 - j] === longa[longa.length - 1 - j]) j++;\n  return i + j >= curta.length - (dif === 0 ? 1 : 0);\n}\n\nfunction tokensDoNome(nome) {\n  return normalizar(String(nome || '').replace(/^[\\d.\\-/\\s]+/, '')).split(' ').filter(Boolean);\n}\n\nfunction nomesBatem(a, b) {\n  const ta = tokensDoNome(a);\n  const tb = tokensDoNome(b);\n  if (!ta.length || !tb.length) return false;\n  return distanciaAte1(ta[0], tb[0]) && distanciaAte1(ta[ta.length - 1], tb[tb.length - 1]);\n}\n\n// \"FICHA\" no nome do arquivo e sinal de que e a ficha certa, e nao outra planilha qualquer\n// que veio junto — por isso essas vem primeiro na ordem de tentativa (spec 3.1).\nfunction planilhasDoItem(item) {\n  const props = Object.keys((item && item.binary) || {});\n  const xlsx = props.filter((pr) => /\\.xlsx$/i.test(String(item.binary[pr].fileName || '')));\n  const comFicha = xlsx.filter((pr) => /ficha/i.test(String(item.binary[pr].fileName || '')));\n  const resto = xlsx.filter((pr) => !comFicha.includes(pr));\n  return comFicha.concat(resto);\n}\n\nasync function textosDaPlanilha(indice, prop) {\n  const buffer = await this.helpers.getBinaryDataBuffer(indice, prop);\n  const wb = new ExcelJS.Workbook();\n  await wb.xlsx.load(buffer);\n  const valores = [];\n  for (const ws of wb.worksheets) {\n    ws.eachRow({ includeEmpty: false }, (row) => {\n      row.eachCell({ includeEmpty: false }, (cell) => {\n        const v = cell.value;\n        if (v === null || v === undefined) return;\n        const texto = typeof v === 'object' ? (v.text || v.result || v.richText && v.richText.map((r) => r.text).join('') || '') : v;\n        const s = String(texto).trim();\n        if (s) valores.push(s);\n      });\n    });\n  }\n  return valores;\n}\n\nfunction fichaConfere(valores, alvos) {\n  for (const alvo of alvos) {\n    const docAlvo = digitosDeDocumento(alvo);\n    for (const v of valores) {\n      if (docAlvo && documentosBatem(digitosDeDocumento(v), docAlvo)) return { ok: true, por: 'documento', valor: v.slice(0, 60) };\n      if (nomesBatem(v, alvo)) return { ok: true, por: 'nome', valor: v.slice(0, 60) };\n    }\n  }\n  return { ok: false };\n}\n\nconst origem = $('Preparar checagem paralela de contrato').all().map((i) => i.json);\nconst candidatos = $('Etapa 1 — candidatos plausíveis').all().map((i) => i.json);\nconst entradas = $input.all();\n\n// O node de Gmail devolve UM item por item de entrada, na mesma ordem — por isso o pareamento\n// aqui e por INDICE contra a saida da Etapa 1, e nao por pairedItem: o node de Gmail substitui\n// o json do item pela mensagem, e o chaveLinha que a Etapa 1 colocou se perderia no caminho.\nconst porLinha = new Map();\n\nfor (let k = 0; k < entradas.length; k++) {\n  const cand = candidatos[k];\n  if (!cand || cand.semCandidatos) continue; // sentinela da Etapa 1: nenhum candidato plausivel\n  const linha = origem[cand.indiceOrigem];\n  if (!linha) continue;\n\n  const alvos = [linha.nomeColaborador, linha.nota && linha.nota.colunaH].filter(\n    (v) => v && !/FALTA INFORMA/i.test(String(v)),\n  );\n  if (!alvos.length) continue;\n\n  const item = entradas[k];\n  if (item.json && item.json.error) continue;\n\n  for (const prop of planilhasDoItem(item)) {\n    let resultado;\n    try {\n      const valores = await textosDaPlanilha.call(this, k, prop);\n      resultado = fichaConfere(valores, alvos);\n    } catch (e) {\n      // planilha corrompida ou protegida: nao confirma, e tambem nao derruba a execucao\n      resultado = { ok: false, erro: String(e.message).slice(0, 120) };\n    }\n    if (resultado.ok) {\n      porLinha.set(cand.chaveLinha, {\n        arquivo: String(item.binary[prop].fileName || '').slice(0, 80),\n        por: resultado.por,\n        valorNaFicha: resultado.valor,\n      });\n      break;\n    }\n  }\n}\n\n// Uma saida por LINHA DE ORIGEM, sempre — o consolidador precisa do par completo das duas\n// checagens, inclusive quando nao houve candidato nenhum.\nreturn origem.map((linha) => {\n  const prova = porLinha.get(linha.chaveLinha);\n  return { json: {\n    ...linha,\n    fonteChecagem: 'ficha_cadastral',\n    confirmado: !!prova,\n    provaFicha: prova || null,\n    atualizarColunaNPara: prova ? 'OK - ASSINADO' : undefined,\n  } };\n});\n"
       },
       "id": "n18-contrato-etapa2",
       "name": "Checagem de contrato — ficha cadastral (Gmail)",
@@ -276,7 +266,8 @@
       "position": [
         2260,
         220
-      ]
+      ],
+      "notes": "Etapa 2 do spec 3.1: le a ficha .xlsx com exceljs e confirma pela mesma tolerancia da checagem de Contratos."
     },
     {
       "parameters": {
@@ -424,10 +415,10 @@
     {
       "parameters": {
         "chatId": "749277207",
-        "text": "={{ '✅ Correção automática de contrato (Fase 1)\\n\\nFornecedor: ' + ($json.fornecedor || '?') + '\\n\\nLinhas corrigidas pra \"OK - ASSINADO\" (estavam pendentes/vazias, mas outra linha do mesmo fornecedor/vencimento já estava assinada):\\n' + (($json.linhasCorrigidas || []).map(l => '- Linha ' + (l?.linha ?? '?') + ': R$ ' + (typeof l?.valor === 'number' ? l.valor.toLocaleString('pt-BR', {minimumFractionDigits:2}) : '?')).join('\\n') || '- (sem detalhe)') }}",
+        "text": "={{ /* escapa-html */ String('✅ Correção automática de contrato (Fase 1)\\n\\nFornecedor: ' + ($json.fornecedor || '?') + '\\n\\nLinhas corrigidas pra \"OK - ASSINADO\" (estavam pendentes/vazias, mas outra linha do mesmo fornecedor/vencimento já estava assinada):\\n' + (($json.linhasCorrigidas || []).map(l => '- Linha ' + (l?.linha ?? '?') + ': R$ ' + (typeof l?.valor === 'number' ? l.valor.toLocaleString('pt-BR', {minimumFractionDigits:2}) : '?')).join('\\n') || '- (sem detalhe)') ?? \"\").replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') }}",
         "additionalFields": {
-          "parse_mode": "Markdown",
-          "appendAttribution": false
+          "appendAttribution": false,
+          "parse_mode": "HTML"
         }
       },
       "id": "n_telegram_correcao_contrato",
@@ -449,10 +440,10 @@
     {
       "parameters": {
         "chatId": "749277207",
-        "text": "={{ $json.textoAlerta }}",
+        "text": "={{ /* escapa-html */ String($json.textoAlerta ?? \"\").replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') }}",
         "additionalFields": {
-          "parse_mode": "Markdown",
-          "appendAttribution": false
+          "appendAttribution": false,
+          "parse_mode": "HTML"
         }
       },
       "id": "n_telegram_alerta_nao_mapeada",
@@ -709,7 +700,7 @@
     {
       "parameters": {
         "method": "PUT",
-        "url": "=https://api.box.com/2.0/files/{{ $json.fileId }}",
+        "url": "=https://api.box.com/2.0/files/{{ $('Resolver arquivo-alvo da escrita').first().json.fileId }}",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "boxOAuth2Api",
         "sendBody": true,
@@ -717,7 +708,7 @@
           "parameters": [
             {
               "name": "lock",
-              "value": "={{ { type: 'lock', is_download_prevented: false } }}"
+              "value": "={{ { type: 'lock', is_download_prevented: false, expires_at: new Date(Date.now() + 30*60*1000).toISOString().replace(/\\.\\d+Z$/, '-00:00') } }}"
             }
           ]
         }
@@ -730,13 +721,20 @@
         6400,
         220
       ],
-      "notes": "spec.md seção 7.2 — o node nativo do Box não expõe lock/unlock, então usamos HTTP Request com a credencial Box OAuth2 predefinida. Rodar 1x por arquivo Cost Report que tiver mudança (S01 e/ou S02, conforme mudancasColunaN/L.projetoId). fileId placeholder — resolver dinamicamente por projeto."
+      "notes": "spec.md seção 7.2 — o node nativo do Box não expõe lock/unlock, então usamos HTTP Request com a credencial Box OAuth2 predefinida. Rodar 1x por arquivo Cost Report que tiver mudança (S01 e/ou S02, conforme mudancasColunaN/L.projetoId). fileId placeholder — resolver dinamicamente por projeto.",
+      "credentials": {
+        "boxOAuth2Api": {
+          "id": "cred-box-account",
+          "name": "Box account"
+        }
+      }
     },
     {
       "parameters": {
         "resource": "file",
         "operation": "download",
-        "fileId": "={{ $json.fileId }}"
+        "fileId": "={{ $('Resolver arquivo-alvo da escrita').first().json.fileId }}",
+        "binaryPropertyName": "data"
       },
       "id": "n32-box-reler",
       "name": "Box — Reler (pós-lock)",
@@ -751,7 +749,8 @@
           "id": "cred-box-account",
           "name": "Box account"
         }
-      }
+      },
+      "onError": "continueErrorOutput"
     },
     {
       "parameters": {
@@ -764,7 +763,8 @@
       "position": [
         6840,
         220
-      ]
+      ],
+      "onError": "continueErrorOutput"
     },
     {
       "parameters": {
@@ -792,12 +792,19 @@
         7060,
         220
       ],
-      "notes": "O node nativo do Box NÃO tem operação de \"subir nova versão\" (as válidas são copy, delete, download, get, search, share, upload — e \"upload\" cria arquivo novo). Nova versão exige POST em upload.box.com/api/2.0/files/{id}/content, por isso HTTP Request com a credencial Box OAuth2. Ver spec.md seção 7.2."
+      "notes": "O node nativo do Box NÃO tem operação de \"subir nova versão\" (as válidas são copy, delete, download, get, search, share, upload — e \"upload\" cria arquivo novo). Nova versão exige POST em upload.box.com/api/2.0/files/{id}/content, por isso HTTP Request com a credencial Box OAuth2. Ver spec.md seção 7.2.",
+      "credentials": {
+        "boxOAuth2Api": {
+          "id": "cred-box-account",
+          "name": "Box account"
+        }
+      },
+      "onError": "continueErrorOutput"
     },
     {
       "parameters": {
         "method": "PUT",
-        "url": "=https://api.box.com/2.0/files/{{ $json.fileId }}",
+        "url": "=https://api.box.com/2.0/files/{{ $('Resolver arquivo-alvo da escrita').first().json.fileId }}",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "boxOAuth2Api",
         "sendBody": true,
@@ -819,7 +826,13 @@
         220
       ],
       "notes": "onError=continueRegularOutput: mesmo se o upload (n34) falhar, este node precisa rodar pra não deixar o arquivo travado (spec.md seção 7.2, 'destravar sempre, mesmo em falha no meio do processo'). Ligação de erro de n31/n32/n33/n34 -> aqui deve ser configurada também nas 'connections' (ver settings do workflow).",
-      "onError": "continueRegularOutput"
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "boxOAuth2Api": {
+          "id": "cred-box-account",
+          "name": "Box account"
+        }
+      }
     },
     {
       "parameters": {
@@ -840,10 +853,10 @@
     {
       "parameters": {
         "chatId": "749277207",
-        "text": "={{ '📋 Relatório Fase 1 — Solicitação de Nota\\n\\nRascunhos criados: ' + ($json.resumo?.rascunhosCriados ?? '?') + '\\nEnvios diretos: ' + ($json.resumo?.enviosDiretos ?? '?') + '\\nPendentes de contrato: ' + ($json.resumo?.pendentesContrato ?? '?') + '\\nCom lacuna de informação (FALTA INFORMAÇÃO): ' + ($json.resumo?.comLacunaInformacao ?? '?') + '\\nCorreções de contrato aplicadas: ' + ($json.resumo?.correcoesContrato ?? '?') + '\\nSituações não mapeadas (alertadas): ' + ($json.resumo?.alertasSituacaoNaoMapeada ?? '?') + '\\nCiclos encerrados sem resposta: ' + ($json.resumo?.alertasEncerramento?.length ?? '?') }}",
+        "text": "={{ /* escapa-html */ String('📋 Relatório Fase 1 — Solicitação de Nota\\n\\nRascunhos criados: ' + ($json.resumo?.rascunhosCriados ?? '?') + '\\nEnvios diretos: ' + ($json.resumo?.enviosDiretos ?? '?') + '\\nPendentes de contrato: ' + ($json.resumo?.pendentesContrato ?? '?') + '\\nCom lacuna de informação (FALTA INFORMAÇÃO): ' + ($json.resumo?.comLacunaInformacao ?? '?') + '\\nCorreções de contrato aplicadas: ' + ($json.resumo?.correcoesContrato ?? '?') + '\\nSituações não mapeadas (alertadas): ' + ($json.resumo?.alertasSituacaoNaoMapeada ?? '?') + '\\nCiclos encerrados sem resposta: ' + ($json.resumo?.alertasEncerramento?.length ?? '?') ?? \"\").replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') }}",
         "additionalFields": {
-          "parse_mode": "Markdown",
-          "appendAttribution": false
+          "appendAttribution": false,
+          "parse_mode": "HTML"
         }
       },
       "id": "n37-telegram-relatorio",
@@ -1437,9 +1450,11 @@
       "parameters": {
         "resource": "message",
         "operation": "getAll",
-        "returnAll": true,
+        "returnAll": false,
+        "limit": 10,
+        "simple": false,
         "filters": {
-          "q": "={{ 'label:CONTRATAÇÃO ' + ($json.nomeColaborador && $json.nomeColaborador !== 'FALTA INFORMACAO' && $json.nomeColaborador !== 'FALTA INFORMAÇÃO' ? $json.nomeColaborador : $json.nota.colunaH) }}"
+          "q": "={{ 'label:CONTRATAÇÃO has:attachment -from:novorealitybox.com -from:boxfishtv.com ' + ($json.nomeColaborador && $json.nomeColaborador !== 'FALTA INFORMACAO' && $json.nomeColaborador !== 'FALTA INFORMAÇÃO' ? $json.nomeColaborador : $json.nota.colunaH) }}"
         }
       },
       "id": "n17-gmail-buscar-ficha",
@@ -1456,7 +1471,7 @@
           "name": "Gmail account"
         }
       },
-      "notes": "Busca por marcador CONTRATAÇÃO + nome do colaborador (seção 3.1.2/3.1). Ajustar a query real conforme testes em homologação — o operador 'label:' do Gmail é case/acento sensível dependendo de como o marcador foi criado.",
+      "notes": "Etapa 1 do spec 3.1: RESTRINGE candidatos, nunca confirma. Os dois dominios internos sao excluidos aqui (boxfishtv.com tambem e da empresa — descoberto em 11/09).",
       "alwaysOutputData": true
     },
     {
@@ -1839,7 +1854,8 @@
       "parameters": {
         "resource": "file",
         "operation": "download",
-        "fileId": "={{ $('Resolver arquivo-alvo da escrita').first().json.fileId }}"
+        "fileId": "={{ $('Resolver arquivo-alvo da escrita').first().json.fileId }}",
+        "binaryPropertyName": "data"
       },
       "credentials": {
         "boxOAuth2Api": {
@@ -1902,9 +1918,10 @@
       ],
       "parameters": {
         "chatId": "749277207",
-        "text": "={{ $json.textoAlerta }}",
+        "text": "={{ /* escapa-html */ String($json.textoAlerta ?? \"\").replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') }}",
         "additionalFields": {
-          "appendAttribution": false
+          "appendAttribution": false,
+          "parse_mode": "HTML"
         }
       },
       "credentials": {
@@ -1934,7 +1951,8 @@
           "id": "cred-box-account",
           "name": "Box account"
         }
-      }
+      },
+      "onError": "continueErrorOutput"
     },
     {
       "id": "box-restaurar",
@@ -2050,7 +2068,7 @@
     {
       "parameters": {
         "method": "PUT",
-        "url": "=https://api.box.com/2.0/files/{{ $json.fileId }}",
+        "url": "=https://api.box.com/2.0/files/{{ $('Resolver arquivo-alvo da escrita (coluna L)').first().json.fileId }}",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "boxOAuth2Api",
         "sendBody": true,
@@ -2058,7 +2076,7 @@
           "parameters": [
             {
               "name": "lock",
-              "value": "={{ { type: 'lock', is_download_prevented: false } }}"
+              "value": "={{ { type: 'lock', is_download_prevented: false, expires_at: new Date(Date.now() + 30*60*1000).toISOString().replace(/\\.\\d+Z$/, '-00:00') } }}"
             }
           ]
         }
@@ -2071,13 +2089,20 @@
         6400,
         1580
       ],
-      "notes": "spec.md seção 7.2 — o node nativo do Box não expõe lock/unlock, então usamos HTTP Request com a credencial Box OAuth2 predefinida. Rodar 1x por arquivo Cost Report que tiver mudança (S01 e/ou S02, conforme mudancasColunaN/L.projetoId). fileId placeholder — resolver dinamicamente por projeto."
+      "notes": "spec.md seção 7.2 — o node nativo do Box não expõe lock/unlock, então usamos HTTP Request com a credencial Box OAuth2 predefinida. Rodar 1x por arquivo Cost Report que tiver mudança (S01 e/ou S02, conforme mudancasColunaN/L.projetoId). fileId placeholder — resolver dinamicamente por projeto.",
+      "credentials": {
+        "boxOAuth2Api": {
+          "id": "cred-box-account",
+          "name": "Box account"
+        }
+      }
     },
     {
       "parameters": {
         "resource": "file",
         "operation": "download",
-        "fileId": "={{ $json.fileId }}"
+        "fileId": "={{ $('Resolver arquivo-alvo da escrita (coluna L)').first().json.fileId }}",
+        "binaryPropertyName": "data"
       },
       "id": "n32-box-reler-l",
       "name": "Box — Reler (pós-lock) (coluna L)",
@@ -2092,7 +2117,8 @@
           "id": "cred-box-account",
           "name": "Box account"
         }
-      }
+      },
+      "onError": "continueErrorOutput"
     },
     {
       "parameters": {
@@ -2105,7 +2131,8 @@
       "position": [
         6840,
         1490
-      ]
+      ],
+      "onError": "continueErrorOutput"
     },
     {
       "parameters": {
@@ -2133,12 +2160,19 @@
         7060,
         1490
       ],
-      "notes": "O node nativo do Box NÃO tem operação de \"subir nova versão\" (as válidas são copy, delete, download, get, search, share, upload — e \"upload\" cria arquivo novo). Nova versão exige POST em upload.box.com/api/2.0/files/{id}/content, por isso HTTP Request com a credencial Box OAuth2. Ver spec.md seção 7.2."
+      "notes": "O node nativo do Box NÃO tem operação de \"subir nova versão\" (as válidas são copy, delete, download, get, search, share, upload — e \"upload\" cria arquivo novo). Nova versão exige POST em upload.box.com/api/2.0/files/{id}/content, por isso HTTP Request com a credencial Box OAuth2. Ver spec.md seção 7.2.",
+      "credentials": {
+        "boxOAuth2Api": {
+          "id": "cred-box-account",
+          "name": "Box account"
+        }
+      },
+      "onError": "continueErrorOutput"
     },
     {
       "parameters": {
         "method": "PUT",
-        "url": "=https://api.box.com/2.0/files/{{ $json.fileId }}",
+        "url": "=https://api.box.com/2.0/files/{{ $('Resolver arquivo-alvo da escrita (coluna L)').first().json.fileId }}",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "boxOAuth2Api",
         "sendBody": true,
@@ -2160,7 +2194,13 @@
         1580
       ],
       "notes": "onError=continueRegularOutput: mesmo se o upload (n34) falhar, este node precisa rodar pra não deixar o arquivo travado (spec.md seção 7.2, 'destravar sempre, mesmo em falha no meio do processo'). Ligação de erro de n31/n32/n33/n34 -> aqui deve ser configurada também nas 'connections' (ver settings do workflow).",
-      "onError": "continueRegularOutput"
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "boxOAuth2Api": {
+          "id": "cred-box-account",
+          "name": "Box account"
+        }
+      }
     },
     {
       "id": "box-reler-pos-l",
@@ -2174,7 +2214,8 @@
       "parameters": {
         "resource": "file",
         "operation": "download",
-        "fileId": "={{ $('Resolver arquivo-alvo da escrita (coluna L)').first().json.fileId }}"
+        "fileId": "={{ $('Resolver arquivo-alvo da escrita (coluna L)').first().json.fileId }}",
+        "binaryPropertyName": "data"
       },
       "credentials": {
         "boxOAuth2Api": {
@@ -2330,9 +2371,10 @@
       ],
       "parameters": {
         "chatId": "749277207",
-        "text": "={{ $json.textoAlerta }}",
+        "text": "={{ /* escapa-html */ String($json.textoAlerta ?? \"\").replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') }}",
         "additionalFields": {
-          "appendAttribution": false
+          "appendAttribution": false,
+          "parse_mode": "HTML"
         }
       },
       "credentials": {
@@ -2473,31 +2515,154 @@
       "parameters": {
         "jsCode": "function statusBoxAindaAntesDoEnvio(statusBox) {\n  const s = String(statusBox || '').normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toUpperCase().trim();\n  return /^PROGRAMAR ATE/.test(s) || /^SOLICITAR/.test(s);\n}\n\n// Rascunho nao existe mais: a Michelle enviou manualmente. NAO reenviar (spec 3.1.8) —\n// reenviar duplicaria o pedido pro colaborador.\n//\n// So grava coluna L se o Status Box AINDA estiver num estagio anterior ao envio. Se ja\n// avancou (ENTREGUE MI, ENTREGUE MI R1...), a automacao nao pode regredir o que foi feito\n// a mao. O valor usado e o colunaL lido nesta execucao, direto do Cost Report.\nreturn $input.all().map((item) => {\n  const d = item.json;\n  const statusAtual = (d.nota && d.nota.colunaL) || '';\n  const podeGravar = statusBoxAindaAntesDoEnvio(statusAtual);\n  return { json: {\n    ...d,\n    acao: 'programado_ja_enviado_manualmente',\n    atualizarColunaL: podeGravar,\n    novoValorColunaL: podeGravar ? 'SOLICITADA MI' : undefined,\n    // registro auditavel — entra no resumo/log, sem alerta urgente (3.1.8)\n    auditoria: podeGravar\n      ? 'rascunho programado ausente (enviado manualmente); Status Box ainda era \"' + statusAtual + '\", atualizado para SOLICITADA MI'\n      : 'rascunho programado ausente (enviado manualmente); Status Box ja estava em \"' + statusAtual + '\" — nao regredido',\n  } };\n});"
       }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Corta as linhas que NAO sao da fonte desta passada (spec.md 3.1.5, 09/09).\n//\n// O ciclo completo — leitura, checagem de contrato, escrita e as duas camadas de\n// confirmacao — tem que rodar por inteiro para UMA fonte antes da proxima. Sem isso, a\n// Camada 2 conferia a lista de mudancas das DUAS fontes contra um unico arquivo aberto:\n// na melhor hipotese abortava por divergencia espuria, na pior dava FALSO POSITIVO,\n// porque os numeros de linha se repetem entre as planilhas (a celula N293 existe nas duas).\n//\n// O corte e por ARQUIVO, nao por projeto: AREP e REUNION vivem na MESMA planilha (S01,\n// distinguidos pela cor da linha — secao 6), entao os dois entram na mesma passada e\n// escrevem no mesmo arquivo. Isso e correto: uma passada, um arquivo, uma conferencia.\nconst PROJETOS_DA_FONTE = { S01: ['AREP', 'REUNION'], S02: ['SOFT_PRE'] };\n\nconst fonteId = $('Trigger — fonte a processar').first().json.fonteId;\nconst projetos = PROJETOS_DA_FONTE[fonteId];\nif (!projetos) {\n  throw new Error(\n    'fonteId invalido ou ausente: \"' + fonteId + '\". Esperado \"S01\" ou \"S02\". ' +\n    'Este workflow so roda chamado pelo despachante, que informa a fonte da passada.'\n  );\n}\n\nreturn $input.all().filter((i) => projetos.includes(i.json.nota && i.json.nota.projetoId));\n"
+      },
+      "id": "n-filtro-fonte",
+      "name": "Filtrar pela fonte desta passada",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ETAPA 1 do spec 3.1 (redesenho de 11/09) — RESTRINGE candidatos, NUNCA confirma.\n//\n// O bug que isto corrige: a versao anterior buscava o nome em qualquer lugar da mensagem, e\n// o Gmail casa termo solto em qualquer campo — inclusive no CC. Como a Coordenadora Executiva\n// fica em copia em quase toda thread de contratacao, a linha dela casava com 104 mensagens de\n// OUTRAS pessoas (caso real \"Vanessa Paes\", execucao 214).\n//\n// Criterios de plausibilidade (spec 3.1):\n//   (a) a mensagem foi endereçada ao e-mail do colaborador (coluna R da planilha Cost), OU\n//   (b) o nome do colaborador OU a razao social aparece no ASSUNTO ou no CORPO NOVO.\n// NUNCA no CC, NUNCA no corpo citado (thread anterior) — que era exatamente a origem do falso\n// positivo. Passar aqui nao libera nada: quem confirma e a Etapa 2, lendo a ficha.\n\nfunction normalizar(texto) {\n  if (!texto) return '';\n  return String(texto).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim().replace(/\\s+/g, ' ');\n}\n\nfunction indiceDeOrigem(item) {\n  const p = item.pairedItem;\n  if (p === undefined || p === null) return null;\n  if (typeof p === 'number') return p;\n  if (Array.isArray(p)) return p.length && p[0] ? p[0].item : null;\n  return p.item === undefined ? null : p.item;\n}\n\n// Corta o corpo citado. Sem isto, o nome que aparece na assinatura de uma thread antiga\n// encaminhada valeria como \"corpo novo\" — e voltariamos ao falso positivo por outro caminho.\nfunction corpoNovo(texto) {\n  const linhas = String(texto || '').split(/\\r?\\n/);\n  const MARCA = /^\\s*(>|Em .*escreveu:|On .*wrote:|-{2,}\\s*Mensagem encaminhada|De:\\s|From:\\s|Enviada em:\\s)/i;\n  const novo = [];\n  for (const l of linhas) {\n    if (MARCA.test(l)) break;\n    novo.push(l);\n  }\n  return novo.join('\\n');\n}\n\n// \"o nome aparece no texto\": exige o PRIMEIRO e o ULTIMO token do nome, na mesma tolerancia\n// ja usada na checagem de Contratos. Substring do nome inteiro seria estrito demais (some com\n// nome do meio diferente); token solto seria frouxo demais (um \"SANTOS\" casaria com qualquer um).\nfunction nomeApareceEm(texto, nome) {\n  const alvo = normalizar(texto);\n  const tokens = normalizar(String(nome || '').replace(/^[\\d.\\-/\\s]+/, '')).split(' ').filter(Boolean);\n  if (!alvo || tokens.length === 0) return false;\n  if (tokens.length === 1) return alvo.includes(tokens[0]);\n  return alvo.includes(tokens[0]) && alvo.includes(tokens[tokens.length - 1]);\n}\n\nfunction textoDe(campo) {\n  if (!campo) return '';\n  if (typeof campo === 'string') return campo;\n  try { return JSON.stringify(campo); } catch (e) { return ''; }\n}\n\nconst origem = $('Preparar checagem paralela de contrato').all().map((i) => i.json);\nconst entradas = $input.all();\nconst saida = [];\n\nfor (let k = 0; k < entradas.length; k++) {\n  const item = entradas[k];\n  const i = indiceDeOrigem(item);\n  if (i === null || !origem[i]) continue;\n  const linha = origem[i];\n  const msg = item.json || {};\n\n  const assunto = msg.subject || '';\n  const novo = corpoNovo(msg.text || '');\n  const alvos = [linha.nomeColaborador, linha.nota && linha.nota.colunaH].filter(\n    (v) => v && !/FALTA INFORMA/i.test(String(v)),\n  );\n\n  // (b) nome ou razao social no assunto ou no corpo novo\n  const casouTexto = alvos.some((a) => nomeApareceEm(assunto, a) || nomeApareceEm(novo, a));\n\n  // (a) endereçada ao e-mail da coluna R — so o campo TO, nunca o CC\n  const emailR = normalizar(linha.nota && linha.nota.colunaR);\n  const para = normalizar(textoDe(msg.to));\n  const casouEmail = !!emailR && emailR.includes('@') && para.includes(emailR);\n\n  if (!casouTexto && !casouEmail) continue;\n\n  saida.push({\n    json: {\n      messageId: msg.id,\n      chaveLinha: linha.chaveLinha,\n      indiceOrigem: i,\n      motivo: casouEmail ? 'email_coluna_R' : 'nome_no_assunto_ou_corpo_novo',\n      assunto: String(assunto).slice(0, 120),\n    },\n    pairedItem: { item: k },\n  });\n}\n\n// Se nenhum candidato sobrar, ainda assim e preciso emitir UM item: um node que devolve zero\n// itens interrompe a cadeia no n8n, e a Etapa 2 nunca rodaria — deixando o \"Merge — resultado\n// da checagem de contrato\" sem a entrada 2 e a linha sem resposta da checagem de ficha.\n// O sentinela viaja ate a Etapa 2, que o ignora e devolve a linha como nao confirmada.\nif (saida.length === 0) {\n  return [{ json: { semCandidatos: true }, pairedItem: { item: 0 } }];\n}\n\nreturn saida;\n"
+      },
+      "id": "n-etapa1-candidatos",
+      "name": "Etapa 1 — candidatos plausíveis",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2200,
+        280
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "get",
+        "messageId": "={{ $json.messageId }}",
+        "simple": false,
+        "options": {
+          "downloadAttachments": true
+        }
+      },
+      "id": "n-baixar-anexos",
+      "name": "Gmail — Baixar anexos do candidato",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        2400,
+        280
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "cred-gmail-producao",
+          "name": "Gmail account"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "notes": "Binarios saem como attachment_0, attachment_1... (confirmado em teste real)."
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://api.box.com/2.0/files/{{ $('Resolver arquivo-alvo da escrita').first().json.fileId }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "boxOAuth2Api",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "lock",
+              "value": "={{ null }}"
+            }
+          ]
+        }
+      },
+      "id": "n-unlock-falha",
+      "name": "Box — Unlock (falha no ciclo)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        6540,
+        600
+      ],
+      "credentials": {
+        "boxOAuth2Api": {
+          "id": "cred-box-account",
+          "name": "Box account"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "notes": "spec 7.2 — destravar SEMPRE, mesmo em falha no meio do ciclo. Recebe a saida de erro de todos os nodes entre o Lock e o Upload."
+    },
+    {
+      "parameters": {
+        "jsCode": "// O caminho de erro SEMPRE termina aqui, lancando de novo: o lock ja foi solto pelo node\n// anterior, mas a execucao precisa continuar sendo reportada como FALHA — senao o Error\n// Handler nao alerta e a planilha ficaria meio-escrita sem ninguem saber.\n//\n// A causa raiz NAO chega ate aqui: o item que vem do Unlock e a resposta da API do Box,\n// que sobrescreve o json de erro. Por isso a mensagem aponta onde encontrar o detalhe em\n// vez de fingir que sabe — o node que falhou aparece na execucao do n8n.\nthrow new Error(\n  'Ciclo de escrita no Box falhou (coluna N) e foi abortado. O LOCK JA FOI SOLTO — a planilha nao ficou travada. '\n  + 'A planilha NAO foi alterada (a escrita acontece depois deste ponto). '\n  + 'Para a causa raiz, abra esta execucao no n8n e veja qual node falhou antes do desvio.'\n);\n"
+      },
+      "id": "n-abortar",
+      "name": "Abortar ciclo de escrita (coluna N)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6760,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://api.box.com/2.0/files/{{ $('Resolver arquivo-alvo da escrita (coluna L)').first().json.fileId }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "boxOAuth2Api",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "lock",
+              "value": "={{ null }}"
+            }
+          ]
+        }
+      },
+      "id": "n-unlock-falhacolunaL",
+      "name": "Box — Unlock (falha no ciclo) (coluna L)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        6620,
+        1660
+      ],
+      "credentials": {
+        "boxOAuth2Api": {
+          "id": "cred-box-account",
+          "name": "Box account"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "notes": "spec 7.2 — destravar SEMPRE, mesmo em falha no meio do ciclo. Recebe a saida de erro de todos os nodes entre o Lock e o Upload."
+    },
+    {
+      "parameters": {
+        "jsCode": "// O caminho de erro SEMPRE termina aqui, lancando de novo: o lock ja foi solto pelo node\n// anterior, mas a execucao precisa continuar sendo reportada como FALHA — senao o Error\n// Handler nao alerta e a planilha ficaria meio-escrita sem ninguem saber.\n//\n// A causa raiz NAO chega ate aqui: o item que vem do Unlock e a resposta da API do Box,\n// que sobrescreve o json de erro. Por isso a mensagem aponta onde encontrar o detalhe em\n// vez de fingir que sabe — o node que falhou aparece na execucao do n8n.\nthrow new Error(\n  'Ciclo de escrita no Box falhou (coluna L) e foi abortado. O LOCK JA FOI SOLTO — a planilha nao ficou travada. '\n  + 'A planilha NAO foi alterada (a escrita acontece depois deste ponto). '\n  + 'Para a causa raiz, abra esta execucao no n8n e veja qual node falhou antes do desvio.'\n);\n"
+      },
+      "id": "n-abortarcolunaL",
+      "name": "Abortar ciclo de escrita (coluna L)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6840,
+        1660
+      ]
     }
   ],
   "connections": {
-    "Manual Trigger": {
-      "main": [
-        [
-          {
-            "node": "Gmail — Listar marcadores",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Schedule Trigger (diário 08h)": {
-      "main": [
-        [
-          {
-            "node": "Gmail — Listar marcadores",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Ler config_execucao.json": {
       "main": [
         [
@@ -2621,7 +2786,7 @@
       "main": [
         [
           {
-            "node": "Filtrar por Status Box (novo pedido / monitoramento)",
+            "node": "Filtrar pela fonte desta passada",
             "type": "main",
             "index": 0
           }
@@ -2960,6 +3125,13 @@
             "type": "main",
             "index": 0
           }
+        ],
+        [
+          {
+            "node": "Box — Unlock (falha no ciclo)",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
@@ -2971,6 +3143,13 @@
             "type": "main",
             "index": 0
           }
+        ],
+        [
+          {
+            "node": "Box — Unlock (falha no ciclo)",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
@@ -2979,6 +3158,13 @@
         [
           {
             "node": "Box — Unlock (sempre, mesmo em erro)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Box — Unlock (falha no ciclo)",
             "type": "main",
             "index": 0
           }
@@ -3214,7 +3400,7 @@
       "main": [
         [
           {
-            "node": "Checagem de contrato — ficha cadastral (Gmail)",
+            "node": "Etapa 1 — candidatos plausíveis",
             "type": "main",
             "index": 0
           }
@@ -3544,6 +3730,13 @@
             "type": "main",
             "index": 0
           }
+        ],
+        [
+          {
+            "node": "Box — Unlock (falha no ciclo)",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
@@ -3665,6 +3858,13 @@
             "type": "main",
             "index": 0
           }
+        ],
+        [
+          {
+            "node": "Box — Unlock (falha no ciclo) (coluna L)",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
@@ -3676,6 +3876,13 @@
             "type": "main",
             "index": 0
           }
+        ],
+        [
+          {
+            "node": "Box — Unlock (falha no ciclo) (coluna L)",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
@@ -3684,6 +3891,13 @@
         [
           {
             "node": "Box — Unlock (sempre, mesmo em erro) (coluna L)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Box — Unlock (falha no ciclo) (coluna L)",
             "type": "main",
             "index": 0
           }
@@ -3853,12 +4067,79 @@
           }
         ]
       ]
+    },
+    "Trigger — fonte a processar": {
+      "main": [
+        [
+          {
+            "node": "Gmail — Listar marcadores",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filtrar pela fonte desta passada": {
+      "main": [
+        [
+          {
+            "node": "Filtrar por Status Box (novo pedido / monitoramento)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Etapa 1 — candidatos plausíveis": {
+      "main": [
+        [
+          {
+            "node": "Gmail — Baixar anexos do candidato",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail — Baixar anexos do candidato": {
+      "main": [
+        [
+          {
+            "node": "Checagem de contrato — ficha cadastral (Gmail)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Box — Unlock (falha no ciclo)": {
+      "main": [
+        [
+          {
+            "node": "Abortar ciclo de escrita (coluna N)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Box — Unlock (falha no ciclo) (coluna L)": {
+      "main": [
+        [
+          {
+            "node": "Abortar ciclo de escrita (coluna L)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": false,
   "settings": {
     "executionOrder": "v1",
-    "errorWorkflow": "REPLACE_WITH_error_handler_WORKFLOW_ID"
+    "errorWorkflow": "REPLACE_WITH_error_handler_WORKFLOW_ID",
+    "timezone": "America/Sao_Paulo"
   },
   "staticData": null
 }

@@ -64,10 +64,19 @@ node inexistente e node que só roda depois são ERRO.
 
 ## Estado atual (atualize quando mudar)
 
-- **Fase 1** — publicada em homolog (inativa), ~120 nodes. Em validação com Manual Trigger.
+- **Fase 1** — DOIS workflows desde 10/09 (spec 3.1.5, processamento sequencial por fonte):
+  - `fase1_despachante` — Manual Trigger + Schedule Trigger. Emite uma fonte por item
+    (S01, depois S02) e chama a Fase 1 com `mode: each`, uma execução por fonte, em série.
+    **É AQUI que se dispara o Manual Trigger agora**, não mais na Fase 1.
+  - `fase1_solicitacao_nota` — virou sub-workflow: só tem `executeWorkflowTrigger` (recebe
+    `fonteId`). Não roda sozinho. O node `Filtrar pela fonte desta passada` corta as linhas
+    que não são daquela fonte, logo depois do parsing.
+  Os dois publicados em homolog, inativos.
 - **Error Handler** — publicado e **ativo**. Alerta no Telegram em qualquer falha.
-- **Fase 2** (3 workflows) e **resumo_diario** — existem como arquivo, **não publicados**, e
-  ainda no formato antigo (sem fonte única).
+- **Fase 2** (3 workflows) — migrados para fonte única em 08/09 e **não publicados**. Ainda
+  têm bloqueadores conhecidos (spec seção 9): `boxFileId` nunca definido, 4 IDs de pasta
+  `REPLACE_WITH_…`, perda de contexto depois do `Gmail — Baixar anexo`, e Cost Report sem
+  ramo por ambiente. **resumo_diario** continua no formato antigo e não publicado.
 - **Fase 3+4** — não iniciadas.
 - **Rollback via Telegram (spec 13.3)** — não existe. Depende antes de a automação passar a
   registrar o "recibo" de cada execução.

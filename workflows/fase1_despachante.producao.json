@@ -1,0 +1,144 @@
+{
+  "name": "Fase 1 — Despachante por fonte (Produção)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "d01-manual",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9,12,15,18,21 * * 1-5"
+            }
+          ]
+        }
+      },
+      "id": "d02-schedule",
+      "name": "Schedule Trigger (dias úteis, 9h-21h de 3 em 3h)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        180
+      ],
+      "notes": "spec.md 7.1: de 3 em 3h, 9h-21h, segunda a sexta. O fuso vem de settings.timezone (America/Sao_Paulo) — a instância roda em America/New_York por padrão."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Uma passada por FONTE de Cost Report (spec.md 3.1.5, decisao de 09/09).\n//\n// O ciclo completo — leitura, checagem de contrato, escrita e as DUAS camadas de\n// confirmacao — roda por inteiro para uma fonte antes de comecar a proxima. Por isso\n// este node emite um item por fonte e o \"Execute Workflow\" abaixo usa mode=each: cada\n// item vira uma execucao separada do workflow da Fase 1, uma depois da outra.\n//\n// Por que isso importa: os numeros de linha se repetem entre as duas planilhas (a celula\n// N293 existe nas duas, sao arquivos independentes). Conferir as duas listas de mudancas\n// contra um unico arquivo aberto abortava a execucao por divergencia espuria — ou, pior,\n// dava falso positivo, confirmando uma escrita que nunca aconteceu na outra fonte.\n//\n// A ordem e deliberada: S01 primeiro (AREP + Reunion, o volume maior), S02 depois.\nreturn [\n  { json: { fonteId: 'S01', descricao: 'Cost Report S01 — AREP + Reunion' } },\n  { json: { fonteId: 'S02', descricao: 'Cost Report S02 — Soft Pré' } },\n];\n"
+      },
+      "id": "d03-fontes",
+      "name": "Definir fontes a processar",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        260,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_fase1_solicitacao_nota_WORKFLOW_ID",
+          "mode": "id"
+        },
+        "mode": "each",
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "fonteId": "={{ $json.fonteId }}"
+          }
+        }
+      },
+      "id": "d04-executar",
+      "name": "Executar Fase 1 (uma fonte por vez)",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        520,
+        80
+      ],
+      "notes": "mode=each + espera a sub-execucao terminar => as fontes rodam EM SEQUENCIA, nunca em paralelo. E o que garante um arquivo aberto/escrito/conferido por vez."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Resumo do despacho. Cada sub-execucao ja manda o proprio relatorio no Telegram\n// (spec 7.3) e grava a propria entrada no log_diario — este node so consolida o que\n// aconteceu no nivel do despachante, pra ficar visivel na tela de execucao.\nconst fontes = $('Definir fontes a processar').all().map((i) => i.json.fonteId);\nreturn [{ json: { despachadas: fontes, total: fontes.length, quando: new Date().toISOString() } }];\n"
+      },
+      "id": "d05-resumo",
+      "name": "Resumo do despacho",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        780,
+        80
+      ]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Definir fontes a processar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger (dias úteis, 9h-21h de 3 em 3h)": {
+      "main": [
+        [
+          {
+            "node": "Definir fontes a processar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Definir fontes a processar": {
+      "main": [
+        [
+          {
+            "node": "Executar Fase 1 (uma fonte por vez)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Executar Fase 1 (uma fonte por vez)": {
+      "main": [
+        [
+          {
+            "node": "Resumo do despacho",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "REPLACE_WITH_error_handler_WORKFLOW_ID",
+    "timezone": "America/Sao_Paulo"
+  },
+  "staticData": null,
+  "meta": {
+    "description": "[GERADO AUTOMATICAMENTE — não edite este arquivo] Ambiente: producao. Fonte: workflows/_fonte/fase1_despachante.fonte.json. Regerar com: node scripts/gerar_workflows.js. Despachante da Fase 1 (spec.md 3.1.5): dispara o workflow de solicitação de nota UMA VEZ POR FONTE de Cost Report (S01 e depois S02), em sequência. Existe para que o ciclo leitura->contrato->escrita->confirmação nunca misture as duas planilhas na mesma passada — os números de linha se repetem entre elas e a conferência podia dar falso positivo."
+  }
+}

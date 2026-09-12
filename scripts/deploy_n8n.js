@@ -126,6 +126,50 @@ function resolverErrorWorkflow(wf, workflowsDaInstancia, avisos) {
   }
 }
 
+/**
+ * Resolve o placeholder de sub-workflow nos nodes "Execute Workflow".
+ *
+ * Na fonte o campo vem como `REPLACE_WITH_<base>_WORKFLOW_ID` (ex.:
+ * REPLACE_WITH_fase1_solicitacao_nota_WORKFLOW_ID). O ID real só existe depois que o
+ * sub-workflow foi publicado, e é diferente por ambiente — por isso não dá pra fixar no
+ * arquivo. Aqui a gente descobre o NOME que aquele arquivo gera para este ambiente
+ * (lendo o .json gerado ao lado) e procura esse nome na instância.
+ */
+function resolverSubWorkflows(wf, arquivo, workflowsDaInstancia, avisos) {
+  const ambiente = /\.producao\.json$/.test(arquivo) ? 'producao' : 'homolog';
+
+  for (const node of wf.nodes || []) {
+    if (node.type !== 'n8n-nodes-base.executeWorkflow') continue;
+    const bruto = node.parameters && node.parameters.workflowId;
+    const valor = bruto && typeof bruto === 'object' ? bruto.value : bruto;
+    if (!valor || !String(valor).startsWith('REPLACE_WITH')) continue;
+
+    const m = /^REPLACE_WITH_(.+)_WORKFLOW_ID$/.exec(String(valor));
+    if (!m) { avisos.push(`${node.name}: placeholder de sub-workflow em formato inesperado ("${valor}")`); continue; }
+
+    const irmao = path.join(path.dirname(arquivo), `${m[1]}.${ambiente}.json`);
+    if (!fs.existsSync(irmao)) {
+      avisos.push(`${node.name}: não achei ${path.basename(irmao)} pra descobrir o nome do sub-workflow — o node fica sem destino.`);
+      continue;
+    }
+    const nomeAlvo = JSON.parse(fs.readFileSync(irmao, 'utf8')).name;
+    const achados = (workflowsDaInstancia || []).filter((w) => w.name === nomeAlvo);
+
+    if (achados.length === 1) {
+      const id = achados[0].id;
+      node.parameters.workflowId = bruto && typeof bruto === 'object' ? { ...bruto, value: id } : id;
+      avisos.push(`sub-workflow resolvido: ${node.name} -> "${nomeAlvo}" (id ${id})`);
+    } else if (achados.length === 0) {
+      avisos.push(
+        `${node.name}: o sub-workflow "${nomeAlvo}" ainda NÃO existe na instância — ` +
+          `publique ${path.basename(irmao)} primeiro e rode o deploy de novo. O node sobe sem destino e falha ao executar.`,
+      );
+    } else {
+      avisos.push(`${node.name}: há ${achados.length} workflows chamados "${nomeAlvo}" na instância — resolva a duplicidade.`);
+    }
+  }
+}
+
 async function publicar(arquivo, api, contexto, opcoes) {
   const nomeArquivo = path.basename(arquivo);
   const local = JSON.parse(fs.readFileSync(arquivo, 'utf8'));
@@ -134,6 +178,7 @@ async function publicar(arquivo, api, contexto, opcoes) {
   const payload = prepararPayload(local);
   resolverCredenciais(payload, contexto.credenciais, contexto.env, avisos);
   resolverErrorWorkflow(payload, contexto.workflows, avisos);
+  resolverSubWorkflows(payload, arquivo, contexto.workflows, avisos);
 
   // Descobre se já existe: primeiro pelo nome na instância, depois pelo estado local.
   const estado = lerEstado();

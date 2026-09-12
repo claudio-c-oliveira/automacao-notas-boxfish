@@ -101,9 +101,92 @@ function chavesInternasValidas(prop) {
   return null;
 }
 
+/**
+ * Parâmetros que o n8n espera como RESOURCE LOCATOR — objeto `{__rl:true, value, mode}` —
+ * e não como string simples.
+ *
+ * Por que isto existe: em 11/09 o despachante de produção subiu com
+ * `workflowId: "cNspHK45vaYDsFmb"` (string). O ID estava CERTO, mas o node procura
+ * `workflowId.value`, não achou, e abortou com "No information about the workflow to
+ * execute found. Please provide either the id or code!". Nem a validação de parâmetros
+ * nem o `--remoto` pegaram: `executeWorkflow` não está em n8n_node_defs.json (então
+ * `validarNode` pulava o node inteiro), e arquivo e publicado estavam igualmente errados.
+ * Só apareceu na execução real, contra dados de produção.
+ *
+ * A checagem é estrutural, de propósito: não depende das definições oficiais, justamente
+ * para cobrir os nodes que faltam no arquivo de definições.
+ */
+const RESOURCE_LOCATORS = {
+  'n8n-nodes-base.executeWorkflow': ['workflowId'],
+};
+
+function validarResourceLocators(node, registrar) {
+  const campos = RESOURCE_LOCATORS[node.type];
+  if (!campos) return;
+  const params = node.parameters || {};
+  for (const campo of campos) {
+    const v = params[campo];
+    if (v === undefined || v === null) {
+      registrar('ERRO', `parâmetro "${campo}" ausente — o node espera um resource locator {__rl:true, value, mode}`);
+      continue;
+    }
+    if (typeof v !== 'object') {
+      registrar(
+        'ERRO',
+        `parâmetro "${campo}" veio como ${typeof v} ("${String(v).slice(0, 40)}"), mas o n8n espera um ` +
+          `resource locator {__rl:true, value, mode}. Com string pura o node aborta em execução com ` +
+          `"No information about the workflow to execute found. Please provide either the id or code!"`,
+      );
+      continue;
+    }
+    if (v.__rl !== true) registrar('ERRO', `parâmetro "${campo}": falta "__rl": true no resource locator`);
+    if (!v.value && v.value !== 0) registrar('ERRO', `parâmetro "${campo}": resource locator sem "value"`);
+    if (!v.mode) registrar('ERRO', `parâmetro "${campo}": resource locator sem "mode" (ex.: "id")`);
+  }
+}
+
+/**
+ * Node que DECLARA uma credencial mas não tem nenhuma amarrada.
+ *
+ * Por que isto existe: em 11/09 a execução 250 (produção, primeira vez que o fluxo chegou ao
+ * ciclo de escrita) morreu em `Box — Lock (HTTP Request)` com "Credentials not found". O node
+ * tinha `authentication: predefinedCredentialType` + `nodeCredentialType: boxOAuth2Api`, mas o
+ * bloco `credentials` estava vazio — eram 6 nodes assim, todo o ciclo de travar/subir/destravar
+ * do Box. Nada pegava: o validador de parâmetros só olha `parameters`, o `--remoto` comparava
+ * arquivo e publicado (igualmente errados), e o defeito só existe no ramo de PRODUÇÃO — em
+ * homolog esses nodes nem sobrevivem à geração, então nenhum teste passava por ali.
+ *
+ * Mesma categoria do bug do `workflowId` como string: passa em tudo e só quebra rodando.
+ */
+function validarCredencialDeclarada(node, registrar) {
+  const par = node.parameters || {};
+  if (par.authentication !== 'predefinedCredentialType') return;
+  const tipo = par.nodeCredentialType;
+  if (!tipo) {
+    registrar('ERRO', 'authentication="predefinedCredentialType" sem "nodeCredentialType" — o n8n não sabe qual credencial pedir');
+    return;
+  }
+  const cred = (node.credentials || {})[tipo];
+  if (!cred) {
+    const tem = Object.keys(node.credentials || {});
+    registrar(
+      'ERRO',
+      `declara nodeCredentialType "${tipo}" mas não tem credencial amarrada` +
+        (tem.length ? ` (tem ${tem.join(', ')})` : ' (bloco "credentials" vazio)') +
+        ' — o n8n só descobre isso em execução, com "Credentials not found"',
+    );
+  }
+}
+
 function validarNode(node, achados) {
   const def = DEFS[node.type];
   const registrar = (nivel, msg) => achados.push({ nivel, node: node.name, msg });
+
+  // Antes do `!def`: nodes fora do n8n_node_defs.json (executeWorkflow é um deles) ainda
+  // precisam ter os resource locators conferidos — foi por essa fresta que o workflowId
+  // como string passou por tudo e só quebrou na execução real de produção (11/09).
+  validarResourceLocators(node, registrar);
+  validarCredencialDeclarada(node, registrar);
 
   if (!def) return; // node type sem definição disponível (ex.: manualTrigger, noOp) — ignora
   const props = def.properties;
@@ -348,8 +431,30 @@ function compararComPublicado(local, remoto, divergencias, grafiasDiferentes = n
       divergencias.push(`"${nome}": onError=${pub.onError || 'nenhum'} publicado, esperado ${esp.onError || 'nenhum'}`);
     }
 
+    // Placeholders resolvidos no deploy não são divergência: o arquivo guarda
+    // REPLACE_WITH_<base>_WORKFLOW_ID (o ID real só existe depois que o sub-workflow é
+    // publicado, e muda por instância/ambiente) e o publicado guarda o ID de verdade.
+    // Sem esta normalização, todo `--remoto` acusaria uma divergência falsa nos nodes
+    // "Execute Workflow" — e ruído recorrente esconde a divergência que importa.
+    const normalizarPlaceholders = (params, referencia) => {
+      const clone = JSON.parse(JSON.stringify(params || {}));
+      const ref = referencia || {};
+      const alvo = clone.workflowId;
+      const valorRef = ref.workflowId && typeof ref.workflowId === 'object' ? ref.workflowId.value : ref.workflowId;
+      const valorAlvo = alvo && typeof alvo === 'object' ? alvo.value : alvo;
+      if (String(valorRef || '').startsWith('REPLACE_WITH') && valorAlvo && !String(valorAlvo).startsWith('REPLACE_WITH')) {
+        if (alvo && typeof alvo === 'object') clone.workflowId = { ...alvo, value: valorRef };
+        else clone.workflowId = valorRef;
+      }
+      return clone;
+    };
+
     const paramsEsp = JSON.stringify(esp.parameters || {});
-    const paramsPub = JSON.stringify(pub.parameters || {});
+    const paramsPub = JSON.stringify(
+      esp.type === 'n8n-nodes-base.executeWorkflow'
+        ? normalizarPlaceholders(pub.parameters, esp.parameters)
+        : pub.parameters || {},
+    );
     if (paramsEsp !== paramsPub) {
       divergencias.push(`"${nome}": parâmetros diferentes do arquivo (o n8n pode ter normalizado, confira na tela)`);
     }

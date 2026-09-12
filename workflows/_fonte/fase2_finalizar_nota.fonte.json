@@ -1,7 +1,8 @@
 {
   "name": "Fase 2 — Finalizar nota (sub-workflow compartilhado)",
   "meta": {
-    "description": "Chamado via Execute Workflow por fase2_recebimento_validacao.json (match confiável) e fase2_verificar_pendencias.json (Michelle resolveu via Telegram). Atualiza a planilha do Box e faz os 2 salvamentos em paralelo (spec.md seção 4/4.1/4.2)."
+    "description": "Chamado via Execute Workflow por fase2_recebimento_validacao.json (match confiável) e fase2_verificar_pendencias.json (Michelle resolveu via Telegram). Atualiza a planilha do Box e faz os 2 salvamentos em paralelo (spec.md seção 4/4.1/4.2).",
+    "__fonte": "ARQUIVO-FONTE. Não importar direto no n8n — gere os arquivos finais com `node scripts/gerar_workflows.js`. Marcadores: __porAmbiente (credencial que muda por ambiente), __ifAmbiente (IF cujo ramo é escolhido em tempo de geração) e __SUFIXO_AMBIENTE__ (sufixo dos arquivos de estado)."
   },
   "nodes": [
     {
@@ -372,13 +373,20 @@
         1760,
         0
       ],
-      "notes": "boxFileId precisa vir resolvido a partir do projetoId (Cost Report S01 ou S02) — mesmo mapeamento usado na Fase 1."
+      "notes": "boxFileId precisa vir resolvido a partir do projetoId (Cost Report S01 ou S02) — mesmo mapeamento usado na Fase 1.",
+      "credentials": {
+        "boxOAuth2Api": {
+          "id": "cred-box-account",
+          "name": "Box account"
+        }
+      }
     },
     {
       "parameters": {
         "resource": "file",
         "operation": "download",
-        "fileId": "={{ $json.boxFileId }}"
+        "fileId": "={{ $json.boxFileId }}",
+        "binaryPropertyName": "data"
       },
       "id": "f2f-15-box-download",
       "name": "Box — Download planilha",
@@ -434,7 +442,13 @@
         2420,
         0
       ],
-      "notes": "O node nativo do Box não tem operação de \"subir nova versão\" — só \"upload\", que cria arquivo novo. Nova versão exige POST em upload.box.com/api/2.0/files/{id}/content, daí o HTTP Request."
+      "notes": "O node nativo do Box não tem operação de \"subir nova versão\" — só \"upload\", que cria arquivo novo. Nova versão exige POST em upload.box.com/api/2.0/files/{id}/content, daí o HTTP Request.",
+      "credentials": {
+        "boxOAuth2Api": {
+          "id": "cred-box-account",
+          "name": "Box account"
+        }
+      }
     },
     {
       "parameters": {
@@ -460,12 +474,18 @@
         2640,
         0
       ],
-      "onError": "continueRegularOutput"
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "boxOAuth2Api": {
+          "id": "cred-box-account",
+          "name": "Box account"
+        }
+      }
     },
     {
       "parameters": {
         "operation": "read",
-        "fileSelector": "/home/node/.n8n-files/box-fish-config/cobrancas.json",
+        "fileSelector": "/home/node/.n8n-files/box-fish-config/cobrancas__SUFIXO_AMBIENTE__.json",
         "options": {}
       },
       "id": "f2f-19-ler-cobrancas",
@@ -479,7 +499,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Marca a nota como recebida em cobrancas.json (status_ciclo='recebido') — a\n// Fase 1 (Avaliar cobrança) para de monitorar/cobrar assim que vir esse status.\n// Leitura de binário: esta instância do n8n guarda binário no disco (filesystem-v2),\n// então item.binary.data.data NÃO é o conteúdo, e sim o rótulo do modo de armazenamento.\n// O único acesso liberado no Code Node é helpers.getBinaryDataBuffer, que lê pelo ÍNDICE\n// do item no input DIRETO — daí localizarmos o item pelo id do binário. Cobre os 2 modos.\nconst helpers = this.helpers;\nconst entradasDoNode = $input.all();\nasync function bufferDe(item, prop) {\n  prop = prop || 'data';\n  const b = item && item.binary && item.binary[prop];\n  if (!b) return null;\n  if (!b.id) return Buffer.from(b.data, 'base64'); // modo embutido\n  const i = entradasDoNode.findIndex((e) => e.binary && e.binary[prop] && e.binary[prop].id === b.id);\n  if (i < 0) throw new Error('binario \"' + (b.fileName || prop) + '\" nao esta no input direto deste node — o Code Node so consegue le-lo por ai');\n  return await helpers.getBinaryDataBuffer(i, prop);\n}\n\nasync function parseBinaryJson(item) {\n  if (!item || !item.binary || !item.binary.data) return {};\n  return JSON.parse((await bufferDe(item)).toString('utf8'));\n}\nconst item = $('Ler cobrancas.json').first();\nconst cobrancas = await parseBinaryJson(item);\nconst chave = $('Gerar retranca e nomes de pasta').first().json.chaveCobranca;\nif (chave && cobrancas[chave]) {\n  cobrancas[chave].status_ciclo = 'recebido';\n}\nreturn [{ json: {}, binary: { data: { data: Buffer.from(JSON.stringify(cobrancas, null, 2)).toString('base64'), mimeType: 'application/json', fileName: 'cobrancas.json' } } }];"
+        "jsCode": "// Marca a nota como recebida em cobrancas.json (status_ciclo='recebido') — a\n// Fase 1 (Avaliar cobrança) para de monitorar/cobrar assim que vir esse status.\n// Leitura de binário: esta instância do n8n guarda binário no disco (filesystem-v2),\n// então item.binary.data.data NÃO é o conteúdo, e sim o rótulo do modo de armazenamento.\n// O único acesso liberado no Code Node é helpers.getBinaryDataBuffer, que lê pelo ÍNDICE\n// do item no input DIRETO — daí localizarmos o item pelo id do binário. Cobre os 2 modos.\nconst helpers = this.helpers;\nconst entradasDoNode = $input.all();\nasync function bufferDe(item, prop) {\n  prop = prop || 'data';\n  const b = item && item.binary && item.binary[prop];\n  if (!b) return null;\n  if (!b.id) return Buffer.from(b.data, 'base64'); // modo embutido\n  const i = entradasDoNode.findIndex((e) => e.binary && e.binary[prop] && e.binary[prop].id === b.id);\n  if (i < 0) throw new Error('binario \"' + (b.fileName || prop) + '\" nao esta no input direto deste node — o Code Node so consegue le-lo por ai');\n  return await helpers.getBinaryDataBuffer(i, prop);\n}\n\nasync function parseBinaryJson(item) {\n  if (!item || !item.binary || !item.binary.data) return {};\n  return JSON.parse((await bufferDe(item)).toString('utf8'));\n}\nconst item = $('Ler cobrancas.json').first();\nconst cobrancas = await parseBinaryJson(item);\nconst chave = $('Gerar retranca e nomes de pasta').first().json.chaveCobranca;\nif (chave && cobrancas[chave]) {\n  cobrancas[chave].status_ciclo = 'recebido';\n}\nreturn [{ json: {}, binary: { data: { data: Buffer.from(JSON.stringify(cobrancas, null, 2)).toString('base64'), mimeType: 'application/json', fileName: 'cobrancas__SUFIXO_AMBIENTE__.json' } } }];"
       },
       "id": "f2f-20-atualizar-cobrancas",
       "name": "Marcar cobrancas.json como recebido",
@@ -493,7 +513,7 @@
     {
       "parameters": {
         "operation": "write",
-        "fileName": "/home/node/.n8n-files/box-fish-config/cobrancas.json",
+        "fileName": "/home/node/.n8n-files/box-fish-config/cobrancas__SUFIXO_AMBIENTE__.json",
         "dataPropertyName": "data"
       },
       "id": "f2f-21-gravar-cobrancas",

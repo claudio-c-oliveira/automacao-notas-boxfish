@@ -29,10 +29,10 @@
     {
       "parameters": {
         "chatId": "749277207",
-        "text": "={{ $json.texto }}",
+        "text": "={{ /* escapa-html */ String($json.texto ?? \"\").replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') }}",
         "additionalFields": {
-          "parse_mode": "Markdown",
-          "appendAttribution": false
+          "appendAttribution": false,
+          "parse_mode": "HTML"
         }
       },
       "id": "e1a1b003-0000-4000-8000-000000000003",

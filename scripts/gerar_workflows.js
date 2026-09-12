@@ -14,6 +14,10 @@
  * Marcadores entendidos pela fonte:
  *   credentials.<tipo>.__porAmbiente = { homolog: "<nome>", producao: "<nome>" }
  *       -> vira a credencial concreta do ambiente alvo.
+ *   "__SUFIXO_AMBIENTE__" dentro de qualquer parâmetro
+ *       -> vira "" em produção e "_hml" em homolog. Usado nos caminhos dos arquivos
+ *          de estado (cobrancas/apelidos/config_execucao), que são separados por
+ *          ambiente desde 07/09 (spec.md seção 9).
  *   node.__ifAmbiente = { saida0: "homolog", saida1: "producao" }
  *       -> o IF é REMOVIDO e só o ramo do ambiente alvo sobrevive; quem apontava
  *          pro IF passa a apontar direto pro primeiro node do ramo escolhido.
@@ -164,6 +168,35 @@ function assarAmbiente(wf, ambiente, avisos) {
   );
 }
 
+/**
+ * Resolve o sufixo de ambiente nos caminhos dos arquivos de estado (spec.md seção 9,
+ * decisão de 07/09): arquivo SEM sufixo = produção, com `_hml` = homologação.
+ *
+ * Na fonte o caminho é escrito com o marcador `__SUFIXO_AMBIENTE__`, ex.:
+ *   /home/node/.n8n-files/box-fish-config/cobrancas__SUFIXO_AMBIENTE__.json
+ * que vira `cobrancas.json` em produção e `cobrancas_hml.json` em homolog.
+ *
+ * Por que um marcador em vez de substituir o nome do arquivo direto: os nomes desses
+ * arquivos também aparecem como NOMES DE NODE ("Ler cobrancas.json") e dentro de
+ * `$('Ler cobrancas.json')` no jsCode. Trocar por texto quebraria essas referências —
+ * o marcador só existe onde é caminho de verdade.
+ *
+ * Só percorre `parameters` justamente para não encostar em `name`/`connections`.
+ */
+function resolverSufixoDeAmbiente(wf, ambiente) {
+  const sufixo = ambiente === 'homolog' ? '_hml' : '';
+  const trocar = (valor) => {
+    if (typeof valor === 'string') return valor.split('__SUFIXO_AMBIENTE__').join(sufixo);
+    if (Array.isArray(valor)) return valor.map(trocar);
+    if (valor && typeof valor === 'object') {
+      for (const k of Object.keys(valor)) valor[k] = trocar(valor[k]);
+      return valor;
+    }
+    return valor;
+  };
+  for (const node of wf.nodes) if (node.parameters) node.parameters = trocar(node.parameters);
+}
+
 /** Limpa marcadores que só fazem sentido na fonte. */
 function limparMarcadores(wf) {
   for (const n of wf.nodes) delete n.__ifAmbiente;
@@ -182,6 +215,7 @@ function gerar(arquivoFonte) {
     colapsarIfsDeAmbiente(wf, ambiente, avisos);
     const removidos = removerInalcancaveis(wf);
     assarAmbiente(wf, ambiente, avisos);
+    resolverSufixoDeAmbiente(wf, ambiente);
     limparMarcadores(wf);
 
     const rotulo = ambiente === 'homolog' ? 'Homolog' : 'Produção';
