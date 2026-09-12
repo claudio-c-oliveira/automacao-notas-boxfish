@@ -1,0 +1,142 @@
+DECISÕES PENDENTES — rodada de 07/09/2026
+=========================================
+
+--------------------------------------------------------------------
+1) NOME DA NOVA PASTA RAIZ NO DRIVE DA MICHELLE  (item 1 da sua lista)
+--------------------------------------------------------------------
+Precisa ficar óbvio que é: (a) dado de PRODUÇÃO, (b) TEMPORÁRIO, e
+(c) separado de HOMOLOG_BOX-FISH e de SMTC, que já existem lá.
+
+   OPÇÃO A (minha recomendação):  PRODUCAO_BOX-FISH_A-CONFERIR
+       - segue o mesmo padrão de HOMOLOG_BOX-FISH (só troca HOMOLOG por PRODUCAO)
+       - "A-CONFERIR" diz o propósito: a Michelle confere e depois copia
+         manualmente pro Drive oficial do financeiro
+       - sem acento e sem espaço, igual às outras pastas raiz dela
+
+   OPÇÃO B:  PRODUCAO_BOX-FISH_TEMP
+       - mais curto; "TEMP" deixa claro que sai quando a Fase 2 for validada,
+         mas não diz que é pra conferência
+
+   OPÇÃO C:  PRODUCAO_BOX-FISH_ARQUIVO-POR-FUNCAO
+       - diz exatamente o que tem dentro, mas NÃO diz que é temporário
+
+   OPÇÃO D: outro nome que você escolher.
+
+   >>> SUA RESPOSTA: ______________________________________________
+
+
+--------------------------------------------------------------------
+2) TODAS AS 5 CREDENCIAIS GOOGLE DO n8n ESTÃO EXPIRADAS (bloqueio)
+--------------------------------------------------------------------
+Testei uma a uma hoje. As cinco respondem:
+   "The credential ... needs to be reconnected. Access could not be
+    refreshed because the connected account has revoked access, the
+    refresh token expired, or the account password or permissions changed."
+
+   - Google Drive - Produção (financeiro1@novorealitybox.com)   EXPIRADA
+   - Google Drive - Michelle (michelle.mimiaguia@gmail.com)     EXPIRADA
+   - Google Drive - HML (claudioco70@gmail.com)                 EXPIRADA
+   - Gmail account (produção, financeiro1)                      EXPIRADA
+   - Gmail - Homolog (Claudio Pessoal)                          EXPIRADA
+
+Isso bloqueia o item 1 inteiro (não consigo LER a estrutura de produção
+nem CRIAR nada no Drive da Michelle) e bloqueia também homologação.
+
+CAUSA MAIS PROVÁVEL: o app OAuth no Google Cloud Console está com o status
+de publicação em "Testing" (Teste). Nesse status o Google EXPIRA o refresh
+token em 7 dias — e a última execução com sucesso foi ~29/08, hoje é 07/09.
+
+   >>> ORDEM CORRETA (importante — corrige o que eu tinha escrito antes):
+   PRIMEIRO publicar, DEPOIS reconectar. Se reconectar primeiro, o token novo
+   pode nascer ainda sob o status "Em teste" e morrer por volta de 14/09 —
+   com você viajando desde 12/09.
+
+   (a) Google Cloud Console -> projeto automacao-notas-boxfish -> APIs e
+       serviços -> Tela de permissão OAuth -> "PUBLICAR APP" (Em teste ->
+       Em produção). Isso muda na hora e é o que acaba com a expiração de
+       7 dias.
+       - Se o Console exigir submeter para verificação e travar: tudo bem,
+         não perde nada, só continua no ciclo de 7 dias. Siga para (b).
+       - Publicação != verificação. App não verificado CONTINUA funcionando
+         (tela de aviso "O Google não verificou este app" -> Avançado ->
+         Acessar mesmo assim), com teto de 100 usuários. Temos 3.
+
+   (b) Reconectar as 5 credenciais no n8n (abrir cada uma -> "Connect my
+       account"). NÃO consigo gerar esses links por você: confirmei que o
+       endpoint /rest/oauth2-credential/auth do n8n exige sessão de editor
+       logado e responde 401 com a chave de API. Tem que ser clicado na tela.
+
+       DONO DE CADA UMA:
+         Google Drive - HML (claudioco70@gmail.com) ........... VOCÊ
+         Gmail - Homolog (Claudio Pessoal) .................... VOCÊ
+         Google Drive - Produção (financeiro1) ............... MICHELLE
+         Gmail account (financeiro1) ......................... MICHELLE
+         Google Drive - Michelle (michelle.mimiaguia) ........ MICHELLE
+
+       TEMPO: as suas 2, ~5 min. As 3 da Michelle, ~10 min com ela junto.
+       DICA: use janela anônima / perfil separado do Chrome para as contas
+       dela, senão a sua sessão Google briga com a dela a cada consentimento.
+
+   (c) PLANO B PARA A VIAGEM: a Michelle é dona de 3 das 5. Vale gastar
+       5 min hoje ensinando o passo a passo pra ela. Se os tokens morrerem
+       dia ~14 com você fora, ela se resolve sozinha.
+
+   >>> TIPO DO APP: você precisa conferir no Console (Tela de permissão
+       OAuth, aparece no topo). Pela evidência, é External com certeza:
+       contas consumidor (@gmail.com) autorizaram esse app, e isso é
+       impossível num app "Internal".
+
+--------------------------------------------------------------------
+3) COST REPORT S02 (SOFT PRÉ) SUMIU DO BOX
+--------------------------------------------------------------------
+O Box está OK (credencial da Michelle, ativa). Mas:
+   - Cost Report S01 (id 2028817453680): LÊ NORMAL, aba NOTAS, 3.730 linhas,
+     modificado hoje 07/09 15:40.
+   - Cost Report S02 / Soft Pré (id 2366859928452): HTTP 404 "not found".
+     Busquei por "SOFTPRE" e "BR_SMTC_S02" no Box inteiro: zero resultados.
+     A conta do Box só enxerga UM arquivo hoje — o S01.
+
+O spec (seção 6) dizia "nome PROVISÓRIO, o link permanece o mesmo" — na
+prática o ID morreu.
+
+   >>> PRECISO SABER: a planilha do Soft Pré foi movida/renomeada/substituída,
+       ou o compartilhamento com a conta Box da Michelle foi removido?
+       Sem isso, o projeto SOFT PRÉ não roda em produção.
+
+   >>> SUA RESPOSTA: ______________________________________________
+
+
+--------------------------------------------------------------------
+4) CREDENCIAL "Claude account (produção)" NÃO EXISTE NO n8n
+--------------------------------------------------------------------
+O arquivo de produção referencia a credencial pelo nome exato
+"Claude account (produção)". Listando as credenciais da instância, só existe
+"Claude account (dev)" (essa testei e funciona: respondeu a lista de modelos).
+
+O spec 4.3 marca a chave de produção como "✅ Criada" — a chave pode até
+existir no Console da Anthropic, mas ela NUNCA foi cadastrada como credencial
+dentro do n8n. Em ambiente=produção o node de IA falharia na hora.
+
+   >>> PRECISO DE VOCÊ: criar no n8n uma credencial Anthropic com o nome
+       EXATO  Claude account (produção)  usando a chave da conta da Michelle.
+       (O nome tem que ser idêntico, com parênteses e acento — é assim que o
+       gerador amarra a credencial.)
+
+
+--------------------------------------------------------------------
+5) FUSO HORÁRIO DA VM — JÁ CORRIGI NO WORKFLOW, MAS VALE CORRIGIR NA VM
+--------------------------------------------------------------------
+Descobri testando: a instância do n8n está rodando em America/New_York
+(o default do n8n quando não se define GENERIC_TIMEZONE). Sem corrigir,
+"9h" no agendamento sairia às 10h ou 11h de Brasília, variando conforme o
+horário de verão dos EUA.
+
+Já resolvi no nível do workflow da Fase 1 (settings.timezone =
+America/Sao_Paulo, já publicado). Mas os outros workflows (Fase 2, resumo
+diário, error handler) continuam em Nova York.
+
+   >>> RECOMENDO (opcional, você decide quando): recriar o container com
+       -e GENERIC_TIMEZONE=America/Sao_Paulo  e  -e TZ=America/Sao_Paulo
+       no docker run (procedimento da seção 7.6 do spec). Aí vale pra todos.
+
+   >>> Quer que eu prepare o arquivo de comandos pra VM?  [ ] sim  [ ] não

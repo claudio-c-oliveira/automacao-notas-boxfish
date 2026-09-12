@@ -1,0 +1,99 @@
+DECISOES PENDENTES — rodada de 08/09/2026 (destravar a Fase 2)
+==============================================================
+
+BOA NOTICIA PRIMEIRO: as 5 credenciais Google voltaram. Testei todas agora:
+  Gmail producao (financeiro1) ....... OK (11.726 mensagens, perfil respondeu)
+  Google Drive - Producao ............ OK (achei FINANCEIRO e FINANCEIRO S02)
+  Google Drive - Michelle ............ OK (achei SMTC e HOMOLOG_BOX-FISH)
+  Google Drive - HML (claudioco70) ... OK (achei a estrutura de teste)
+  Gmail - Homolog (Claudio pessoal) .. OK
+Isso destrava tanto a Fase 2 quanto a criacao da pasta que ficou pendente.
+
+--------------------------------------------------------------------
+1) NOME DA PASTA "ARQUIVO DE NOTAS" DO SOFT PRE (S02) — BLOQUEIA O S02
+--------------------------------------------------------------------
+Li a arvore real de producao agora. Do lado do S01 esta assim:
+
+  FINANCEIRO > 08. NOTAS ARQUIVADAS >
+      0000 - NDS DE ACERTOS         (vazia)
+      ARQUIVO DE NOTAS REUNION      (4 pastas de funcao)
+      ARQUIVO DE NOTAS S01          (203 pastas de funcao)
+      MKT                           (vazia)
+
+Ou seja: [PROJETO] e "S01" para o AREP e "REUNION" para o Reunion.
+
+MAS: FINANCEIRO S02 > 08. NOTAS ARQUIVADAS esta COMPLETAMENTE VAZIA. Nao existe
+nenhuma pasta "ARQUIVO DE NOTAS ..." la dentro.
+
+Entao a automacao vai precisar criar essa pasta na primeira nota do Soft Pre, e
+eu nao tenho como adivinhar o nome. As opcoes coerentes com o padrao existente:
+
+   [ ] ARQUIVO DE NOTAS S02
+   [ ] ARQUIVO DE NOTAS SOFT PRE
+   [ ] outro: ____________________________
+
+   >>> Sem isso o Salvamento 2 do Soft Pre nao tem destino.
+   >>> AREP e Reunion nao dependem desta resposta - esses eu ja resolvo.
+
+--------------------------------------------------------------------
+2) O COST REPORT S02 NO BOX CONTINUA 404 (pendencia de 07/09, sem resposta)
+--------------------------------------------------------------------
+Reforcando, porque agora vira bloqueio da Fase 2 tambem: o fileId 2366859928452
+(Soft Pre) responde "not found" no Box, e a conta do Box da Michelle so enxerga
+UM arquivo, o Cost Report S01.
+
+Sem isso, a Fase 2 nao consegue nem ler nem escrever a planilha do Soft Pre.
+
+   >>> A planilha foi movida/renomeada/substituida, ou o compartilhamento com a
+       conta Box da Michelle caiu?
+
+   >>> SUA RESPOSTA: ______________________________________________
+
+--------------------------------------------------------------------
+3) POSSO CRIAR A PASTA PRODUCAO_BOX-FISH_A-CONFERIR AGORA?
+--------------------------------------------------------------------
+Confirmei que ela NAO existe: a raiz do Drive da Michelle tem so HOMOLOG_BOX-FISH
+e SMTC. Com as credenciais de volta, consigo criar.
+
+O Salvamento 2 em modo rascunho (a regra que voce fechou) precisa dela pra ter
+destino. Sem ela, implementar a regra nao adianta.
+
+   >>> POSSO CRIAR?   [ ] sim   [ ] nao, espera
+
+   Se sim, o que eu criaria: a pasta raiz + o esqueleto espelhado
+   (FINANCEIRO > 08. NOTAS ARQUIVADAS > ARQUIVO DE NOTAS S01 / REUNION, e
+   FINANCEIRO S02 > 08. NOTAS ARQUIVADAS), SEM copiar nota nenhuma.
+
+   ATENCAO ao tamanho: se voce quiser o espelho COMPLETO (com as 203 pastas de
+   funcao do S01 + as 4 do Reunion), sao ~210 pastas. Da pra fazer, leva alguns
+   minutos de API. Mas tem uma alternativa mais enxuta:
+
+   [ ] espelho completo agora (~210 pastas, replica fiel)
+   [ ] so o esqueleto ate "ARQUIVO DE NOTAS ..." e deixar a automacao criar cada
+       pasta de funcao sob demanda (ela ja sabe fazer isso - "criar se nao
+       existir" ja esta implementado). Fica mais limpo e evita 200 pastas vazias.
+
+   >>> Minha recomendacao e a SEGUNDA. As pastas de funcao vazias nao ajudam a
+       Michelle a conferir nada, e a automacao cria a certa na hora que precisa.
+
+--------------------------------------------------------------------
+4) COMO VOCE QUER TESTAR A FASE 2 DEPOIS DE PRONTA?
+--------------------------------------------------------------------
+A Fase 2 comeca com um e-mail com anexo chegando. Pra testar de verdade em
+homolog eu preciso que exista um e-mail com uma NF anexada na caixa de
+homologacao (Gmail - Homolog / Claudio pessoal).
+
+   [ ] voce manda um e-mail de teste com um PDF de nota pra essa caixa
+   [ ] voce prefere que eu use um anexo qualquer so pra validar o encanamento
+   [ ] outro: ____________________________
+
+   E, como sempre: eu NAO disparo nada sem seu OK explicito. Quando estiver
+   pronto eu te aviso e voce roda.
+
+--------------------------------------------------------------------
+5) log_diario.json / pendencias_identificacao.json — VM parte 2
+--------------------------------------------------------------------
+Os comandos estao em comandos-vm-config-por-ambiente-parte2.txt.
+O workflow de homolog ja foi publicado apontando pro log_diario_hml.json, entao:
+
+   >>> NAO dispare o Manual Trigger antes de rodar a parte 2.

@@ -1,0 +1,82 @@
+================================================================================
+ESTREIA EM PRODUCAO — despachante, modo rascunho, limite baixo
+================================================================================
+Sao 3 passos. Os dois primeiros sou eu que nao consigo fazer: o deploy de producao
+foi BLOQUEADO pelo classificador de seguranca do meu ambiente, e a VM eu nao gravo.
+
+--------------------------------------------------------------------------------
+PASSO 1 - ajustar o limite na VM  (por que 1 e nao 3: ver o final deste arquivo)
+--------------------------------------------------------------------------------
+Cole na VM, um comando por vez:
+
+sudo cp /opt/box-fish-config/config_execucao.json /opt/box-fish-config/config_execucao.json.bak-20260911
+
+printf '{\n  "ambiente": "producao",\n  "modo": "rascunho",\n  "limite_linhas_execucao": 1\n}\n' | sudo tee /opt/box-fish-config/config_execucao.json > /dev/null
+
+cat /opt/box-fish-config/config_execucao.json
+
+  Esperado: "ambiente": "producao", "modo": "rascunho", "limite_linhas_execucao": 1
+
+
+--------------------------------------------------------------------------------
+PASSO 2 - publicar os DOIS workflows de producao, NESTA ORDEM
+--------------------------------------------------------------------------------
+A ordem importa: o despachante precisa achar o sub-workflow ja publicado pra
+resolver o ID dele. Se inverter, o despachante sobe apontando pro vazio.
+
+Na sua maquina, na pasta do repositorio:
+
+node scripts/deploy_n8n.js workflows/fase1_solicitacao_nota.producao.json --producao --confirmo-producao
+
+  Espere terminar e confira que apareceu "publicado : id ...".
+
+node scripts/deploy_n8n.js workflows/fase1_despachante.producao.json --producao --confirmo-producao
+
+  Confira que apareceu a linha:
+  AVISO: sub-workflow resolvido: Executar Fase 1 (uma fonte por vez)
+         -> "Fase 1 — Solicitação de nota (Produção)" (id ...)
+
+  SE ESSA LINHA NAO APARECER, PARE. Significa que o despachante nao achou o
+  sub-workflow, e clicar no Manual Trigger nao vai fazer nada util.
+
+Depois, confira que o que subiu bate com o arquivo:
+
+node scripts/validar_workflows.js --remoto workflows/fase1_solicitacao_nota.producao.json workflows/fase1_despachante.producao.json
+
+  Esperado: "REMOTO: tudo confere"
+
+
+--------------------------------------------------------------------------------
+PASSO 3 - me avise
+--------------------------------------------------------------------------------
+Antes de voce clicar no Manual Trigger, eu faco a ultima conferencia pela API
+(IDs resolvidos, credenciais certas, workflows inativos) e te dou o sinal verde.
+Sao 30 segundos.
+
+
+================================================================================
+POR QUE LIMITE = 1 E NAO 3
+================================================================================
+Voce sugeriu 3 pensando em "uma linha de cada fonte, mais uma sobra". Mas o teto
+que o spec decidiu (secao 7.4, 09/09) e POR PROJETO, nao por fonte nem por
+execucao. Sao tres projetos: AREP, REUNION e SOFT_PRE.
+
+Entao:
+
+   limite = 3  ->  ate 3 do AREP + 3 do REUNION + 3 do SOFT PRE = ate 9 linhas
+                   (9 rascunhos criados, 9 gravacoes reais na coluna N)
+
+   limite = 1  ->  ate 1 do AREP + 1 do REUNION + 1 do SOFT PRE = ate 3 linhas
+                   passada S01: ate 2 linhas (AREP + Reunion, mesmo arquivo)
+                   passada S02: ate 1 linha  (Soft Pre)
+
+O limite = 1 e exatamente o que voce descreveu em palavras: uma de cada, e da pra
+ver as duas passadas acontecerem em sequencia. E teto, nao cota — se um projeto
+nao tiver nenhuma linha elegivel, ele simplesmente nao processa nada, sem erro.
+
+Para uma estreia de arquitetura em cima da planilha real, 3 linhas sao suficientes
+pra provar o que queremos (as duas passadas isoladas, cada uma com seu proprio
+ciclo de escrita e conferencia) com o menor estrago possivel se algo der errado.
+
+Se voce preferir 3 mesmo, e so trocar o numero no PASSO 1 — mas saiba que sao ate
+9 linhas, nao 3.

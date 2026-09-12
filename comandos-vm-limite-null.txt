@@ -1,0 +1,47 @@
+================================================================================
+AJUSTAR limite_linhas_execucao = null NO CONFIG DE PRODUCAO
+================================================================================
+Item 3 da sua lista. Eu nao consigo gravar na VM daqui (a acao e bloqueada), entao
+segue o comando pra voce colar.
+
+ATENCAO: isto mexe SO no arquivo de PRODUCAO. O de homolog (config_execucao_hml.json)
+fica como esta.
+
+Cole UM comando por vez.
+
+--------------------------------------------------------------------------------
+PASSO 1 - ver como esta hoje
+--------------------------------------------------------------------------------
+cat /opt/box-fish-config/config_execucao.json
+
+  Esperado hoje: {"ambiente":"producao","modo":"rascunho","limite_linhas_execucao":2}
+
+--------------------------------------------------------------------------------
+PASSO 2 - backup
+--------------------------------------------------------------------------------
+sudo cp /opt/box-fish-config/config_execucao.json /opt/box-fish-config/config_execucao.json.bak-20260910
+
+--------------------------------------------------------------------------------
+PASSO 3 - gravar com limite null
+--------------------------------------------------------------------------------
+printf '{\n  "ambiente": "producao",\n  "modo": "rascunho",\n  "limite_linhas_execucao": null\n}\n' | sudo tee /opt/box-fish-config/config_execucao.json > /dev/null
+
+--------------------------------------------------------------------------------
+PASSO 4 - conferir
+--------------------------------------------------------------------------------
+cat /opt/box-fish-config/config_execucao.json
+
+  Esperado: "modo": "rascunho" (NAO mudou) e "limite_linhas_execucao": null
+
+--------------------------------------------------------------------------------
+IMPORTANTE - NAO RODE O MANUAL TRIGGER DEPOIS DISTO
+--------------------------------------------------------------------------------
+Com limite = null, uma execucao processa TODAS as linhas elegiveis das DUAS
+planilhas na mesma passada — que e exatamente o cenario que dispara o bug do
+ciclo de escrita descrito na secao 3.1.5 do spec, e que ainda NAO esta corrigido.
+
+Ou seja: o limite null so e seguro DEPOIS do processamento sequencial por fonte
+estar implementado. Detalhes no resumo-ultima-entrega.md.
+
+Se voce quiser rodar antes disso, o jeito seguro e manter um limite e garantir que
+so UMA fonte tenha linhas elegiveis na execucao.

@@ -1,0 +1,55 @@
+Claude, beleza? Ela vai tendo de sete e meia -- Vamos pra alguns pontos, tá? Na primeira imagem, eles executou tudo, né, com sucesso. É bom. Só que aquela barra lateral ali, né, a segunda barra lateral, mostra os passos dele, tem passos ali que está em vermelho. Ele não travou, passou por eles, tu acha que só tem três que está verde, e ele mandou o email, né? Então o email chegou. Foi a segunda imagem, e um email aberto é a terceira imagem. Tem alguns pontos que eu ainda preciso resolver, tá? Tipo, É a nuvem da onde que ele escolheu o nome Michelle. porque a conta grande negócios, né, de oportunidades, colaborador, ela é da Michelle, é um é um né, uma homologação. Eu não sei se ele escolheu devido ao nome do email, mas o que eu quero é que ele coloque o nome do colaborador que está na linha lá na planilha. Eu quero que ele mande o email não como se fosse homologação, eu quero que ele, a gente está tratando em homologação, mas eu quero que ele mande o email como se fosse um email de produção, entendeu? O os dados, ele vai tirar os dados da planilha e vai fazer a cópia fiel dos dados. Eu tipo assim um assunto ali que está assim entre colchetes homologue, né? Isso está errado, isso daí não existe no email original. Então eu quero que ele replique o email original. agora esse essa ferramenta pediátrica. Outra coisa, as duas linhas da planilha foi arepe. Só que quando eu olho a planilha e faço o filtro lá na planilha, solicitar né e programar até, as duas primeiras linhas, a primeira linha arepe, mas a segunda reunião. Então não sei da onde que ele pegou essa outra linha ali. Eu não sei se ele está filtrando, somente por solicitar para depois filtrar PROGRAMAR ATÉ.
+
+O modelo de email não está dentro do padrão. Eu peguei aqui um email aleatório da Michelle. 
+
+Uma das coisas que foram bem batidas entre nós foi o modelo de email. Está faltando os grifos. tipo:
+
+
+
+* A fonte padrão para toda escrita de email precisa ser "Verdana", tamanho "Normal".
+
+* Para cada linha bloco de dados que tem no email a linha "1- Emitir nota fiscal no valor de R$ 4.200,00 com os dados abaixo no corpo da nota:" precisa estar grifado em amarelo. Exatamente essa cor. Não pode ser uma outro tipo de amarelo, nem mais forte e nem mais fraco. Precisa estar bem proximo. Os dados "valor de R$ 4.200,00", precisa estar em negrito.
+
+* Seguem as instruções para a emissão da sua nota fiscal que deverá ser enviada até o dia 24/08/2026 com vencimento em 10/09/2026. - Os dados "até o dia 24/08/2026", a cor da letra precisa ser vermelha. "vencimento em 10/09/2026." - precisa estar em negrito e "10/09/2026.", precisa estar grifado com essa cor, eu acho que é um azul, meio que puxado para um cinza azulado, precisa analisar qual é o código dessa cor para replicar a mesma.
+
+* "Tomador" - Precisa estar em negrito.
+
+* "Serviço Prestado como", "Colaborador", "Período de", "Dados bancários", "chave pix", precisa estar em negrito.
+
+* "Importante: Peço a gentileza de enviar a sua nota nestes e-mails:" - Precisa estar em vermelho.
+
+* "Os dados bancários considerados para pagamento são os que estão cadastrados.
+
+O cadastro é feito baseado nas informações cedidas pelo contratado através do preenchimento de ficha cadastral da Box.
+
+Qualquer alteração bancária ou mudança na forma de pagamento deve ser notificada por e-mail pelo contratado e se faz necessário atualização da ficha cadastral e envio prévio ao responsável financeiro do projeto." - precisam estar todos digitados na sequencia e não pode estar grifado em amarelo. Precisa estar com a fonte em itálico.
+
+* Para esse trecho do email:  Ref.  "SMTC"
+
+Serviço Prestado como ASSISTENTE DE CONTROLLER
+
+Colaborador: MICHELLE DE AGUIAR TEIXEIRA
+
+Período de 01/09 A 30/09
+
+Dados bancários:
+
+chave pix:
+
+-------------------------------------------------------------------------, precisa usar o espaçamento entre as linhas de 1,5 ou então pular uma linha entre as escritas. Veja, é uma coisa ou outra. A que se encaixar melhor, pode escolher.
+
+* "Olá MICHELLE! Tudo bem?" - No final, precisa ter o emoji  da carinha sorrindo.
+
+* No assunto, o modelo está errado. ao em vez de "[HOMOLOG] AREP", seria "SMTC |". A mesma lógica precisa ser usada para os demais projetos:
+
+   * Quando for REUNION - padrão --> [SMTC - S01 |]
+
+   * Quando for SOFT PRE - padrão --> [SMTC02 |] ou [PNS |] e quando o STATUS BOX = SOLICITAR ou SOLICITAR XXX, colocar a sigla URG na frente - padrão --> [URG | PNS | SOFT PRE |]
+
+* 
+
+Esse email, embora estamos testando em homologação, precisa parecer como se fosse o de produção. Todos os dados utilizados precisam parecer como se já estivesse utilizando a automação em produção, embora as credenciais e o ambiente sejam de homologação
+
+vc quer preparar um prompt para o claude chrome para pedir a ele analisar detalhadamente o código de cada cor e modelagem do email e montar um prompt detalhado para vc adicionar no spec.md?
+
+Duvida: O n8n, na realidade usa um agente através da minha API do Claude, correto ? Qual o agente usado nesta API e qual o grau de habilidade que ele está configurado?

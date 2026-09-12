@@ -1,0 +1,103 @@
+================================================================================
+PARTE 2 - separar tambem log_diario.json e pendencias_identificacao.json
+================================================================================
+Extensao da mesma decisao do spec (secao 9): sem sufixo = PRODUCAO, _hml = HOMOLOG.
+A parte 1 (config_execucao / apelidos / cobrancas) ja foi rodada por voce e eu ja
+CONFERI pela API que ficou correta - os 3 _hml abrem e estao com o conteudo certo.
+
+Agora faltam os 2 ultimos:
+
+    log_diario.json                 <- producao    log_diario_hml.json
+    pendencias_identificacao.json   <- producao    pendencias_identificacao_hml.json
+
+Mesma regra de dados: o que existe hoje e de homolog, entao vai pro _hml e o de
+producao nasce vazio.
+
+    >>> NAO DISPARE O MANUAL TRIGGER ANTES DE TERMINAR ESTE ARQUIVO. <<<
+    O workflow de homolog que acabei de publicar ja aponta pro log_diario_hml.json.
+
+Cole UM comando por vez.
+
+--------------------------------------------------------------------------------
+PASSO 1 - ver o estado atual
+--------------------------------------------------------------------------------
+ls -la /opt/box-fish-config
+
+  Esperado hoje: 8 arquivos (5 originais + os 3 _hml da parte 1).
+  No fim desta parte 2 serao 10.
+
+
+--------------------------------------------------------------------------------
+PASSO 2 - backup antes de mexer
+--------------------------------------------------------------------------------
+sudo cp -a /opt/box-fish-config /opt/box-fish-config.bak-20260908-parte2
+
+
+--------------------------------------------------------------------------------
+PASSO 3 - criar os 2 arquivos de HOMOLOG a partir do que ja existe
+--------------------------------------------------------------------------------
+sudo cp /opt/box-fish-config/log_diario.json /opt/box-fish-config/log_diario_hml.json
+
+sudo cp /opt/box-fish-config/pendencias_identificacao.json /opt/box-fish-config/pendencias_identificacao_hml.json
+
+  Conferi pela API antes de te mandar isto:
+  - log_diario.json tem 9 registros, todos de execucoes de homolog de 24 e 25/08.
+    Vao inteiros pro _hml, nada se perde.
+  - pendencias_identificacao.json ja esta vazio ({}), entao a copia nasce vazia
+    dos dois lados. Sem drama aqui.
+
+
+--------------------------------------------------------------------------------
+PASSO 4 - zerar os de PRODUCAO
+--------------------------------------------------------------------------------
+printf '[]\n' | sudo tee /opt/box-fish-config/log_diario.json > /dev/null
+
+printf '{}\n' | sudo tee /opt/box-fish-config/pendencias_identificacao.json > /dev/null
+
+  ATENCAO ao formato: log_diario.json e uma LISTA ([]), os outros sao OBJETOS ({}).
+  Nao troque um pelo outro - o node que le faz push() nele.
+
+
+--------------------------------------------------------------------------------
+PASSO 5 - permissoes
+--------------------------------------------------------------------------------
+sudo chmod 644 /opt/box-fish-config/*.json
+
+
+--------------------------------------------------------------------------------
+PASSO 6 - conferir
+--------------------------------------------------------------------------------
+ls -la /opt/box-fish-config
+
+  Esperado: 10 arquivos.
+
+head -3 /opt/box-fish-config/log_diario.json
+
+  Esperado: []
+
+head -3 /opt/box-fish-config/log_diario_hml.json
+
+  Esperado: comeca com [ { "timestamp": "2026-08-24T10:04:32.226Z", ...
+
+
+--------------------------------------------------------------------------------
+DEPOIS QUE TERMINAR
+--------------------------------------------------------------------------------
+Me avise que eu confiro pela API de novo, arquivo por arquivo, como fiz na parte 1.
+
+
+--------------------------------------------------------------------------------
+OBSERVACAO - 2 workflows ainda nao acompanham essa separacao
+--------------------------------------------------------------------------------
+Os arquivos _hml passam a valer AUTOMATICAMENTE so pra Fase 1, que e a unica que
+passa pelo gerador de fonte unica.
+
+Continuam apontando pros arquivos de PRODUCAO, em qualquer ambiente:
+
+  - workflows/resumo_diario.json      -> le log_diario.json
+  - os 3 workflows da Fase 2          -> config_execucao / cobrancas /
+                                         pendencias_identificacao
+
+Nenhum dos 4 esta publicado no n8n, entao nao ha risco hoje. Isso se resolve
+quando eles entrarem na fonte unica - que e exatamente a tarefa que voce acabou
+de priorizar para a Fase 2.

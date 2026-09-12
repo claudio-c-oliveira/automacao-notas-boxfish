@@ -1,0 +1,95 @@
+================================================================================
+GRAVAR AS 16 ENTRADAS DE DEDUPLICACAO NO cobrancas.json (producao)
+================================================================================
+Sao os 16 rascunhos criados direto em 11/09 para as linhas que ficaram pendentes
+de contrato na execucao 305. Sem essas entradas, a deduplicacao nao conhece esses
+rascunhos e um proximo disparo poderia criar um SEGUNDO rascunho para a mesma
+pessoa.
+
+O comando MESCLA: le o arquivo atual, acrescenta as 16 chaves e regrava. Nao
+sobrescreve nada do que ja esta la.
+
+Eu nao consegui gravar daqui - a escrita na VM e bloqueada no meu ambiente.
+
+Cole UM comando por vez. O PASSO 2 e uma linha longa (4.632 caracteres): cole
+inteira, de uma vez so, e confira no PASSO 3 antes de seguir.
+
+--------------------------------------------------------------------------------
+PASSO 1 - backup
+--------------------------------------------------------------------------------
+sudo cp /opt/box-fish-config/cobrancas.json /opt/box-fish-config/cobrancas.json.bak-20260911-16rascunhos
+
+ls -la /opt/box-fish-config/cobrancas.json*
+
+  Se algo der errado, volta com:
+  sudo cp /opt/box-fish-config/cobrancas.json.bak-20260911-16rascunhos /opt/box-fish-config/cobrancas.json
+
+--------------------------------------------------------------------------------
+PASSO 2 - gravar as 16 entradas num arquivo temporario (linha longa, cole inteira)
+--------------------------------------------------------------------------------
+printf '%s' 'eyJSRVVOSU9OX1MwMV9MMTEyIjp7InRocmVhZElkIjoiMWEwOTJhN2YwZWU0MmQ5NCIsImRyYWZ0SWQiOiJyMzEzNTYwNjU1NTY1ODAyMzMzNiIsImRhdGFBbHZvRW52aW8iOiIyMDI2LTA5LTEwVDAwOjAwOjAwLjAwMFoiLCJkYXRhX3VsdGltYV9jb2JyYW5jYSI6IjIwMjYtMDktMTEiLCJjb250YWdlbV9jb2JyYW5jYXMiOjAsInN0YXR1c19jaWNsbyI6ImVtX2FuZGFtZW50byJ9LCJTT0ZUIFBSRV9TMDJfTDIwIjp7InRocmVhZElkIjoiMWEwOTJhN2YyMzkyNzBjZSIsImRyYWZ0SWQiOiJyLTYyNzcyOTg4NDY3OTgyMzYyMDUiLCJkYXRhQWx2b0VudmlvIjoiMjAyNi0wOS0xMFQwMDowMDowMC4wMDBaIiwiZGF0YV91bHRpbWFfY29icmFuY2EiOiIyMDI2LTA5LTExIiwiY29udGFnZW1fY29icmFuY2FzIjowLCJzdGF0dXNfY2ljbG8iOiJlbV9hbmRhbWVudG8ifSwiU09GVCBQUkVfUzAyX0wyNSI6eyJ0aHJlYWRJZCI6IjFhMDkyYTdmNWQ2OGMwYjMiLCJkcmFmdElkIjoici0zNjgyMDA0MDUzMjkxNjE2MjYiLCJkYXRhQWx2b0VudmlvIjoiMjAyNi0wOS0xMFQwMDowMDowMC4wMDBaIiwiZGF0YV91bHRpbWFfY29icmFuY2EiOiIyMDI2LTA5LTExIiwiY29udGFnZW1fY29icmFuY2FzIjowLCJzdGF0dXNfY2ljbG8iOiJlbV9hbmRhbWVudG8ifSwiU09GVCBQUkVfUzAyX0w0MyI6eyJ0aHJlYWRJZCI6IjFhMDkyYTdmNTg4NDM3MTAiLCJkcmFmdElkIjoici02ODAwNzQ1NzczMTQxMDY3NDE2IiwiZGF0YUFsdm9FbnZpbyI6IjIwMjYtMDktMTBUMDA6MDA6MDAuMDAwWiIsImRhdGFfdWx0aW1hX2NvYnJhbmNhIjoiMjAyNi0wOS0xMSIsImNvbnRhZ2VtX2NvYnJhbmNhcyI6MCwic3RhdHVzX2NpY2xvIjoiZW1fYW5kYW1lbnRvIn0sIlNPRlQgUFJFX1MwMl9MNTciOnsidGhyZWFkSWQiOiIxYTA5MmE3ZjcxMTM2YTQyIiwiZHJhZnRJZCI6InItMTM3NTAyMjMzOTUxMTUxMTM0MSIsImRhdGFBbHZvRW52aW8iOiIyMDI2LTA5LTEwVDAwOjAwOjAwLjAwMFoiLCJkYXRhX3VsdGltYV9jb2JyYW5jYSI6IjIwMjYtMDktMTEiLCJjb250YWdlbV9jb2JyYW5jYXMiOjAsInN0YXR1c19jaWNsbyI6ImVtX2FuZGFtZW50byJ9LCJTT0ZUIFBSRV9TMDJfTDY4Ijp7InRocmVhZElkIjoiMWEwOTJhN2Y5NTk0ZjE2OCIsImRyYWZ0SWQiOiJyLTg0MjU0MjQ3MTE4ODEzMjI3MTMiLCJkYXRhQWx2b0VudmlvIjoiMjAyNi0wOS0xMFQwMDowMDowMC4wMDBaIiwiZGF0YV91bHRpbWFfY29icmFuY2EiOiIyMDI2LTA5LTExIiwiY29udGFnZW1fY29icmFuY2FzIjowLCJzdGF0dXNfY2ljbG8iOiJlbV9hbmRhbWVudG8ifSwiU09GVCBQUkVfUzAyX0w3NiI6eyJ0aHJlYWRJZCI6IjFhMDkyYTdmODhiMDViOGIiLCJkcmFmdElkIjoici00NjQ5MTI1MzEwNTMzNzI4MTUwIiwiZGF0YUFsdm9FbnZpbyI6IjIwMjYtMDktMTBUMDA6MDA6MDAuMDAwWiIsImRhdGFfdWx0aW1hX2NvYnJhbmNhIjoiMjAyNi0wOS0xMSIsImNvbnRhZ2VtX2NvYnJhbmNhcyI6MCwic3RhdHVzX2NpY2xvIjoiZW1fYW5kYW1lbnRvIn0sIlNPRlQgUFJFX1MwMl9MOTAiOnsidGhyZWFkSWQiOiIxYTA5MmE3ZmFlZWJlODA0IiwiZHJhZnRJZCI6InI1Nzc5NjczNDA1NDEyODgyMTExIiwiZGF0YUFsdm9FbnZpbyI6IjIwMjYtMDktMTBUMDA6MDA6MDAuMDAwWiIsImRhdGFfdWx0aW1hX2NvYnJhbmNhIjoiMjAyNi0wOS0xMSIsImNvbnRhZ2VtX2NvYnJhbmNhcyI6MCwic3RhdHVzX2NpY2xvIjoiZW1fYW5kYW1lbnRvIn0sIlNPRlQgUFJFX1MwMl9MOTYiOnsidGhyZWFkSWQiOiIxYTA5MmE3ZmI2ODY5MDBiIiwiZHJhZnRJZCI6InItODg5ODQ4MTA1OTYwODYxNjMwNCIsImRhdGFBbHZvRW52aW8iOiIyMDI2LTA5LTEwVDAwOjAwOjAwLjAwMFoiLCJkYXRhX3VsdGltYV9jb2JyYW5jYSI6IjIwMjYtMDktMTEiLCJjb250YWdlbV9jb2JyYW5jYXMiOjAsInN0YXR1c19jaWNsbyI6ImVtX2FuZGFtZW50byJ9LCJTT0ZUIFBSRV9TMDJfTDExNSI6eyJ0aHJlYWRJZCI6IjFhMDkyYTdmZGE2NDU5NDYiLCJkcmFmdElkIjoici02NzExNjUyNzUzMzUxMTk2MjI3IiwiZGF0YUFsdm9FbnZpbyI6IjIwMjYtMDktMTBUMDA6MDA6MDAuMDAwWiIsImRhdGFfdWx0aW1hX2NvYnJhbmNhIjoiMjAyNi0wOS0xMSIsImNvbnRhZ2VtX2NvYnJhbmNhcyI6MCwic3RhdHVzX2NpY2xvIjoiZW1fYW5kYW1lbnRvIn0sIlNPRlQgUFJFX1MwMl9MMTE5Ijp7InRocmVhZElkIjoiMWEwOTJhN2ZkMTI0OTM1OCIsImRyYWZ0SWQiOiJyOTAxMDc0NzM4MTk4MTQwMDI3NyIsImRhdGFBbHZvRW52aW8iOiIyMDI2LTA5LTEwVDAwOjAwOjAwLjAwMFoiLCJkYXRhX3VsdGltYV9jb2JyYW5jYSI6IjIwMjYtMDktMTEiLCJjb250YWdlbV9jb2JyYW5jYXMiOjAsInN0YXR1c19jaWNsbyI6ImVtX2FuZGFtZW50byJ9LCJTT0ZUIFBSRV9TMDJfTDEyMiI6eyJ0aHJlYWRJZCI6IjFhMDkyYTdmZjFlZGIyOTkiLCJkcmFmdElkIjoicjIxNzAzMDY2NDQwODk2Mzc1MTMiLCJkYXRhQWx2b0VudmlvIjoiMjAyNi0wOS0xMFQwMDowMDowMC4wMDBaIiwiZGF0YV91bHRpbWFfY29icmFuY2EiOiIyMDI2LTA5LTExIiwiY29udGFnZW1fY29icmFuY2FzIjowLCJzdGF0dXNfY2ljbG8iOiJlbV9hbmRhbWVudG8ifSwiU09GVCBQUkVfUzAyX0wxNDgiOnsidGhyZWFkSWQiOiIxYTA5MmE3ZmYyN2FlNTU5IiwiZHJhZnRJZCI6InItODk2NTQ3OTg3NTAwMDY2NDg4NSIsImRhdGFBbHZvRW52aW8iOiIyMDI2LTA5LTEwVDAwOjAwOjAwLjAwMFoiLCJkYXRhX3VsdGltYV9jb2JyYW5jYSI6IjIwMjYtMDktMTEiLCJjb250YWdlbV9jb2JyYW5jYXMiOjAsInN0YXR1c19jaWNsbyI6ImVtX2FuZGFtZW50byJ9LCJTT0ZUIFBSRV9TMDJfTDE1NyI6eyJ0aHJlYWRJZCI6IjFhMDkyYTgwMTQ4NjIyZWIiLCJkcmFmdElkIjoicjM3NzcyNjYyMzExOTc1Nzc2ODMiLCJkYXRhQWx2b0VudmlvIjoiMjAyNi0wOS0xMFQwMDowMDowMC4wMDBaIiwiZGF0YV91bHRpbWFfY29icmFuY2EiOiIyMDI2LTA5LTExIiwiY29udGFnZW1fY29icmFuY2FzIjowLCJzdGF0dXNfY2ljbG8iOiJlbV9hbmRhbWVudG8ifSwiU09GVCBQUkVfUzAyX0wxNjkiOnsidGhyZWFkSWQiOiIxYTA5MmE4MDE1NWRkZWFiIiwiZHJhZnRJZCI6InItNDg3OTkwNzczMTQzNjQ4MTE4MSIsImRhdGFBbHZvRW52aW8iOiIyMDI2LTA5LTEwVDAwOjAwOjAwLjAwMFoiLCJkYXRhX3VsdGltYV9jb2JyYW5jYSI6IjIwMjYtMDktMTEiLCJjb250YWdlbV9jb2JyYW5jYXMiOjAsInN0YXR1c19jaWNsbyI6ImVtX2FuZGFtZW50byJ9LCJTT0ZUIFBSRV9TMDJfTDIwMyI6eyJ0aHJlYWRJZCI6IjFhMDkyYTgwM2ViZmI5YTgiLCJkcmFmdElkIjoicjIwMDYzODQzOTEwODk4MzIxMzYiLCJkYXRhQWx2b0VudmlvIjoiMjAyNi0wOS0xMFQwMDowMDowMC4wMDBaIiwiZGF0YV91bHRpbWFfY29icmFuY2EiOiIyMDI2LTA5LTExIiwiY29udGFnZW1fY29icmFuY2FzIjowLCJzdGF0dXNfY2ljbG8iOiJlbV9hbmRhbWVudG8ifX0=' | base64 -d > /tmp/novas16.json
+
+--------------------------------------------------------------------------------
+PASSO 3 - CONFERIR antes de mesclar (nao pule este passo)
+--------------------------------------------------------------------------------
+python3 -c "import json;d=json.load(open('/tmp/novas16.json'));print('chaves:',len(d));print('exemplo:',list(d)[0],'->',d[list(d)[0]]['draftId'])"
+
+  Esperado exatamente:
+      chaves: 16
+      exemplo: REUNION_S01_L112 -> r3135606555658023336
+
+  >>> SE NAO DER 16, PARE. O texto do passo 2 foi cortado na colagem.
+      Refaca o passo 2 e confira de novo.
+
+--------------------------------------------------------------------------------
+PASSO 4 - mesclar no cobrancas.json (le, acrescenta, regrava)
+--------------------------------------------------------------------------------
+sudo python3 -c "import json;p='/opt/box-fish-config/cobrancas.json';a=json.load(open(p));n=json.load(open('/tmp/novas16.json'));print('antes:',len(a));a.update(n);json.dump(a,open(p,'w'),ensure_ascii=False,indent=2);print('depois:',len(a))"
+
+  Esperado: 'antes: N' e 'depois: N+16' (ou menos que +16 se alguma chave ja
+  existisse - nesse caso ela e atualizada, nao duplicada).
+
+--------------------------------------------------------------------------------
+PASSO 5 - conferir o resultado
+--------------------------------------------------------------------------------
+python3 -c "import json;d=json.load(open('/opt/box-fish-config/cobrancas.json'));alvo=['REUNION_S01_L112','SOFT PRE_S02_L20','SOFT PRE_S02_L203'];print('total:',len(d));[print(k,'->',d.get(k,{}).get('draftId','AUSENTE')) for k in alvo]"
+
+  Esperado:
+      REUNION_S01_L112 -> r3135606555658023336
+      SOFT PRE_S02_L20 -> r-6277298846798236205
+      SOFT PRE_S02_L203 -> r2006384391089832136
+
+--------------------------------------------------------------------------------
+PASSO 6 - limpar o temporario
+--------------------------------------------------------------------------------
+rm -f /tmp/novas16.json
+
+--------------------------------------------------------------------------------
+DEPOIS
+--------------------------------------------------------------------------------
+Me avise que eu confirmo pela API, lendo o arquivo de dentro do container, que as
+16 chaves estao la com o draftId certo - do mesmo jeito que conferi a separacao
+por ambiente.
+
+================================================================================
+AS 16 CHAVES QUE SERAO ACRESCENTADAS (para conferencia visual)
+================================================================================
+  REUNION_S01_L112     VANESSA PAES
+  SOFT PRE_S02_L20     GUI CINTRA
+  SOFT PRE_S02_L25     ANDRE BRANDT
+  SOFT PRE_S02_L43     VANESSA PAES
+  SOFT PRE_S02_L57     LARRI ANDRADE
+  SOFT PRE_S02_L68     KAIO GOUDINHO
+  SOFT PRE_S02_L76     DANIELLE BARCELOS
+  SOFT PRE_S02_L90     BRUNA MEGGIOLARO
+  SOFT PRE_S02_L96     KAREN VITORIA
+  SOFT PRE_S02_L115    NATALIA SALVADOR
+  SOFT PRE_S02_L119    FLAVIA MACHADO
+  SOFT PRE_S02_L122    KIKA MAMNERICH
+  SOFT PRE_S02_L148    EDUARDO YOUNG
+  SOFT PRE_S02_L157    ANA CLARA ABREU
+  SOFT PRE_S02_L169    GABY CHANTRE
+  SOFT PRE_S02_L203    FELIPE NICOLETTI
+
+Cada entrada tem: threadId, draftId, dataAlvoEnvio (2026-09-10),
+data_ultima_cobranca (2026-09-11), contagem_cobrancas 0, status_ciclo em_andamento.

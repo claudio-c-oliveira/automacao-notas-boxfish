@@ -1,0 +1,142 @@
+================================================================================
+SEPARAR OS ARQUIVOS DE CONFIGURACAO POR AMBIENTE (spec.md secao 9, decisao 07/09)
+================================================================================
+Convencao nova:  sem sufixo = PRODUCAO   |   com _hml = HOMOLOGACAO
+
+    config_execucao.json      <- producao      config_execucao_hml.json
+    apelidos.json             <- producao      apelidos_hml.json
+    cobrancas.json            <- producao      cobrancas_hml.json
+
+    log_diario.json e pendencias_identificacao.json NAO mudam (nao entraram na
+    decisao do spec) - ver a pergunta no final deste arquivo.
+
+POR QUE VOCE PRECISA RODAR ISSO: eu nao consegui gravar na VM daqui (a acao foi
+bloqueada). E o workflow de homolog que acabei de publicar JA aponta para os
+arquivos _hml. Entao:
+
+    >>> NAO DISPARE O MANUAL TRIGGER ANTES DE TERMINAR ESTE ARQUIVO. <<<
+    Sem os _hml, o primeiro node (Ler config_execucao.json) falha na hora.
+
+Cole UM comando por vez (o terminal SSH do navegador gruda linhas coladas juntas).
+
+--------------------------------------------------------------------------------
+PASSO 1 - ver o que existe hoje (nada e alterado aqui)
+--------------------------------------------------------------------------------
+ls -la /opt/box-fish-config
+
+  Esperado: 5 arquivos - apelidos.json, cobrancas.json, config_execucao.json,
+  log_diario.json, pendencias_identificacao.json
+
+
+--------------------------------------------------------------------------------
+PASSO 2 - guardar uma copia de seguranca antes de mexer
+--------------------------------------------------------------------------------
+sudo cp -a /opt/box-fish-config /opt/box-fish-config.bak-20260908
+
+ls -la /opt/box-fish-config.bak-20260908
+
+  Se algo der errado depois, da pra voltar tudo com:
+  sudo cp -a /opt/box-fish-config.bak-20260908/. /opt/box-fish-config/
+
+
+--------------------------------------------------------------------------------
+PASSO 3 - criar os 3 arquivos de HOMOLOG a partir do que ja existe
+--------------------------------------------------------------------------------
+sudo cp /opt/box-fish-config/apelidos.json /opt/box-fish-config/apelidos_hml.json
+
+sudo cp /opt/box-fish-config/cobrancas.json /opt/box-fish-config/cobrancas_hml.json
+
+sudo cp /opt/box-fish-config/config_execucao.json /opt/box-fish-config/config_execucao_hml.json
+
+  Os 8 registros que estao hoje no cobrancas.json sao todos de testes de homolog
+  (chaves REUNION_S01_L293, L404, L631...). Por isso eles VAO para o _hml, em vez
+  de serem jogados fora - assim seus testes de homolog continuam de onde pararam.
+
+
+--------------------------------------------------------------------------------
+PASSO 4 - corrigir o nome da credencial dentro do config_execucao_hml.json
+--------------------------------------------------------------------------------
+sudo sed -i 's/Google Drive - Homolog (Claudio pessoal)/Google Drive - HML (claudioco70@gmail.com)/' /opt/box-fish-config/config_execucao_hml.json
+
+  O arquivo da VM tinha "Google Drive - Homolog (Claudio pessoal)", que NAO existe
+  no n8n. O nome real da credencial e "Google Drive - HML (claudioco70@gmail.com)"
+  (confirmei listando as credenciais da instancia; e o mesmo nome da secao 7.4 do
+  spec). Esse campo so e usado pela Fase 2, entao nao quebrou nada ate agora.
+
+
+--------------------------------------------------------------------------------
+PASSO 5 - zerar o cobrancas.json de PRODUCAO
+--------------------------------------------------------------------------------
+printf '{}\n' | sudo tee /opt/box-fish-config/cobrancas.json > /dev/null
+
+  O spec (secao 9) autoriza: "ambos os arquivos podem nascer vazios", e os dados
+  antigos ja foram preservados no _hml no passo 3.
+
+
+--------------------------------------------------------------------------------
+PASSO 6 - deixar o config_execucao.json de PRODUCAO coerente e no modo seguro
+--------------------------------------------------------------------------------
+printf '{\n  "ambiente": "producao",\n  "modo": "rascunho",\n  "limite_linhas_execucao": 2\n}\n' | sudo tee /opt/box-fish-config/config_execucao.json > /dev/null
+
+  ATENCAO - isto NAO liga producao. O workflow de producao nem esta publicado no
+  n8n, e o de homolog agora le so os arquivos _hml. O motivo de mexer aqui e o
+  contrario: o arquivo estava com "modo": "automatico" herdado dos seus testes.
+  Se um dia alguem publicasse e ativasse o workflow de producao, ele leria esse
+  "automatico" e mandaria e-mail de verdade sozinho. Com "rascunho" isso nao
+  acontece nem por acidente.
+
+
+--------------------------------------------------------------------------------
+PASSO 7 - permissoes (o container le como usuario "node")
+--------------------------------------------------------------------------------
+sudo chmod 644 /opt/box-fish-config/*.json
+
+
+--------------------------------------------------------------------------------
+PASSO 8 - conferir o resultado
+--------------------------------------------------------------------------------
+ls -la /opt/box-fish-config
+
+  Esperado: 8 arquivos agora (os 5 de antes + os 3 novos com _hml).
+
+head -20 /opt/box-fish-config/config_execucao_hml.json
+
+  Esperado: "ambiente": "homolog", "modo": "automatico", e a credencial ja
+  corrigida para "Google Drive - HML (claudioco70@gmail.com)".
+
+head -5 /opt/box-fish-config/config_execucao.json
+
+  Esperado: "ambiente": "producao", "modo": "rascunho".
+
+head -5 /opt/box-fish-config/cobrancas.json
+
+  Esperado: {}
+
+head -8 /opt/box-fish-config/cobrancas_hml.json
+
+  Esperado: a chave "REUNION_S01_L293" com o threadId.
+
+
+--------------------------------------------------------------------------------
+DEPOIS QUE TERMINAR
+--------------------------------------------------------------------------------
+Me avise. Eu rodo uma leitura pelos nodes do proprio n8n pra confirmar que os 8
+arquivos estao visiveis DE DENTRO do container (que e o que importa - o bind
+mount ja provou funcionar, mas confirmar custa 30 segundos).
+
+Lembrando que o Manual Trigger continua bloqueado por outro motivo: as 5
+credenciais Google seguem expiradas (ver decisao-pendente-2026-09-07.txt).
+
+
+--------------------------------------------------------------------------------
+PERGUNTA - log_diario.json tambem deveria ser separado?
+--------------------------------------------------------------------------------
+A decisao do spec cita so os 3 arquivos acima. Nao mexi no log_diario.json por
+isso - regra que nao esta no spec eu nao invento.
+
+Mas vale voce decidir: hoje ele e um arquivo so, entao o resumo diario do Telegram
+vai misturar execucao de teste com execucao real na mesma lista quando producao
+comecar. Nao e risco de dado (nao alimenta deduplicacao nem cobranca), e sim
+relatorio poluido.
+
+    [x] separar tambem (log_diario_hml.json)   [ ] deixar junto mesmo
