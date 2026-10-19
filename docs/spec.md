@@ -488,7 +488,7 @@ Cada projeto vira um "perfil" de configuração — o motor (as 4 fases) é o me
 | Prefixo assunto (entrega) | AREP \| NOTAS À PAGAR... | SMTC - S01 \| REUNION \| NOTAS À PAGAR... | SMTC - S02 \| SOFT PRE \| NOTAS À PAGAR... |
 | Texto "Ref." | "SMTC" | "SMTC - REUNION" | "SMTC - SOFT PRE" |
 | Retranca | S01 | REUNION_S01 | SOFT PRE_S02 |
-| Planilha Cost Report (Box) | Mesmo arquivo do Reunion — linhas sem preenchimento de cor | BR_SMTC_S01__COST REPORT_VS_EXECUÇÃO_1201.xlsx — linhas com preenchimento roxo/cinza | BR_SMTC_S02_SOFTPRE_PROVISÓRIO.xlsx (nome pode mudar, link permanece) |
+| Planilha Cost Report (Box) | Mesmo arquivo do Reunion — linhas sem preenchimento de cor | BR_SMTC_S01__COST REPORT_VS_EXECUÇÃO_1201.xlsx — linhas com preenchimento roxo/cinza (**desde 19/10/2026 o nome em produção é `BR_SMTC_S01__COST REPORT_VS_EXECUÇÃO_22.09`**; verificar se o ID do Box continua vigente) | BR_SMTC_S02_SOFTPRE_PROVISÓRIO.xlsx (**desde 19/10/2026: `BR_SMTC_S02_SOFTPRE_PROVISÓRIO_22.09`**; o nome muda, então a automação localiza por ID e, se o ID não responder, por nome parecido na pasta pai — nunca assume) |
 | Planilha de Contratos | BR_AREP_S01_CONTROLE_DE_CONTRATOS.xlsb | BR_AREP_S01_REUNION_CONTROLE_DE_CONTRATOS.xlsb | BR_SMTC_S02_CONTROLE_DE_CONTRATOS.xlsb |
 
 **Localização real e regra de acesso (confirmado com prints)**: essas 3 planilhas NÃO ficam no Box — ficam no **Google Drive**, dentro de pastas compartilhadas pela Danielle Barcelos / Bruna Bortolazo (visíveis em "Compartilhados comigo"), com a credencial "Google Drive - Produção (financeiro1@novorealitybox.com)" (financeiro1@novorealitybox.com) já com acesso:
@@ -771,3 +771,12 @@ Cada fase é um workflow separado no n8n, com gatilho manual (além do agendamen
      - Rollback parcial: reverte só o que a automação criou/moveu (rascunhos, arquivos, pastas), deixando a planilha intacta para conferência/ajuste manual depois.
      - Cancelar: não faz nada.
   4. Ao final, envia resumo pelo Telegram do que foi revertido e do que não foi.
+
+### 13.4 BACKUP OBRIGATÓRIO antes de qualquer escrita em planilha real (premissa permanente, decidida em 19/10/2026)
+Motivo: o versionamento do Box não basta. A conta Box do projeto (plano gratuito) não permite listar/restaurar versão por API (`GET /files/{id}/versions` → 403), e a restauração manual de versão anterior já bagunçou largura de colunas e formatação. Por isso, vale para o Claude Code, para a automação n8n e para qualquer script:
+1. **Antes de QUALQUER escrita** em planilha real (Cost S01, Cost S02 ou qualquer outra), fazer uma CÓPIA datada do arquivo exatamente como está naquele instante (download byte a byte do Box), guardada em local seguro FORA das pastas oficiais e fora da pasta de trabalho dos testes (nome: `<nome-original>__BACKUP_AAAA-MM-DD_HHMMSS.xlsx`).
+2. A cópia só vale se verificada: conferir sha1 e tamanho da cópia contra o arquivo baixado e registrar `version id`/sha1 do arquivo no Box. Sem backup verificado, NÃO escreve.
+3. A cópia é o arquivo inteiro (inclui estilos, larguras de coluna, formatação condicional `x14`/legada, filtros) — restaurar = subir esse arquivo de volta como nova versão (lock → upload → unlock), nunca recriar a partir de dados. Antes de restaurar, fazer outro backup do estado atual.
+4. Backups não são apagados pela automação; limpeza só com autorização do Claudio.
+5. Vale também quando a escrita é cirúrgica (`scripts/lib/xlsx_cirurgico.js`): o módulo reduz o risco, não substitui o backup.
+6. O relatório de toda escrita informa: caminho do backup, sha1 antes/depois e como restaurar.
