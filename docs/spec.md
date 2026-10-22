@@ -774,9 +774,29 @@ Cada fase é um workflow separado no n8n, com gatilho manual (além do agendamen
 
 ### 13.4 BACKUP OBRIGATÓRIO antes de qualquer escrita em planilha real (premissa permanente, decidida em 19/10/2026)
 Motivo: o versionamento do Box não basta. A conta Box do projeto (plano gratuito) não permite listar/restaurar versão por API (`GET /files/{id}/versions` → 403), e a restauração manual de versão anterior já bagunçou largura de colunas e formatação. Por isso, vale para o Claude Code, para a automação n8n e para qualquer script:
-1. **Antes de QUALQUER escrita** em planilha real (Cost S01, Cost S02 ou qualquer outra), fazer uma CÓPIA datada do arquivo exatamente como está naquele instante (download byte a byte do Box), guardada em local seguro FORA das pastas oficiais e fora da pasta de trabalho dos testes (nome: `<nome-original>__BACKUP_AAAA-MM-DD_HHMMSS.xlsx`).
+1. **Antes de QUALQUER escrita** em planilha real (Cost S01, Cost S02 ou qualquer outra), fazer uma CÓPIA datada do arquivo exatamente como está naquele instante (download byte a byte do Box), guardada no Box, na pasta `ZZ-BACKUP-COST` (id 429803889593), FORA das pastas oficiais, fora da pasta de trabalho dos testes e não compartilhada. Nome: nome original + `_copia_AAAA-MM-DD_HHMMSS` antes do `.xlsx` (ex.: `BR_SMTC_S01__COST REPORT_VS_EXECUÇÃO_22.09_copia_2026-10-21_204900.xlsx`). Não há cópia local: o backup fica só no Box.
 2. A cópia só vale se verificada: conferir sha1 e tamanho da cópia contra o arquivo baixado e registrar `version id`/sha1 do arquivo no Box. Sem backup verificado, NÃO escreve.
 3. A cópia é o arquivo inteiro (inclui estilos, larguras de coluna, formatação condicional `x14`/legada, filtros) — restaurar = subir esse arquivo de volta como nova versão (lock → upload → unlock), nunca recriar a partir de dados. Antes de restaurar, fazer outro backup do estado atual.
-4. Backups não são apagados pela automação; limpeza só com autorização do Claudio.
+4. Retenção: ficam as 5 últimas cópias de cada planilha. A limpeza das mais antigas só roda depois de uma escrita bem-sucedida, só apaga itens com nome começando pelo da planilha e terminando em `_copia_<data>`, só dentro da `ZZ-BACKUP-COST`, e nunca apaga a única cópia verificada. Qualquer outra limpeza exige autorização do Claudio.
 5. Vale também quando a escrita é cirúrgica (`scripts/lib/xlsx_cirurgico.js`): o módulo reduz o risco, não substitui o backup.
 6. O relatório de toda escrita informa: caminho do backup, sha1 antes/depois e como restaurar.
+7. **Passo 0 (antes de escrever):** baixar o arquivo atual e comparar com o último estado conhecido. Se houver diferença, parar e investigar. Diferença só de renumeração de `styles.xml` e de mesclagens (o Excel Online reescreve isso a cada salvamento da Michelle, sem mudar o visual) é aceita; qualquer outra diferença para a execução.
+8. **Prioridade:** na dúvida entre marcar uma célula e arriscar a formatação, não marca. Prefere-se perder uma marcação a perder a formatação; se algo sair do esperado, abortar e restaurar o backup.
+9. **Escrita segura no Box:** ciclo lock (com `expires_at`) → upload com `If-Match` → unlock sempre, mesmo em erro. Depois da escrita, comparar o pacote inteiro: só a aba NOTAS e só a coluna Q podem mudar; todas as outras partes do .xlsx ficam byte a byte idênticas. O lock do Box nem sempre mostra quem está editando, e cada salvamento no Excel Online gera uma versão nova.
+
+### 13.5 Coluna Q (CHECK ARQUIVO DRIVE) do Cost Report — regras (decididas em 21/10/2026)
+- Aba `NOTAS`, coluna Q. Valores: `OK` = nota arquivada (pela Michelle ou pela automação); `ARQUIVO INTERNO` = nunca tocar; vazio e `PENDENTE` = a mesma coisa (ainda não arquivada).
+- Arquivar a nota na pasta da função e marcar `OK` andam juntos. A automação só escreve `OK` em célula vazia ou `PENDENTE`; nunca sobrescreve outro valor.
+- O estilo da célula `OK` é copiado do estilo já usado por `OK` na própria planilha (hoje, estilo 370 no S01).
+- A escrita usa só `scripts/lib/xlsx_cirurgico.js` (nunca exceljs, que causou o estrago de formatação de setembro). A verificação conta formatação condicional legada (`<conditionalFormatting`) e x14 (`<x14:cfRule`) separadamente, além de extLst, dxfs, cols, autoFilter, mesclagens e `styles.xml`.
+- A coluna N (status de contrato) não entra no arquivamento.
+- Resultado da rodada de 19–22/10/2026 (Reunion e Soft Pré, setembro e outubro; AREP fora): 151 notas arquivadas e marcadas `OK` (114 no S01, 37 no S02). 115 notas ficaram fora da rodada, por motivo (fora do padrão 43, colisão 26, sem fornecedor 18, rateio 12, nº diverge 9, vencimento 3, ambígua 3, linha não mapeada 1); a lista vai para a Michelle decidir.
+- Casamento da nota com a linha do Cost: nome do fornecedor com tolerância (acento, sufixo societário, ±1 caractere); desempate por vencimento (col. G) e depois por nº da nota (col. E, normalizando zeros e hífen); CPF/CNPJ no início ou fim da col. H é ignorado. Pasta de função = `<código da col. B> - <FUNÇÃO>`; se o código já tem pasta, usa a existente.
+
+### 13.6 IDs e nomes vigentes dos Cost (desde 19/10/2026)
+- S01 (Reunion): `BR_SMTC_S01__COST REPORT_VS_EXECUÇÃO_22.09` — Box id `2482160269668`.
+- S02 (Soft Pré): `BR_SMTC_S02_SOFTPRE_PROVISÓRIO_22.09` — Box id `2482145718537`.
+- Os dois pertencem a financeiro@novorealitybox.com; a conta da Michelle é Editor (não pode apagar o arquivo).
+- Os workflows da Fase 1 e da Fase 2 ainda apontam para os IDs antigos (8 pontos fixos). Trocar é tarefa pendente: o ID deve vir de um arquivo de configuração versionado, com checagem de nome antes de qualquer leitura ou escrita.
+- Ninguém renomeia pastas ou arquivos: a automação depende dos nomes.
+- Pastas de trabalho: `ZZ-BACKUP-COST` (backups, retenção de 5) e `ZZ-TESTE-ESCRITA` (cópias descartáveis, a apagar).
