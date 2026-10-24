@@ -2,6 +2,31 @@ AUTOMAÇÃO — CONTROLE DE NOTAS FISCAIS
 Box Fish · Michelle Aguiar — Documento mestre do projeto
 Preparado por Claude a pedido de Claudio Carvalho de Oliveira · 17/08/2026
 
+## 0. Mapa de leitura (índice) — atualizado em 23/10/2026
+Este documento é grande. Para cada tarefa, leia só as seções indicadas abaixo (os números são os das seções, que não mudam de lugar). Este índice não substitui o conteúdo e não muda nenhuma regra; se algo aqui divergir do corpo do documento, vale o corpo. Obs.: o documento não tem as seções 9 e 12 (a numeração pula de 8 para 10 e de 11 para 13).
+
+**Leitura obrigatória em qualquer tarefa:** seção 1 (escopo), seção 2 (as 4 fases e os dois arquivamentos diferentes), seção 6 (perfis de projeto e nomes vigentes dos Cost), seção 7.4 (ambiente × modo de execução) e seções 13.4, 13.5 e 13.6 (backup obrigatório, coluna Q, IDs vigentes dos Cost).
+
+**Por fase** (cada fase com o seu fluxo):
+| Fase | Seções principais | O que cobre |
+|---|---|---|
+| 1. Solicitação de nota | 3 (3.1 a 3.5), 3.2.1 (REC e REC+NF), 6, 7.2 | Filtro da planilha, validação de contrato, e-mail de pedido em rascunho, cobrança (3.1.1), marcadores do Gmail (3.1.2), deduplicação (3.1.6), To/CC (3.1.7), PROGRAMAR ATÉ (3.1.8), confirmação pós-escrita (3.1.5), formatação do e-mail (3.5) |
+| 2. Recebimento e validação | 4 (4.1 a 4.4), 3.2.1, 13.5 | Retranca do nome da nota (4.1), os dois salvamentos (4.2), credenciais (4.3), estrutura real do Drive (4.4), arquivamento por função e coluna Q (13.5) |
+| 3. Remessa para o Danilo | 5 (5.0 a 5.2) | Lotes por janela de tempo (5.0), e-mail da remessa (5.1), planilha recortada (5.2) |
+| 4. Arquivamento da remessa | 5.3, 2, 4.2 | Pastas de Contas a Pagar e sufixo "_MI" (5.3); distinção entre arquivamento por função (Fase 2) e da remessa (Fase 4) |
+
+**Por tipo de tarefa:**
+| Tarefa | Leia |
+|---|---|
+| Migrar ou alterar a Fase 1 / qualquer escrita no Cost | 3.1.5, 6, 7.2, 13.4, 13.5, 13.6 |
+| Arquivamento por função e coluna Q | 4.2, 4.4, 13.5, 13.6 |
+| Backup e restauração de planilha | 13.4 |
+| Infra do n8n, VM e credenciais | 7.6, 7.4, 4.3, 8 |
+| Telegram e rollback | 7.3, 13.3 |
+| Custo da API da Claude | 7.5 |
+| Git e execução isolada por fase | 13.1, 13.2 |
+| Regras já decididas e próximos passos | 10, 11 |
+
 ## 1. Objetivo e escopo
 Este documento consolida tudo o que foi mapeado, validado e decidido sobre o processo de trabalho da Michelle na Box Fish (controle e solicitação de notas fiscais de colaboradores/fornecedores), servindo tanto de referência técnica de implementação quanto de material para a Michelle conferir se o comportamento descrito bate com o que ela faz hoje.
 O processo cobre 3 projetos, com regras idênticas mas dados/nomenclaturas próprios de cada um:
