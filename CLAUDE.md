@@ -107,3 +107,14 @@ node inexistente e node que só roda depois são ERRO.
 - **`$('Node').item`** depende de pareamento de itens e quebra quando um node no meio agrega
   ou reemite sem `pairedItem`. Para correlacionar após um Switch, use
   `$('Switch — ação').all(N)`, que devolve só os itens daquela saída, em ordem.
+
+## Onde escrever arquivos
+
+- Relatórios, resumos, decisões pendentes (`decisao-pendente-*.txt`), estados, planos, exportações
+  e qualquer arquivo de trabalho do Claude Code vão em `_saidas/`. O resumo da última entrega é
+  `_saidas/resumo-ultima-entrega.md`. **Nunca na raiz do projeto.**
+- Scripts temporários (`zz-temp-*`) e rascunhos descartáveis vão em `_lixo/`.
+- Só entram na raiz e nas pastas de projeto o código, a configuração e a documentação que o
+  Claudio pedir para versionar.
+- Planilhas de negócio (`notas-fora-da-rodada-*`, `conferencia-arquivadas-*`) ficam fora do Git
+  (já estão no `.gitignore`).

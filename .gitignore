@@ -11,3 +11,17 @@ resumo-ultima-entrega.md
 
 # Estado do deploy: IDs de workflow da instância do Claudio, não do projeto
 .n8n-deploy-state.json
+
+# Arquivamento por função 19/10: dados da simulação/escrita (fornecedores, IDs) — não versionar
+zz-temp-*
+!zz-temp-*.js
+
+# Lista de notas fora da rodada para a Michelle (dados de negócio) — não versionar
+notas-fora-da-rodada-*.xlsx
+
+# Conferência das notas arquivadas (dados de negócio) — não versionar
+conferencia-arquivadas-*.xlsx
+
+# Rascunhos e saídas de trabalho do Claude Code — não versionar
+_lixo/
+_saidas/
