@@ -20,6 +20,9 @@
  *            (ex.: options, filters, additionalFields)
  *   [ERRO]   marcador @@incluir que sobrou no arquivo gerado (o gerar_workflows.js
  *            não resolveu), dizendo se o arquivo apontado não existe
+ *   [ERRO]   Code node que GRAVA planilha com exceljs (`writeBuffer(` ou `.xlsx.write`,
+ *            fora de comentários) num workflow já migrado para a escrita cirúrgica
+ *   [AVISO]  o mesmo num workflow ainda não migrado (D25 (b) da migração da Fase 1)
  *
  * Uso:
  *   node scripts/validar_workflows.js                 # valida todos em workflows/
@@ -395,12 +398,52 @@ function validarIncluirResolvido(wf, achados) {
   }
 }
 
+/**
+ * D25 (b): o exceljs reconstrói o pacote ao gravar e perde formatação do Cost; a escrita
+ * passa a ser só pela biblioteca cirúrgica (scripts/lib/xlsx_cirurgico.js). Ler com o
+ * exceljs (load, readFile) continua permitido e não é sinalizado.
+ *
+ * "Migrado" = algum Code node tem a biblioteca cirúrgica embutida (as funções
+ * gravarPreservando e aplicarNoXml), ou o gerado/fonte tem o marcador
+ * "@@incluir scripts/lib/xlsx_cirurgico.js". Migrado: ERRO. Não migrado: AVISO.
+ */
+const RE_GRAVA_EXCELJS = /writeBuffer\(|\.xlsx\.write/;
+const MARCADOR_CIRURGICO = '@@incluir scripts/lib/xlsx_cirurgico.js';
+function semComentariosJs(js) {
+  return js.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+}
+function workflowMigrado(wf, arquivo) {
+  const codes = (wf.nodes || []).map((n) => (n.parameters && typeof n.parameters.jsCode === 'string' ? n.parameters.jsCode : ''));
+  if (codes.some((js) => js.includes(MARCADOR_CIRURGICO))) return true;
+  if (codes.some((js) => /async function gravarPreservando\s*\(/.test(js) && /function aplicarNoXml\s*\(/.test(js))) return true;
+  const m = path.basename(arquivo).match(/^(.+?)\.(homolog|producao)\.json$/);
+  if (!m) return false;
+  const fonte = path.join(path.dirname(arquivo), '_fonte', `${m[1]}.fonte.json`);
+  return fs.existsSync(fonte) && fs.readFileSync(fonte, 'utf8').includes(MARCADOR_CIRURGICO);
+}
+function validarEscritaExceljs(wf, arquivo, achados) {
+  const migrado = workflowMigrado(wf, arquivo);
+  for (const node of wf.nodes || []) {
+    if (node.type !== 'n8n-nodes-base.code') continue;
+    const js = node.parameters && node.parameters.jsCode;
+    if (typeof js !== 'string' || !RE_GRAVA_EXCELJS.test(semComentariosJs(js))) continue;
+    achados.push({
+      nivel: migrado ? 'ERRO' : 'AVISO',
+      node: node.name,
+      msg: migrado
+        ? `grava planilha com exceljs (writeBuffer/.xlsx.write) no workflow "${wf.name}", que já usa a escrita cirúrgica — grave com gravarPreservando`
+        : `grava planilha com exceljs (writeBuffer/.xlsx.write) no workflow "${wf.name}" — ainda não migrado para a escrita cirúrgica`,
+    });
+  }
+}
+
 function validarArquivo(arquivo) {
   const wf = JSON.parse(fs.readFileSync(arquivo, 'utf8'));
   const achados = [];
   for (const node of wf.nodes || []) validarNode(node, achados);
   validarReferenciasANodes(wf, achados, nomesDaFonte(arquivo));
   validarIncluirResolvido(wf, achados);
+  validarEscritaExceljs(wf, arquivo, achados);
 
   const erros = achados.filter((a) => a.nivel === 'ERRO');
   const avisos = achados.filter((a) => a.nivel === 'AVISO');
