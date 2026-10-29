@@ -1,5 +1,5 @@
 {
   "ambiente": "producao",
   "modo": "rascunho",
-  "limite_linhas_execucao": 2
+  "limite_linhas_execucao": null
 }

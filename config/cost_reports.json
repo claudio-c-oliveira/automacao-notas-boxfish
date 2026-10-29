@@ -1,0 +1,41 @@
+{
+  "versao": "2026-10-29.1",
+  "ambiente": "producao",
+  "aba": "NOTAS",
+  "login_box_esperado": "michelle.mimiaguia@gmail.com",
+  "retencao_backups": 30,
+  "janela_silencio_minutos": 10,
+  "ids_proibidos": [
+    { "box_id": "2028817453680", "motivo": "ID ANTIGO do S01 (BR_SMTC_S01__COST REPORT_VS_EXECUÇÃO_1201.xlsx), ainda ativo no Box" },
+    { "box_id": "2366859928452", "motivo": "ID ANTIGO do S02 (BR_SMTC_S02_SOFTPRE_PROVISÓRIO.xlsx), ainda ativo no Box" }
+  ],
+  "cabecalho_notas": {
+    "B": "CONTA NETFLIX",
+    "E": "Nº DOC FISCAL",
+    "H": "FORNECEDOR",
+    "L": "STATUS BOX",
+    "N": "STATUS CONTRATO",
+    "Q": "CHECK ARQUIVO DRIVE"
+  },
+  "coluna_q": {
+    "valor_ok": "OK",
+    "gravaveis": ["", "PENDENTE", "N/A"],
+    "intocaveis": ["ARQUIVO INTERNO", "ARQUIVO DIRETORIA", "PREVISÃO", "ARQUIVO INERNO"]
+  },
+  "S01": {
+    "projetos": ["AREP", "REUNION"],
+    "box_id": "2482160269668",
+    "nome_esperado": "BR_SMTC_S01__COST REPORT_VS_EXECUÇÃO_22.09",
+    "dono_esperado": "financeiro@novorealitybox.com",
+    "backup": { "pasta_raiz_id": "429803889593", "subpasta_id": "432114143613", "subpasta_nome": "S01" },
+    "estilo_ok_coluna_q": "370"
+  },
+  "S02": {
+    "projetos": ["SOFT_PRE"],
+    "box_id": "2482145718537",
+    "nome_esperado": "BR_SMTC_S02_SOFTPRE_PROVISÓRIO_22.09",
+    "dono_esperado": "financeiro@novorealitybox.com",
+    "backup": { "pasta_raiz_id": "429803889593", "subpasta_id": "432117772745", "subpasta_nome": "S02" },
+    "estilo_ok_coluna_q": "410"
+  }
+}

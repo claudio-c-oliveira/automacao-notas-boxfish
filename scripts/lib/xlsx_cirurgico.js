@@ -26,7 +26,7 @@
  *
  * DEPENDÊNCIA: `jszip` precisa estar disponível no Code node do n8n
  *   (imagem da VM + NODE_FUNCTION_ALLOW_EXTERNAL=exceljs,xlsx,jszip).
- *   Ver `comandos-vm-instalar-jszip.txt`.
+ *   O jszip já está na imagem n8n-custom da VM, conforme `infra/Dockerfile`.
  *
  * LEITURA continua podendo usar exceljs — ler não altera arquivo nenhum.
  */

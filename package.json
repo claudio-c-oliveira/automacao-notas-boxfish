@@ -1,0 +1,12 @@
+{
+  "name": "automacao-notas-boxfish",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Automação de notas fiscais Box Fish (n8n). Dependências só para os testes locais; os workflows rodam no n8n da VM.",
+  "scripts": {
+    "test": "node tests/xlsx_conferencia.teste.js"
+  },
+  "devDependencies": {
+    "jszip": "3.10.2"
+  }
+}
