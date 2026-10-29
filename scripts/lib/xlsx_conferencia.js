@@ -277,7 +277,7 @@ async function impressao(zip, abaAlvo, refsMascarar) {
   const wb = mascararFilterDatabase(await zip.file('xl/workbook.xml').async('string'), abas.findIndex((a) => a.nome === abaAlvo));
   return {
     partes, abas: abas.map((a) => a.nome), porAba,
-    workbook: { sha1_mascarado: sha1Txt(wb.mascarado), filterDatabase_aba: wb.faixas },
+    workbook: { sha1_mascarado: sha1Txt(wb.mascarado), filterDatabase_aba: wb.faixas, filterDatabase_global: wb.globais },
     styles: { sha1: partes['xl/styles.xml'], cellXfs: xfs.length, dxfs: { total: dxfs.length, distintos: new Set(dxfs).size, sha1_bloco: sha1Txt(bloco) } },
     abaAlvo, notasMascarada,
   };
@@ -287,20 +287,32 @@ async function impressao(zip, abaAlvo, refsMascarar) {
  * D20 (b): o nome oculto `_xlnm._FilterDatabase` DA ABA (localSheetId = índice da aba no
  * workbook) tem a faixa do filtro, que o Excel atualiza quando alguém insere uma linha.
  * Devolve o workbook.xml com SÓ a faixa desse nome mascarada, e as faixas encontradas.
- * Qualquer outro nome definido (inclusive um `_xlnm._FilterDatabase` global, sem localSheetId)
- * fica como está e continua sendo comparado.
+ * D24 (b): o `_xlnm._FilterDatabase` GLOBAL (sem localSheetId) também tem a faixa mascarada;
+ * as faixas dele vão em `globais` e são conferidas no Passo 0 (formato, aba e colunas).
+ * Qualquer outro nome definido fica como está e continua sendo comparado.
  */
 function mascararFilterDatabase(wbXml, indiceAba) {
-  const faixas = [];
+  const faixas = [], globais = [];
   const mascarado = wbXml.replace(/(<definedName\b([^>]*)>)([^<]*)(<\/definedName>)/g, (m, abre, attrs, texto, fecha) => {
     const nome = (attrs.match(/\bname="([^"]*)"/) || [])[1];
     const local = (attrs.match(/\blocalSheetId="(\d+)"/) || [])[1];
     const oculto = /\bhidden="(1|true)"/.test(attrs);
-    if (nome !== '_xlnm._FilterDatabase' || local == null || +local !== indiceAba || !oculto) return m;
+    if (nome !== '_xlnm._FilterDatabase') return m;
+    if (local == null) { globais.push(desescapar(texto)); return abre + '\u0000FAIXA_GLOBAL\u0000' + fecha; }
+    if (+local !== indiceAba || !oculto) return m;
     faixas.push(desescapar(texto));
     return abre + '\u0000FAIXA\u0000' + fecha;
   });
-  return { mascarado, faixas };
+  return { mascarado, faixas, globais };
+}
+/**
+ * D24 (b), trava (1): a faixa do `_FilterDatabase` global tem de ser exatamente
+ * <aba>!$B$n:$R$m, com n e m números e n <= m. Fora disso (outra aba, outras colunas,
+ * outro formato), devolve false.
+ */
+function faixaGlobalValida(t, aba) {
+  const m = String(t).match(/^([^!]+)!\$B\$(\d+):\$R\$(\d+)$/);
+  return !!m && m[1] === aba && +m[2] <= +m[3];
 }
 /** 'NOTAS'!$B$4:$R$3724  ->  B4:R3724 (só a parte da faixa, sem a aba e sem $). */
 function faixaSemAba(t) { return String(t).replace(/^.*!/, '').replace(/\$/g, ''); }
@@ -348,7 +360,10 @@ function comparar(A, B) {
  * `atual` = impressão do arquivo baixado agora. PARA (divergencias) se mudar:
  *   - parte fora das exceções (abas, styles.xml, sharedStrings, calcChain, docProps): mudou,
  *     apareceu ou sumiu; o workbook.xml é comparado com SÓ a faixa do `_xlnm._FilterDatabase`
- *     da aba-alvo mascarada (D20 (b)), e essa faixa tem de ser igual à ref do autoFilter;  - lista ou ordem das abas;  - dxfs (total, distintos, bloco);
+ *     da aba-alvo e a do `_xlnm._FilterDatabase` global mascaradas (D20 (b) e D24 (b)); a faixa
+ *     da aba tem de ser igual à ref do autoFilter; a global tem de continuar <aba>!$B$n:$R$m,
+ *     sem nome global novo nem sumido (não se exige igualdade com o autoFilter);
+ *   - lista ou ordem das abas;  - dxfs (total, distintos, bloco);
  *   - em qualquer aba: formatação condicional legada e x14 (contagens à parte + regras SEM as
  *     faixas), extLst (sem as faixas), cols, autoFilter (sem a ref) e o conjunto de mesclagens.
  * SÓ RELATA: styles.xml, cellXfs, faixas (sqref), ref do autoFilter, nº de linhas e células.
@@ -358,17 +373,24 @@ function compararPasso0(ref, atual) {
   const j = (x) => JSON.stringify(x);
   const excecao = (p) => RE_EXCECOES_PASSO0.some((re) => re.test(p));
   const todas = [...new Set([...Object.keys(ref.partes), ...Object.keys(atual.partes)])].sort();
-  // o workbook.xml sai da comparação byte a byte e entra pela versão mascarada (D20 (b))
+  // o workbook.xml sai da comparação byte a byte e entra pela versão mascarada (D20 (b), D24 (b))
   const dif = todas.filter((p) => !excecao(p) && p !== 'xl/workbook.xml' && ref.partes[p] !== atual.partes[p]);
   r.item('partes fora das exceções', 'iguais', dif.length ? dif : 'iguais', dif.length === 0);
   const wa = ref.workbook || {}, wbAt = atual.workbook || {};
-  r.item('xl/workbook.xml (só a faixa do _FilterDatabase da aba ' + atual.abaAlvo + ' mascarada)', wa.sha1_mascarado, wbAt.sha1_mascarado, !!wa.sha1_mascarado && wa.sha1_mascarado === wbAt.sha1_mascarado);
+  r.item('xl/workbook.xml (só as faixas do _FilterDatabase da aba ' + atual.abaAlvo + ' e do global mascaradas)', wa.sha1_mascarado, wbAt.sha1_mascarado, !!wa.sha1_mascarado && wa.sha1_mascarado === wbAt.sha1_mascarado);
   // TRAVA da D20: a faixa mascarada (no arquivo atual) tem de ser igual à ref do autoFilter da aba
   const fd = wbAt.filterDatabase_aba || [];
   const afRef = ((atual.porAba[atual.abaAlvo] || {}).autoFilter || {}).ref || [];
   const travaOk = fd.length === 1 && afRef.length === 1 && faixaSemAba(fd[0]) === afRef[0] && (wa.filterDatabase_aba || []).length === 1;
   r.item('_FilterDatabase da aba ' + atual.abaAlvo + ' = ref do autoFilter (arquivo atual)', { filterDatabase: fd.map(faixaSemAba), autoFilter: afRef }, travaOk ? 'iguais' : { filterDatabase: fd.map(faixaSemAba), autoFilter: afRef }, travaOk);
   r.relato('_FilterDatabase da aba ' + atual.abaAlvo + ' (faixa)', wa.filterDatabase_aba, wbAt.filterDatabase_aba);
+  // TRAVAS da D24 (b): o _FilterDatabase GLOBAL só tem a faixa relatada; a quantidade não muda
+  // e cada um continua <aba>!$B$n:$R$m. NÃO se exige igualdade com o autoFilter.
+  const ga = wa.filterDatabase_global || [], gAt = wbAt.filterDatabase_global || [];
+  r.item('quantidade de _FilterDatabase global', ga.length, gAt.length, ga.length === gAt.length);
+  const gInval = gAt.filter((t) => !faixaGlobalValida(t, atual.abaAlvo));
+  r.item('_FilterDatabase global aponta para ' + atual.abaAlvo + '!$B$n:$R$m (n <= m)', 'sim', gInval.length ? gInval : 'sim', gInval.length === 0);
+  r.relato('_FilterDatabase global (faixa)', ga, gAt);
   r.item('lista e ordem das abas', ref.abas, atual.abas, j(ref.abas) === j(atual.abas));
   r.item('dxfs', ref.styles.dxfs, atual.styles.dxfs, j(ref.styles.dxfs) === j(atual.styles.dxfs));
   r.relato('styles.xml (sha1)', ref.styles.sha1, atual.styles.sha1);
@@ -525,6 +547,6 @@ module.exports = {
   abasDoPacote, parteDaAba, sharedStrings, mapaCelulas, celulaXml, lerCelulaBruta, linhasDaAba,
   linhaDoCabecalho, identidadeLinha, compararIdentidade,
   normalizarQ, avaliarQ, prepararAlvos,
-  secoesDaAba, impressao, comparar, compararPasso0, diferencaCelulas, conferirEscrita, mascararFilterDatabase, faixaSemAba,
+  secoesDaAba, impressao, comparar, compararPasso0, diferencaCelulas, conferirEscrita, mascararFilterDatabase, faixaSemAba, faixaGlobalValida,
   conferirPortao, conferirContaBox, janelaDeSilencio, validarConfig, idsProibidos,
 };

@@ -355,14 +355,45 @@ function tabelaResumo(itens) {
     caso('G Passo 0', f + ': … e a faixa relatada', true, rAba.relatados.some((x) => x.includes('_FilterDatabase')), rAba.relatados);
     relatorio.passo0[f].linha_inserida_filterdatabase_da_aba = { divergencias: rAba.divergencias, relatados: rAba.relatados };
     const rTodos = await p0(insercao[f].todos);
-    caso('G Passo 0', f + ': linha inserida + o Excel atualizando TODOS os nomes da NOTAS (inclusive o _FilterDatabase GLOBAL) → PARA (D24)', true, rTodos.divergencias.some((d) => d.includes('workbook.xml')), rTodos.divergencias);
-    relatorio.passo0[f].linha_inserida_todos_os_nomes = rTodos.divergencias;
+    // ajustado pela D24 (b): a inserção realista (o Excel atualiza todos os nomes da NOTAS) agora passa
+    caso('G Passo 0', f + ': linha inserida + o Excel atualizando TODOS os nomes da NOTAS (inclusive o _FilterDatabase GLOBAL) → passa (D24 b)', [], rTodos.divergencias, rTodos.relatados);
+    caso('G Passo 0', f + ': … e as faixas dos dois _FilterDatabase (da aba e global) relatadas', true,
+      rTodos.relatados.some((x) => x.startsWith('_FilterDatabase da aba')) && rTodos.relatados.some((x) => x.startsWith('_FilterDatabase global')), rTodos.relatados);
+    relatorio.passo0[f].linha_inserida_todos_os_nomes = { divergencias: rTodos.divergencias, relatados: rTodos.relatados };
+    // D24 (b), trava (2): não se exige igualdade do global com o autoFilter
+    {
+      const g = ctx[f].imp.workbook.filterDatabase_global, af = ctx[f].imp.porAba[ABA].autoFilter.ref;
+      if (f === 'S02') caso('G Passo 0', 'S02: o _FilterDatabase global já está desatualizado (' + g[0] + ' contra autoFilter ' + af[0] + ')', true, g.length === 1 && C.faixaSemAba(g[0]) !== af[0], { g, af });
+      caso('G Passo 0', f + ': arquivo sem alteração, com o global como está → passa', [], r1.divergencias);
+    }
+    if (f === 'S02') {
+      // linha inserida entre a 281 e a 295: o Excel não mexe no global (a faixa dele acaba na 280)
+      const bEntre = await inserirLinha(buf[f], 285, 'todos');
+      const zE = await zipDe(bEntre);
+      const rE = C.compararPasso0(ref, await C.impressao(zE, ABA, []));
+      caso('G Passo 0', 'S02: linha inserida na 285 (dentro do autoFilter, fora do global) → passa, global sem mudança', true,
+        rE.divergencias.length === 0 && !rE.relatados.some((x) => x.startsWith('_FilterDatabase global')), { div: rE.divergencias, rel: rE.relatados });
+    }
     const wbParte = 'xl/workbook.xml';
     const idxNotas = ctx[f].imp.abas.indexOf(ABA);
     const reDaAba = new RegExp('(<definedName\\b[^>]*name="_xlnm\\._FilterDatabase"[^>]*localSheetId="' + idxNotas + '"[^>]*>)([^<]*)(<\\/definedName>)');
     await muda0('_FilterDatabase da aba divergente do autoFilter', wbParte, (x) => x.replace(reDaAba, (m, a, t, b) => a + t.replace(/\$R\$(\d+)/, (mm, n) => '$R$' + (+n + 7)) + b), true, '_FilterDatabase');
     await muda0('_FilterDatabase da aba removido', wbParte, (x) => x.replace(reDaAba, ''), true, '_FilterDatabase');
-    await muda0('outro nome definido alterado (o _FilterDatabase GLOBAL)', wbParte, (x) => x.replace(/(<definedName name="_xlnm\._FilterDatabase">NOTAS!\$B\$\d+:\$R\$)(\d+)/, (m, a, n) => a + (+n + 1)), true, 'workbook.xml');
+    // D24 (b): o _FilterDatabase GLOBAL
+    const reGlobal = /(<definedName name="_xlnm\._FilterDatabase">)([^<]*)(<\/definedName>)/;
+    const global = (fn) => (x) => x.replace(reGlobal, (m, a, t, b) => a + fn(t) + b);
+    await muda0('_FilterDatabase global: só a linha final mudou (+1)', wbParte, global((t) => t.replace(/\$R\$(\d+)$/, (mm, n) => '$R$' + (+n + 1))), false);
+    await muda0('_FilterDatabase global: as duas linhas mudaram (+3)', wbParte, global((t) => t.replace(/\$(\d+)/g, (mm, n) => '$' + (+n + 3))), false);
+    await muda0('_FilterDatabase global trocado para outra aba', wbParte, global((t) => t.replace(/^NOTAS!/, "'CASH FLOW'!")), true, '_FilterDatabase global');
+    await muda0('_FilterDatabase global com colunas B..S', wbParte, global((t) => t.replace('$R$', '$S$')), true, '_FilterDatabase global');
+    await muda0('_FilterDatabase global com colunas A..R', wbParte, global((t) => t.replace('$B$', '$A$')), true, '_FilterDatabase global');
+    await muda0('_FilterDatabase global em outro formato (sem $)', wbParte, global((t) => t.replace(/\$/g, '')), true, '_FilterDatabase global');
+    await muda0('_FilterDatabase global com n > m', wbParte, global((t) => t.replace(/\$B\$(\d+):\$R\$(\d+)/, (mm, n, m2) => '$B$' + m2 + ':$R$' + n)), true, '_FilterDatabase global');
+    await muda0('_FilterDatabase global removido', wbParte, (x) => x.replace(reGlobal, ''), true, 'quantidade de _FilterDatabase global');
+    await muda0('_FilterDatabase global duplicado', wbParte, (x) => x.replace(reGlobal, (m) => m + m), true, 'quantidade de _FilterDatabase global');
+    await muda0('outro nome definido novo (área de impressão)', wbParte, (x) => x.replace('</definedNames>', '<definedName name="_xlnm.Print_Area" localSheetId="' + idxNotas + '">NOTAS!$B$1:$R$10</definedName></definedNames>'), true, 'workbook.xml');
+    await muda0('atributo do _FilterDatabase global mudado (hidden)', wbParte, (x) => x.replace('<definedName name="_xlnm._FilterDatabase">', '<definedName name="_xlnm._FilterDatabase" hidden="1">'), true, 'workbook.xml');
+    if (f === 'S01') await muda0("outro nome definido alterado (o _FilterDatabase da 'CASH FLOW')", wbParte, (x) => x.replace("'CASH FLOW'!$A$3:$C$190", "'CASH FLOW'!$A$3:$C$191"), true, 'workbook.xml');
     await muda0('calcPr do workbook.xml alterado', wbParte, (x) => /<calcPr\b/.test(x) ? x.replace(/<calcPr\b/, '<calcPr fullCalcOnLoad="1"') : x.replace('</workbook>', '<calcPr fullCalcOnLoad="1"/></workbook>'), true, 'workbook.xml');
     const muda = async (nome, parteAlvo, fn, esperaParar, trecho) => {
       const b = await editarParte(buf[f], parteAlvo, fn);

@@ -22,6 +22,12 @@
  *       -> o IF é REMOVIDO e só o ramo do ambiente alvo sobrevive; quem apontava
  *          pro IF passa a apontar direto pro primeiro node do ramo escolhido.
  *          Os nodes do ramo descartado somem junto (viram inalcançáveis).
+ *   "/\* @@incluir scripts/lib/<arquivo>.js *\/" (sem as barras invertidas) no jsCode
+ *       -> vira o conteúdo do arquivo, sem o 'use strict' do topo e sem o
+ *          module.exports do fim (plano da migração da Fase 1, C.8). Assim a
+ *          biblioteca testada no repositório entra no node sem recorte de texto à mão.
+ *          Arquivo inexistente, fora de scripts/lib/ ou com module.exports que não sai:
+ *          a geração PARA, sem gravar nada daquela fonte.
  *
  * O ambiente também é "assado" no node de carga de config, pra que o arquivo seja
  * autoconsistente: mesmo que o config_execucao.json da VM diga outra coisa, o
@@ -57,6 +63,42 @@ const CRED_IDS = {
 };
 
 const clonar = (x) => JSON.parse(JSON.stringify(x));
+
+const DIR_INCLUIR = path.join(RAIZ, 'scripts', 'lib');
+const RE_INCLUIR = /\/\*\s*@@incluir\s+(\S+?)\s*\*\//g;
+
+/** Conteúdo de um arquivo para o @@incluir: sem o 'use strict' do topo e sem o module.exports do fim. */
+function conteudoParaIncluir(relativo) {
+  const arquivo = path.resolve(RAIZ, relativo);
+  if (!arquivo.startsWith(DIR_INCLUIR + path.sep)) throw new Error(`@@incluir ${relativo}: só se inclui arquivo de scripts/lib/`);
+  if (!fs.existsSync(arquivo)) throw new Error(`@@incluir ${relativo}: arquivo inexistente`);
+  const src = fs.readFileSync(arquivo, 'utf8');
+  const semExport = src
+    .replace(/^'use strict';[ \t]*\r?\n/, '')
+    .replace(/\r?\nmodule\.exports\s*=\s*\{[^{}]*\};?\s*$/, '\n');
+  if (/module\.exports/.test(semExport)) throw new Error(`@@incluir ${relativo}: não consegui remover o module.exports do fim`);
+  return semExport;
+}
+
+/**
+ * Troca cada marcador @@incluir pelo conteúdo do arquivo. Confere TODOS os marcadores da
+ * fonte (dos dois ambientes) antes de trocar, para um arquivo faltando parar a geração
+ * mesmo que o marcador esteja num ramo que este ambiente descarta.
+ */
+function conferirIncluir(fonte) {
+  for (const node of fonte.nodes) {
+    const js = node.parameters && node.parameters.jsCode;
+    if (typeof js !== 'string') continue;
+    for (const m of js.matchAll(RE_INCLUIR)) conteudoParaIncluir(m[1]);
+  }
+}
+function resolverIncluir(wf) {
+  for (const node of wf.nodes) {
+    const js = node.parameters && node.parameters.jsCode;
+    if (typeof js !== 'string' || !js.includes('@@incluir')) continue;
+    node.parameters.jsCode = js.replace(RE_INCLUIR, (m, relativo) => conteudoParaIncluir(relativo));
+  }
+}
 
 /** Resolve credenciais marcadas com __porAmbiente pro ambiente alvo. */
 function resolverCredenciais(wf, ambiente, avisos) {
@@ -203,9 +245,10 @@ function limparMarcadores(wf) {
   if (wf.meta) delete wf.meta.__fonte;
 }
 
-function gerar(arquivoFonte) {
+function gerar(arquivoFonte, dirSaida = DIR_SAIDA) {
   const base = path.basename(arquivoFonte).replace(/\.fonte\.json$/, '');
   const fonte = JSON.parse(fs.readFileSync(arquivoFonte, 'utf8'));
+  conferirIncluir(fonte);
 
   for (const ambiente of AMBIENTES) {
     const wf = clonar(fonte);
@@ -217,6 +260,8 @@ function gerar(arquivoFonte) {
     assarAmbiente(wf, ambiente, avisos);
     resolverSufixoDeAmbiente(wf, ambiente);
     limparMarcadores(wf);
+    // por último: o conteúdo incluído entra como está, sem passar pelas trocas acima
+    resolverIncluir(wf);
 
     const rotulo = ambiente === 'homolog' ? 'Homolog' : 'Produção';
     wf.name = `${(fonte.name || base).replace(/\s*\((Homolog|Produção)\)\s*$/, '')} (${rotulo})`;
@@ -227,7 +272,7 @@ function gerar(arquivoFonte) {
       `Regerar com: node scripts/gerar_workflows.js. ` +
       (wf.meta.description || '');
 
-    const saida = path.join(DIR_SAIDA, `${base}.${ambiente}.json`);
+    const saida = path.join(dirSaida, `${base}.${ambiente}.json`);
     fs.writeFileSync(saida, JSON.stringify(wf, null, 2) + '\n');
 
     console.log(`  ${ambiente.padEnd(9)} -> ${path.relative(RAIZ, saida)}  (${wf.nodes.length} nodes${removidos.length ? `, ${removidos.length} descartados do outro ramo` : ''})`);
@@ -235,20 +280,24 @@ function gerar(arquivoFonte) {
   }
 }
 
-const alvos = process.argv.slice(2);
-const fontes = alvos.length
-  ? alvos
-  : fs.existsSync(DIR_FONTE)
-    ? fs.readdirSync(DIR_FONTE).filter((f) => f.endsWith('.fonte.json')).map((f) => path.join(DIR_FONTE, f))
-    : [];
+if (require.main === module) {
+  const alvos = process.argv.slice(2);
+  const fontes = alvos.length
+    ? alvos
+    : fs.existsSync(DIR_FONTE)
+      ? fs.readdirSync(DIR_FONTE).filter((f) => f.endsWith('.fonte.json')).map((f) => path.join(DIR_FONTE, f))
+      : [];
 
-if (fontes.length === 0) {
-  console.error('Nenhum arquivo-fonte encontrado em workflows/_fonte/');
-  process.exit(1);
+  if (fontes.length === 0) {
+    console.error('Nenhum arquivo-fonte encontrado em workflows/_fonte/');
+    process.exit(1);
+  }
+
+  for (const f of fontes) {
+    console.log(`\n${path.relative(RAIZ, f)}`);
+    gerar(f);
+  }
+  console.log('\nPronto. Importe no n8n apenas o arquivo .homolog.json para testar.');
 }
 
-for (const f of fontes) {
-  console.log(`\n${path.relative(RAIZ, f)}`);
-  gerar(f);
-}
-console.log('\nPronto. Importe no n8n apenas o arquivo .homolog.json para testar.');
+module.exports = { gerar, conteudoParaIncluir, RE_INCLUIR };

@@ -18,6 +18,8 @@
  *            satisfeitas) — normalmente indica config morta/errada
  *   [ERRO]   chave desconhecida dentro de collection/fixedCollection
  *            (ex.: options, filters, additionalFields)
+ *   [ERRO]   marcador @@incluir que sobrou no arquivo gerado (o gerar_workflows.js
+ *            não resolveu), dizendo se o arquivo apontado não existe
  *
  * Uso:
  *   node scripts/validar_workflows.js                 # valida todos em workflows/
@@ -375,11 +377,30 @@ function validarReferenciasANodes(wf, achados, vocabulario = new Set()) {
   }
 }
 
+/**
+ * O gerar_workflows.js troca cada "@@incluir <arquivo>" pelo conteúdo do arquivo. Se um
+ * marcador sobrou no gerado, o Code node rodaria sem a biblioteca: é ERRO.
+ */
+function validarIncluirResolvido(wf, achados) {
+  for (const node of wf.nodes || []) {
+    const blob = JSON.stringify(node.parameters || {});
+    for (const m of blob.matchAll(/@@incluir\s+([^\s*"\\]+)/g)) {
+      const existe = fs.existsSync(path.resolve(__dirname, '..', m[1]));
+      achados.push({
+        nivel: 'ERRO',
+        node: node.name,
+        msg: `marcador "@@incluir ${m[1]}" sem resolver no arquivo gerado` + (existe ? '' : ' — o arquivo apontado não existe'),
+      });
+    }
+  }
+}
+
 function validarArquivo(arquivo) {
   const wf = JSON.parse(fs.readFileSync(arquivo, 'utf8'));
   const achados = [];
   for (const node of wf.nodes || []) validarNode(node, achados);
   validarReferenciasANodes(wf, achados, nomesDaFonte(arquivo));
+  validarIncluirResolvido(wf, achados);
 
   const erros = achados.filter((a) => a.nivel === 'ERRO');
   const avisos = achados.filter((a) => a.nivel === 'AVISO');
