@@ -61,7 +61,15 @@ function gravarSaida(nome, conteudo) {
 // ---------------------------------------------------------------------------------------
 // Ambiente falso do homolog (o que o passo 7 do C.8 vai preencher de verdade)
 // ---------------------------------------------------------------------------------------
-const CFG_HML_REPO = JSON.parse(fs.readFileSync(path.join(RAIZ, 'config', 'cost_reports_hml.json'), 'utf8'));
+const CFG_HML_REPO = JSON.parse(fs.readFileSync(path.join(RAIZ, 'config', 'cost_reports_hml.json'), 'utf8')); // só para conferir a versão
+const CFG_PROD_REPO_VERSAO = JSON.parse(fs.readFileSync(path.join(RAIZ, 'config', 'cost_reports.json'), 'utf8')).versao;
+// Fixture PRÓPRIO (homolog pendente, antes do passo 7); a versão acompanha a do repositório, que a fonte confere.
+function fixtureHmlPendente() {
+  const c = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'cost_reports_hml.pendente.json'), 'utf8'));
+  delete c._fixture;
+  c.versao = CFG_PROD_REPO_VERSAO;
+  return c;
+}
 const CFG_PROD_REPO = JSON.parse(fs.readFileSync(path.join(RAIZ, 'config', 'cost_reports.json'), 'utf8'));
 const PASTA_RAIZ_BK = '9200000000000';
 const FALSO = {
@@ -69,8 +77,7 @@ const FALSO = {
   S02: { box_id: '9100000000002', nome: 'ZZ-HML_BR_SMTC_S02_SOFTPRE_PROVISÓRIO_22.09', subpasta: '9200000000002' },
 };
 function cfgHomologPreenchida() {
-  const c = JSON.parse(JSON.stringify(CFG_HML_REPO));
-  delete c._pendente;
+  const c = fixtureHmlPendente();
   c.login_box_esperado = ME;
   for (const f of ['S01', 'S02']) Object.assign(c[f], { box_id: FALSO[f].box_id, nome_esperado: FALSO[f].nome, dono_esperado: 'financeiro@novorealitybox.com', backup: { pasta_raiz_id: PASTA_RAIZ_BK, subpasta_id: FALSO[f].subpasta, subpasta_nome: f } });
   return c;
@@ -628,7 +635,7 @@ function registrar(cenario, esperado, obtido, p, unlock, resto) {
   }
   {
     const cen = '13 config do repositório (pendente)';
-    const { r } = await cenario('cost_reports_hml.json do repositório como está (box_id null, passo 7 pendente)', 'S01', { cfg: JSON.parse(JSON.stringify(CFG_HML_REPO)) });
+    const { r } = await cenario('cost_reports_hml pendente (fixture: box_id null, como antes do passo 7)', 'S01', { cfg: fixtureHmlPendente() });
     caso(cen, 'PAROU: config dos Cost com problema (box_id vazio)', true, /config dos Cost com problema/.test(r.erros[0] || '') && /box_id vazio/.test(r.erros[0]), r.erros);
   }
   {

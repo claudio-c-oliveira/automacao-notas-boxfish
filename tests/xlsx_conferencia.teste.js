@@ -26,6 +26,8 @@ const ARQUIVOS = {
 };
 const CFG = JSON.parse(fs.readFileSync(path.join(RAIZ, 'config', 'cost_reports.json'), 'utf8'));
 const CFG_HML = JSON.parse(fs.readFileSync(path.join(RAIZ, 'config', 'cost_reports_hml.json'), 'utf8'));
+// Fixture PRÓPRIO do homolog pendente (antes do passo 7): os casos de "config pendente" não dependem do config/ real.
+const CFG_HML_PENDENTE = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'cost_reports_hml.pendente.json'), 'utf8'));
 const ABA = CFG.aba;
 
 function gravarSaida(nome, conteudo) {
@@ -155,9 +157,11 @@ function tabelaResumo(itens) {
 
   console.log('\n== B. Config ==');
   caso('B config', 'cost_reports.json sem problemas', [], C.validarConfig(CFG));
-  caso('B config', 'cost_reports_hml.json sem problemas (aceitando pendências do passo 7)', [], C.validarConfig(CFG_HML, { aceitarPendente: true }));
-  caso('B config', 'cost_reports_hml.json: pendências listadas sem aceitar', true, C.validarConfig(CFG_HML).length > 0, C.validarConfig(CFG_HML));
+  caso('B config', 'cost_reports_hml.json (preenchido no passo 7) sem problemas', [], C.validarConfig(CFG_HML));
   caso('B config', 'hml: Cost reais estão nos proibidos', true, ['2482160269668', '2482145718537'].every((id) => C.idsProibidos(CFG_HML).includes(id)));
+  caso('B config', 'hml: os box_id do homolog não são os dos Cost reais', true, ['S01', 'S02'].every((f) => CFG_HML[f].box_id !== CFG[f].box_id));
+  caso('B config', 'fixture pendente: sem problemas aceitando pendências', [], C.validarConfig(CFG_HML_PENDENTE, { aceitarPendente: true }));
+  caso('B config', 'fixture pendente: pendências listadas sem aceitar', true, C.validarConfig(CFG_HML_PENDENTE).length > 0, C.validarConfig(CFG_HML_PENDENTE));
   const ctx = {};
   for (const f of ['S01', 'S02']) {
     const z = await zipDe(buf[f]);
@@ -461,7 +465,7 @@ function tabelaResumo(itens) {
     p('na lixeira', meta('S01', { item_status: 'trashed', trashed_at: '2026-10-29T10:00:00-03:00' }), CFG.S01, CFG, false, 'situação');
     p('dono diferente', meta('S01', { owned_by: { login: 'outra@pessoa.com' } }), CFG.S01, CFG, false, 'dono');
     p('Box respondeu 404', { type: 'error', status: 404, code: 'not_found' }, CFG.S01, CFG, false, '404');
-    p('homolog sem box_id (passo 7 pendente) → recusa', meta('S01'), CFG_HML.S01, CFG_HML, false, 'box_id');
+    p('homolog sem box_id (fixture pendente) → recusa', meta('S01'), CFG_HML_PENDENTE.S01, CFG_HML_PENDENTE, false, 'box_id');
     p('homolog apontando para o Cost REAL → recusa', meta('S01'), { ...CFG.S01 }, CFG_HML, false, 'PROIBIDO');
     caso('I conta', 'conta certa', true, C.conferirContaBox({ login: 'michelle.mimiaguia@gmail.com' }, CFG).ok);
     caso('I conta', 'outra conta → para', false, C.conferirContaBox({ login: 'x@y.com' }, CFG).ok);

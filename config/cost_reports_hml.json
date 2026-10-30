@@ -1,9 +1,9 @@
 {
-  "versao": "2026-10-29.1",
+  "versao": "2026-10-29.2",
   "ambiente": "homolog",
-  "_pendente": "Passo 7 do roteiro (D5(b)): pasta de teste no Box com cópias atuais dos _22.09. Preencher box_id, nome_esperado, dono_esperado, as subpastas de backup e o login_box_esperado. Até lá o portão recusa (box_id vazio).",
+  "_origem": "Passo 7 do C.8 (D5(b), D34): ids criados pela execução 657 do ZZ-TEMP preparar homolog do Cost no Box (29/10/2026). Cópias de teste em ZZ-HOMOLOG-COST, donas da conta da Michelle; backups em ZZ-HOMOLOG-COST/BACKUP/S01 e S02.",
   "aba": "NOTAS",
-  "login_box_esperado": null,
+  "login_box_esperado": "michelle.mimiaguia@gmail.com",
   "retencao_backups": 30,
   "janela_silencio_minutos": 10,
   "ids_proibidos": [
@@ -27,18 +27,18 @@
   },
   "S01": {
     "projetos": ["AREP", "REUNION"],
-    "box_id": null,
-    "nome_esperado": null,
-    "dono_esperado": null,
-    "backup": { "pasta_raiz_id": null, "subpasta_id": null, "subpasta_nome": "S01" },
+    "box_id": "2558564203065",
+    "nome_esperado": "ZZ-HML_BR_SMTC_S01__COST REPORT_VS_EXECUÇÃO_22.09",
+    "dono_esperado": "michelle.mimiaguia@gmail.com",
+    "backup": { "pasta_raiz_id": "432490127188", "subpasta_id": "432485025464", "subpasta_nome": "S01" },
     "estilo_ok_coluna_q": "370"
   },
   "S02": {
     "projetos": ["SOFT_PRE"],
-    "box_id": null,
-    "nome_esperado": null,
-    "dono_esperado": null,
-    "backup": { "pasta_raiz_id": null, "subpasta_id": null, "subpasta_nome": "S02" },
+    "box_id": "2558533556606",
+    "nome_esperado": "ZZ-HML_BR_SMTC_S02_SOFTPRE_PROVISÓRIO_22.09",
+    "dono_esperado": "michelle.mimiaguia@gmail.com",
+    "backup": { "pasta_raiz_id": "432490127188", "subpasta_id": "432485903050", "subpasta_nome": "S02" },
     "estilo_ok_coluna_q": "410"
   }
 }
