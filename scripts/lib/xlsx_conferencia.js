@@ -275,9 +275,12 @@ async function impressao(zip, abaAlvo, refsMascarar) {
   const dxfs = bloco.match(/<dxf>[\s\S]*?<\/dxf>/g) || [];
   const xfs = ((st.match(/<cellXfs\b[^>]*>([\s\S]*?)<\/cellXfs>/) || [])[1] || '').match(/<xf\b/g) || [];
   const wb = mascararFilterDatabase(await zip.file('xl/workbook.xml').async('string'), abas.findIndex((a) => a.nome === abaAlvo));
+  const wbV2 = mascararCarimbosExcelOnline(wb.mascarado);
   return {
     partes, abas: abas.map((a) => a.nome), porAba,
-    workbook: { sha1_mascarado: sha1Txt(wb.mascarado), filterDatabase_aba: wb.faixas, filterDatabase_global: wb.globais },
+    // sha1_mascarado = regra antiga (D20/D24), mantida para estados gravados antes da D47;
+    // sha1_mascarado_v2 = também sem os carimbos de salvamento do Excel Online (D47 (a)).
+    workbook: { sha1_mascarado: sha1Txt(wb.mascarado), sha1_mascarado_v2: sha1Txt(wbV2.mascarado), carimbos: wbV2.carimbos, filterDatabase_aba: wb.faixas, filterDatabase_global: wb.globais },
     styles: { sha1: partes['xl/styles.xml'], cellXfs: xfs.length, dxfs: { total: dxfs.length, distintos: new Set(dxfs).size, sha1_bloco: sha1Txt(bloco) } },
     abaAlvo, notasMascarada,
   };
@@ -304,6 +307,27 @@ function mascararFilterDatabase(wbXml, indiceAba) {
     return abre + '\u0000FAIXA\u0000' + fecha;
   });
   return { mascarado, faixas, globais };
+}
+/**
+ * D47 (a): carimbos que o Excel Online reescreve a CADA salvamento no xl/workbook.xml, sem
+ * mudar o arquivo: o atributo `rupBuild` do `<fileVersion>` e os atributos `revIDLastSave`
+ * (número da revisão) e `uidLastSave` (id do último salvamento) do `<xr:revisionPtr>`.
+ * Mascara SÓ esses três valores, e só quando o elemento aparece exatamente uma vez; qualquer
+ * outro atributo desses elementos, e o resto do workbook.xml, continuam sendo comparados.
+ * Devolve o XML mascarado e os valores encontrados (para o relato).
+ */
+function mascararCarimbosExcelOnline(wbXml) {
+  const carimbos = {};
+  let x = wbXml;
+  const umaVez = (re) => (x.match(re) || []).length === 1;
+  const mascarar = (reElemento, attr, chave) => {
+    if (!umaVez(reElemento)) return;
+    x = x.replace(reElemento, (tag) => tag.replace(new RegExp('(\\s' + attr + '=")([^"]*)(")'), (m, a, v, b) => { carimbos[chave] = v; return a + '\u0000CARIMBO\u0000' + b; }));
+  };
+  mascarar(/<fileVersion\b[^>]*>/g, 'rupBuild', 'fileVersion.rupBuild');
+  mascarar(/<xr:revisionPtr\b[^>]*>/g, 'revIDLastSave', 'revisionPtr.revIDLastSave');
+  mascarar(/<xr:revisionPtr\b[^>]*>/g, '(?:[A-Za-z0-9]+:)?uidLastSave', 'revisionPtr.uidLastSave');
+  return { mascarado: x, carimbos };
 }
 /**
  * D24 (b), trava (1): a faixa do `_FilterDatabase` global tem de ser exatamente
@@ -360,7 +384,8 @@ function comparar(A, B) {
  * `atual` = impressão do arquivo baixado agora. PARA (divergencias) se mudar:
  *   - parte fora das exceções (abas, styles.xml, sharedStrings, calcChain, docProps): mudou,
  *     apareceu ou sumiu; o workbook.xml é comparado com SÓ a faixa do `_xlnm._FilterDatabase`
- *     da aba-alvo e a do `_xlnm._FilterDatabase` global mascaradas (D20 (b) e D24 (b)); a faixa
+ *     da aba-alvo e a do `_xlnm._FilterDatabase` global mascaradas (D20 (b) e D24 (b)) e, se o
+ *     estado for do formato novo, também os carimbos de salvamento do Excel Online (D47 (a)); a faixa
  *     da aba tem de ser igual à ref do autoFilter; a global tem de continuar <aba>!$B$n:$R$m,
  *     sem nome global novo nem sumido (não se exige igualdade com o autoFilter);
  *   - lista ou ordem das abas;  - dxfs (total, distintos, bloco);
@@ -377,7 +402,17 @@ function compararPasso0(ref, atual) {
   const dif = todas.filter((p) => !excecao(p) && p !== 'xl/workbook.xml' && ref.partes[p] !== atual.partes[p]);
   r.item('partes fora das exceções', 'iguais', dif.length ? dif : 'iguais', dif.length === 0);
   const wa = ref.workbook || {}, wbAt = atual.workbook || {};
-  r.item('xl/workbook.xml (só as faixas do _FilterDatabase da aba ' + atual.abaAlvo + ' e do global mascaradas)', wa.sha1_mascarado, wbAt.sha1_mascarado, !!wa.sha1_mascarado && wa.sha1_mascarado === wbAt.sha1_mascarado);
+  if (wa.sha1_mascarado_v2) {
+    // D47 (a): estado no formato novo — também sem os carimbos de salvamento do Excel Online, só relatados
+    r.item('xl/workbook.xml (só as faixas do _FilterDatabase da aba ' + atual.abaAlvo + ' e do global e os carimbos de salvamento do Excel Online mascarados)', wa.sha1_mascarado_v2, wbAt.sha1_mascarado_v2, wa.sha1_mascarado_v2 === wbAt.sha1_mascarado_v2);
+    r.relato('ignorado: metadados de salvamento do Excel Online (workbook.xml)', wa.carimbos, wbAt.carimbos);
+  } else {
+    // Estado no formato ANTIGO (gravado antes da D47): o hash guardado inclui os carimbos da época
+    // e não dá para refazê-lo sem eles. Compara pela regra antiga; se divergir, só uma impressão
+    // nova (estado no formato novo) resolve — nunca se dispensa a comparação.
+    const igual = !!wa.sha1_mascarado && wa.sha1_mascarado === wbAt.sha1_mascarado;
+    r.item('xl/workbook.xml (só as faixas do _FilterDatabase da aba ' + atual.abaAlvo + ' e do global mascaradas)' + (igual ? '' : ' [estado no formato antigo, anterior à D47: os carimbos do Excel Online ainda contam; é preciso uma impressão digital nova]'), wa.sha1_mascarado, wbAt.sha1_mascarado, igual);
+  }
   // TRAVA da D20: a faixa mascarada (no arquivo atual) tem de ser igual à ref do autoFilter da aba
   const fd = wbAt.filterDatabase_aba || [];
   const afRef = ((atual.porAba[atual.abaAlvo] || {}).autoFilter || {}).ref || [];
@@ -548,5 +583,5 @@ module.exports = {
   linhaDoCabecalho, identidadeLinha, compararIdentidade,
   normalizarQ, avaliarQ, prepararAlvos,
   secoesDaAba, impressao, comparar, compararPasso0, diferencaCelulas, conferirEscrita, mascararFilterDatabase, faixaSemAba, faixaGlobalValida,
-  conferirPortao, conferirContaBox, janelaDeSilencio, validarConfig, idsProibidos,
+  conferirPortao, conferirContaBox, janelaDeSilencio, validarConfig, idsProibidos, mascararCarimbosExcelOnline,
 };

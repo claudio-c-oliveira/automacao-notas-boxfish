@@ -397,6 +397,60 @@ function registrar(cenario, esperado, obtido, p, unlock, resto) {
   }
 
   // ======================================================================================
+  // D47 (a): carimbos de salvamento do Excel Online no workbook.xml — arquivo SINTÉTICO
+  // (tests/passo0_carimbos.casos.js), sem dados reais. Fonte S02, alvo N5.
+  console.log('\n== 3b. Passo 0 e os carimbos do Excel Online (D47 a), arquivo sintético ==');
+  {
+    const S = require('./passo0_carimbos.casos.js');
+    const ref = await S.montarSintetico({});
+    const nAlvo = [{ projetoId: 'SOFT_PRE', linha: 5, valor: 'OK - ASSINADO' }];
+    const antigo = async () => { const e = await estadoInicial('S02', ref, cfgHomologPreenchida().S02.box_id); delete e.S02.impressao.workbook.sha1_mascarado_v2; delete e.S02.impressao.workbook.carimbos; return e; };
+    {
+      const cen = '3b carimbos trocados';
+      const atual = await S.montarSintetico({ wb: S.CARIMBOS_NOVOS });
+      const { amb, r, p, original } = await cenario('D47: só os carimbos do Excel Online trocados (estado novo)', 'S02', { original: atual, originalDoEstado: ref, n: nAlvo });
+      caso(cen, 'sem erro: o Passo 0 passou e a N foi escrita', [[], null], [r.erros, r.erroN || null]);
+      caso(cen, '(1) 1 backup, 1 LOCK, 1 nova versão, 1 UNLOCK', [1, 1, 1, 1], [p.backups, p.locks, p.novaVersao, p.unlocks]);
+      destravou(cen, p);
+      const resto = await restoIdentico(original, amb.box.F[amb.cost.id].buf, ['N5']);
+      caso(cen, '(4) resto do pacote byte a byte idêntico (só N5 mudou)', true, resto.ok, resto);
+      const rec = r.runs['Escrita N — 35 recibo e novo estado'][0][0].json.recibo;
+      caso(cen, 'o Passo 0 relatou "ignorado: metadados de salvamento do Excel Online"', true, JSON.stringify(rec).includes('ignorado: metadados de salvamento do Excel Online'), rec && rec.passo0);
+      const est = JSON.parse(amb.disco[DIR_CFG + 'estado_cost_hml.json']);
+      caso(cen, 'o estado novo é do formato novo (com o hash v2 e os carimbos)', [true, '30701'], [!!est.S02.impressao.workbook.sha1_mascarado_v2, est.S02.impressao.workbook.carimbos['fileVersion.rupBuild']]);
+      registrar('D47: só carimbos do Excel Online trocados', 'escreve; relata os carimbos', r.erros.length ? 'parou' : 'escreveu e conferiu', p, p.lockFinal === null && p.locks === p.unlocks ? 'sim' : 'NÃO', resto.ok ? 'sim' : 'NÃO');
+    }
+    for (const [rotulo, op, trecho] of [
+      ['carimbos + calcPr mudado no workbook.xml', { wb: { ...S.CARIMBOS_NOVOS, calcId: '191030' } }, 'xl/workbook.xml'],
+      ['filtro ativo na coluna L (filterColumn) + carimbos', { wb: S.CARIMBOS_NOVOS, notas: { autoFilter: S.FILTRO_ATIVO, ocultas: [3, 4, 6, 7, 8, 9, 10] } }, 'autoFilter (sem a ref)'],
+    ]) {
+      const cen = '3b ' + rotulo;
+      const { r, p } = await cenario('D47: ' + rotulo, 'S02', { original: await S.montarSintetico(op), originalDoEstado: ref, n: nAlvo });
+      caso(cen, 'PAROU no Passo 0 (09), por: ' + trecho, true, /09 Passo 0/.test(r.erroN || '') && (r.erroN || '').includes(trecho), r.erroN);
+      caso(cen, 'nada escrito: nem backup, nem lock, nem versão', [0, 0, 0], [p.backups, p.locks, p.novaVersao]);
+      semEscritaNoCost(cen, p);
+      registrar('D47: ' + rotulo, 'para, nada escrito', curto(r.erroN).slice(0, 160), p, 'sem lock', '—');
+    }
+    {
+      const cen = '3b estado antigo + carimbos';
+      const { r, p } = await cenario('D47: estado no formato antigo + carimbos trocados', 'S02', { original: await S.montarSintetico({ wb: S.CARIMBOS_NOVOS }), estado: await antigo(), n: nAlvo });
+      caso(cen, 'PAROU no Passo 0 (09), pedindo impressão digital nova', true, /09 Passo 0/.test(r.erroN || '') && /formato antigo/.test(r.erroN) && /impressão digital nova/.test(r.erroN), r.erroN);
+      caso(cen, 'nada escrito: nem backup, nem lock, nem versão', [0, 0, 0], [p.backups, p.locks, p.novaVersao]);
+      semEscritaNoCost(cen, p);
+      registrar('D47: estado antigo + carimbos trocados', 'para, pede impressão nova', curto(r.erroN).slice(0, 160), p, 'sem lock', '—');
+    }
+    {
+      const cen = '3b estado antigo, arquivo igual';
+      const { amb, r, p } = await cenario('D47: estado no formato antigo + arquivo sem mudança', 'S02', { original: ref, estado: await antigo(), n: nAlvo });
+      caso(cen, 'sem erro: compara pela regra antiga e escreve', [[], null], [r.erros, r.erroN || null]);
+      caso(cen, '(1) 1 backup, 1 LOCK, 1 nova versão, 1 UNLOCK', [1, 1, 1, 1], [p.backups, p.locks, p.novaVersao, p.unlocks]);
+      const est = JSON.parse(amb.disco[DIR_CFG + 'estado_cost_hml.json']);
+      caso(cen, 'depois da escrita conferida, o estado passa para o formato novo (hash v2)', true, !!est.S02.impressao.workbook.sha1_mascarado_v2);
+      registrar('D47: estado antigo + arquivo igual', 'escreve; estado vira v2', r.erros.length ? 'parou' : 'escreveu e conferiu', p, p.lockFinal === null && p.locks === p.unlocks ? 'sim' : 'NÃO', '—');
+    }
+  }
+
+  // ======================================================================================
   console.log('\n== 4. Backup sem verificação ==');
   for (const [rotulo, box, onde] of [
     ['o Box guarda outra coisa (sha1 e tamanho na resposta do upload)', { corromperBackup: (b) => Buffer.concat([b, Buffer.from('x')]) }, /11 conferir envio do backup/],

@@ -482,6 +482,10 @@ function tabelaResumo(itens) {
   }
 
   // ------------------------------------------------------------------------------------
+  // K. D47 (a): carimbos de salvamento do Excel Online, com arquivo sintético
+  await require('./passo0_carimbos.casos.js')(caso);
+
+  // ------------------------------------------------------------------------------------
   console.log('\n== J. Nada foi gravado na pasta dos Cost ==');
   for (const f of ['S01', 'S02']) {
     const b = fs.readFileSync(path.join(PASTA_COST, ARQUIVOS[f].nome));
