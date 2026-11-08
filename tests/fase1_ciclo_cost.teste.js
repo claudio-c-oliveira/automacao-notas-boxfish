@@ -79,7 +79,7 @@ const FALSO = {
 function cfgHomologPreenchida() {
   const c = fixtureHmlPendente();
   c.login_box_esperado = ME;
-  for (const f of ['S01', 'S02']) Object.assign(c[f], { box_id: FALSO[f].box_id, nome_esperado: FALSO[f].nome, dono_esperado: 'financeiro@novorealitybox.com', backup: { pasta_raiz_id: PASTA_RAIZ_BK, subpasta_id: FALSO[f].subpasta, subpasta_nome: f } });
+  for (const f of ['S01', 'S02']) Object.assign(c[f], { box_id: FALSO[f].box_id, nome_esperado: FALSO[f].nome, dono_esperado: 'financeiro@novorealitybox.com', backup: { pasta_raiz_id: PASTA_RAIZ_BK, subpasta_id: FALSO[f].subpasta, subpasta_nome: f, pasta_nome: 'ZZ-HOMOLOG-COST/BACKUP/' + f } });
   return c;
 }
 const lerCfgRepo = (n) => fs.readFileSync(path.join(RAIZ, 'config', n));
@@ -282,6 +282,10 @@ function registrar(cenario, esperado, obtido, p, unlock, resto) {
     caso(cen, 'backup na subpasta ' + f + ', com o nome original + _copia_AAAA-MM-DD_HHMMSS e os mesmos bytes do original', [true, true, true], [!!bk && bk.parent === amb.custos[f].backup.subpasta_id, !!bk && bk.name.startsWith(amb.custos[f].nome_esperado + '_copia_'), !!bk && C.sha1(bk.buf) === C.sha1(original)]);
     caso(cen, 'chegou ao "Merge — gravação concluída" (o e-mail pode seguir)', true, !!r.chegou['Merge — gravação concluída']);
     caso(cen, 'Telegram: recibo (só registrado, nada enviado)', true, r.mensagens.some((m) => m.node === 'Telegram — Recibo da escrita no Cost' && m.texto.includes('Escrita no Cost conferida')));
+    { // D54 / D62 (a): a pasta do recibo vem da config (backup.pasta_nome)
+      const rec = (r.mensagens.find((m) => m.node === 'Telegram — Recibo da escrita no Cost') || {}).texto || '';
+      caso(cen, 'D54: o recibo do homolog diz a pasta ZZ-HOMOLOG-COST/BACKUP/' + f + ' (e nunca ZZ-BACKUP-COST)', [true, false], [rec.includes('Backup: ZZ-HOMOLOG-COST/BACKUP/' + f + '/'), rec.includes('ZZ-BACKUP-COST')], rec.split('\n').find((l) => /^Backup:/.test(l)));
+    }
     const est = JSON.parse(amb.disco[DIR_CFG + 'estado_cost_hml.json']);
     caso(cen, 'estado_cost_hml.json: nova impressão gravada, com o sha1 do arquivo escrito e o backup', [C.sha1(final), bk && bk.id], [est[f].arquivo.sha1, est[f].backup.id]);
     caso(cen, 'retenção: listou SÓ a subpasta ' + f + ' e não apagou (1 cópia, limite 30)', [[amb.custos[f].backup.subpasta_id], 0], [p.listouPastas, p.deletes]);
@@ -350,6 +354,10 @@ function registrar(cenario, esperado, obtido, p, unlock, resto) {
     const resto = await restoIdentico(original, amb.box.F[amb.cost.id].buf, refsDe(alvos.S01.n, 'N'));
     caso(cen, '(4) resto idêntico', true, resto.ok, resto);
     caso(cen, 'leu os arquivos SEM sufixo (cost_reports.json, estado_cost.json)', true, !!amb.disco[DIR_CFG + 'estado_cost.json'] && JSON.parse(amb.disco[DIR_CFG + 'estado_cost.json']).S01.coluna === 'N');
+    { // D54 / D62 (a)
+      const rec = (r.mensagens.find((m) => m.node === 'Telegram — Recibo da escrita no Cost') || {}).texto || '';
+      caso(cen, 'D54: o recibo de produção diz a pasta ZZ-BACKUP-COST/S01 (e nunca ZZ-HOMOLOG-COST)', [true, false], [rec.includes('Backup: ZZ-BACKUP-COST/S01/'), rec.includes('ZZ-HOMOLOG-COST')], rec.split('\n').find((l) => /^Backup:/.test(l)));
+    }
     registrar('Caminho feliz S01 no gerado de produção', 'igual ao homolog', r.erros.length ? 'parou' : 'escreveu e conferiu', p, p.lockFinal === null ? 'sim' : 'NÃO', resto.ok ? 'sim' : 'NÃO');
   }
 
@@ -680,6 +688,21 @@ function registrar(cenario, esperado, obtido, p, unlock, resto) {
     caso(cen, 'PAROU no Carregar config: versão', true, /a config da VM não é a do repositório/.test(r.erros[0] || ''), r.erros);
     semEscritaNoCost(cen, p); semLock(cen, p);
     registrar('Config da VM com outra versão', 'para', curto(r.erros[0]).slice(0, 160), p, 'sem lock', '—');
+  }
+  {
+    const cen = '13 versão anterior (2026-10-29.2)';
+    const custos = cfgHomologPreenchida(); custos.versao = '2026-10-29.2'; delete custos.S01.backup.pasta_nome; delete custos.S02.backup.pasta_nome;
+    const { r, p } = await cenario('cost_reports da VM ainda na versão de antes da D62 (sem pasta_nome)', 'S01', { cfg: custos });
+    caso(cen, 'PAROU no Carregar config: versão (a VM precisa da config nova antes do deploy)', true, /a config da VM não é a do repositório \(cost_reports versao "2026-10-29\.2"/.test(r.erros[0] || ''), r.erros);
+    semEscritaNoCost(cen, p); semLock(cen, p);
+    registrar('Config da VM na versão anterior (D62)', 'para', curto(r.erros[0]).slice(0, 160), p, 'sem lock', '—');
+  }
+  {
+    const cen = '13 sem pasta_nome';
+    const custos = cfgHomologPreenchida(); delete custos.S02.backup.pasta_nome;
+    const { r, p } = await cenario('cost_reports na versão nova, mas sem backup.pasta_nome no S02', 'S01', { cfg: custos });
+    caso(cen, 'PAROU: config dos Cost com problema (pasta_nome vazio)', true, /config dos Cost com problema/.test(r.erros[0] || '') && /S02\.backup\.pasta_nome vazio/.test(r.erros[0]), r.erros);
+    semEscritaNoCost(cen, p);
   }
   {
     const cen = '13 ambiente';

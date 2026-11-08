@@ -20,17 +20,48 @@
 //   5. readWriteFile (read/write) sobre um disco falso em memória (`fs` do criarMotor).
 //   6. telegram: NÃO envia nada; só registra o texto em `mensagens`.
 //   7. noOp.
+//
+// Adaptações da 32ª rodada (07/11/2026), para testar o Gmail e as rotas da Fase 1 de ponta a ponta:
+//   8. A execução usa uma PILHA explícita (mesma ordem da recursão antiga: 1ª saída e 1º destino
+//      primeiro, cada ramo até o fim). Isso permite o item 9.
+//   9. merge (append, numberInputs): como no n8n v1, ESPERA — só roda quando nenhum trabalho
+//      pendente ainda pode chegar a ele; junta as entradas na ordem dos índices. Entrada sem dado
+//      não impede o merge de rodar (o mesmo que a execução 682 mostrou).
+//  10. switch (rules, v3) com fallbackOutput 'extra'; $('X').all(saida) devolve os itens daquela
+//      SAÍDA (é o que os nodes "Casar resposta…" usam com o Switch e os IF).
+//  11. gmail (n8n-nodes-base.gmail) e HTTP para gmail.googleapis.com: vão para o Gmail FALSO do
+//      criarMotor (`gmail`, de tests/simulador/gmail_falso.js), que só registra; sem ele, erro.
+//      onError continueRegularOutput em qualquer node: o item com erro vira { json: { error } }.
+//  12. relógio falso: `agora` (ISO ou ms) troca o Date dos Code nodes (new Date() e Date.now()).
 const AsyncF = Object.getPrototypeOf(async function () {}).constructor;
 const reqLocal = (m) => require(m);
-module.exports = function criarMotor({ box, semJszip, fs: disco }) {
+
+function criarDateFalso(agora) {
+  if (agora == null) return Date;
+  const T = typeof agora === 'number' ? agora : Date.parse(agora);
+  if (!isFinite(T)) throw new Error('simulador: relógio falso inválido: ' + agora);
+  class DateFalso extends Date {
+    constructor(...a) { if (a.length) super(...a); else super(T); }
+    static now() { return T; }
+  }
+  return DateFalso;
+}
+
+module.exports = function criarMotor({ box, semJszip, fs: disco, gmail, agora }) {
   disco = disco || {};
+  const DateSandbox = criarDateFalso(agora);
   return async function executar(wf, opcoes = {}) {
     const byName = Object.fromEntries(wf.nodes.map((n) => [n.name, n]));
     const runs = opcoes.runs || {}; const ordem = []; const chegou = {}; const mensagens = [];
+    const saidas = opcoes.saidas || {}; // nome -> [saida0, saida1, …] da última execução
     const parar = opcoes.parar || new Set();
     const $ = (nome) => ({
       first: () => { const r = runs[nome]; if (!r) throw new Error("Node '" + nome + "' hasn't been executed"); return r[r.length - 1][0]; },
-      all: () => { const r = runs[nome]; if (!r) throw new Error("Node '" + nome + "' hasn't been executed"); return r[r.length - 1]; },
+      all: (saida) => {
+        const r = runs[nome]; if (!r) throw new Error("Node '" + nome + "' hasn't been executed");
+        if (saida === undefined || saida === null) return r[r.length - 1];
+        return (saidas[nome] && saidas[nome][saida]) || [];
+      },
       get isExecuted() { return !!runs[nome]; },
     });
     function ev(expr, json, idx) {
@@ -63,11 +94,24 @@ module.exports = function criarMotor({ box, semJszip, fs: disco }) {
         default: throw new Error('IF: operador não suportado no simulador: ' + k);
       }
     }
+    function avaliarCondicoes(P, json, ix) {
+      const res = (P.conditions || []).map((c) => condicao(c, json, ix));
+      return (P.combinator || 'and') === 'or' ? res.some(Boolean) : res.every(Boolean);
+    }
     const requireSandbox = (m) => { if (m === 'jszip' && semJszip) throw new Error("Cannot find module 'jszip'"); if (['jszip', 'exceljs'].includes(m)) return reqLocal(m); throw new Error('módulo bloqueado: ' + m); };
-    async function rodar(nome, input) {
+    const exigirGmail = (nome) => { if (!gmail) throw new Error('[' + nome + '] simulador: node de Gmail sem o Gmail falso (criarMotor({ gmail }))'); return gmail; };
+
+    // Alcançabilidade (para o merge saber se ainda pode receber algo)
+    const alcance = {};
+    function alcancaveis(nome) {
+      if (alcance[nome]) return alcance[nome];
+      const vistos = new Set(); const fila = [nome];
+      while (fila.length) { const x = fila.pop(); const c = wf.connections[x]; if (!c) continue; for (const o of c.main) for (const d of (o || [])) if (!vistos.has(d.node)) { vistos.add(d.node); fila.push(d.node); } }
+      return (alcance[nome] = vistos);
+    }
+
+    async function executarNode(nome, input) {
       const n = byName[nome];
-      if (!n) throw new Error('simulador: node inexistente "' + nome + '"');
-      if (parar.has(nome)) { (chegou[nome] = chegou[nome] || []).push(input); ordem.push('[parou em] ' + nome); return; }
       let outs;
       if (n.executeOnce) input = input.slice(0, 1);
       if (n.type.endsWith('manualTrigger')) outs = [[{ json: {} }]];
@@ -76,10 +120,11 @@ module.exports = function criarMotor({ box, semJszip, fs: disco }) {
       else if (n.type.endsWith('.code')) {
         const helpers = { getBinaryDataBuffer: async (i, p) => Buffer.from(input[i].binary[p].data, 'base64') };
         try {
-          const its = await new AsyncF('$', '$input', 'require', 'Buffer', n.parameters.jsCode).call({ helpers }, $, { all: () => input, first: () => input[0] }, requireSandbox, Buffer);
+          const its = await new AsyncF('$', '$input', 'require', 'Buffer', 'Date', n.parameters.jsCode).call({ helpers }, $, { all: () => input, first: () => input[0] }, requireSandbox, Buffer, DateSandbox);
           outs = [its.map((x) => ({ json: x.json, binary: x.binary }))];
         } catch (e) {
           if (n.onError === 'continueErrorOutput') outs = [[], [{ json: { error: e.message } }]];
+          else if (n.onError === 'continueRegularOutput') outs = [[{ json: { error: { message: e.message } } }]];
           else throw new Error('[' + nome + '] ' + e.message);
         }
       } else if (n.type.endsWith('httpRequest')) {
@@ -100,11 +145,35 @@ module.exports = function criarMotor({ box, semJszip, fs: disco }) {
           }
           let json;
           try {
-            const r = box.http(P.method || 'GET', url, qs, body, headers, arquivo, form);
+            const r = /^https:\/\/gmail\.googleapis\.com\//.test(url) ? exigirGmail(nome).http(nome, P.method || 'GET', url, qs, body) : box.http(P.method || 'GET', url, qs, body, headers, arquivo, form);
             if (r.status >= 300 && !neverError) throw new Error('HTTP ' + r.status + ' ' + (r.code || ''));
             json = r.status < 300 ? (r.body || {}) : { type: 'error', status: r.status, code: r.code || 'x', message: r.message || '' };
           } catch (e) { if (n.onError === 'continueRegularOutput') json = { error: { message: e.message } }; else throw new Error('[' + nome + '] ' + e.message); }
           outs[0].push({ json });
+        }
+      } else if (n.type.endsWith('.gmail')) {
+        const g = exigirGmail(nome);
+        outs = [[]];
+        const P = n.parameters;
+        const params = (ix, json) => {
+          const r = {};
+          for (const [k, v] of Object.entries(P)) {
+            if (v && typeof v === 'object' && !Array.isArray(v)) r[k] = Object.fromEntries(Object.entries(v).map(([k2, v2]) => [k2, ev(v2, json, ix)]));
+            else r[k] = ev(v, json, ix);
+          }
+          return r;
+        };
+        // getAll de marcadores é uma chamada só (não por item)
+        const lote = P.resource === 'label' && P.operation === 'getAll' ? input.slice(0, 1) : input;
+        for (const [ix, it] of lote.entries()) {
+          try {
+            const r = g.chamar(nome, params(ix, it.json));
+            for (const j of (Array.isArray(r) ? r : [r])) outs[0].push({ json: j });
+          } catch (e) {
+            if (n.onError === 'continueRegularOutput') outs[0].push({ json: { error: { message: e.message } } });
+            else if (n.onError === 'continueErrorOutput') { outs[1] = outs[1] || []; outs[1].push({ json: { error: e.message } }); }
+            else throw new Error('[' + nome + '] ' + e.message);
+          }
         }
       } else if (n.type.endsWith('.box')) {
         outs = [[], []];
@@ -115,11 +184,17 @@ module.exports = function criarMotor({ box, semJszip, fs: disco }) {
         }
       } else if (n.type.endsWith('.if')) {
         const P = n.parameters.conditions; outs = [[], []];
+        for (const [ix, it] of input.entries()) (avaliarCondicoes(P, it.json, ix) ? outs[0] : outs[1]).push(it);
+      } else if (n.type.endsWith('.switch')) {
+        const regras = (n.parameters.rules && n.parameters.rules.values) || [];
+        const extra = n.parameters.options && n.parameters.options.fallbackOutput === 'extra';
+        outs = Array.from({ length: regras.length + (extra ? 1 : 0) }, () => []);
         for (const [ix, it] of input.entries()) {
-          const res = (P.conditions || []).map((c) => condicao(c, it.json, ix));
-          const ok = (P.combinator || 'and') === 'or' ? res.some(Boolean) : res.every(Boolean);
-          (ok ? outs[0] : outs[1]).push(it);
+          const i = regras.findIndex((r) => avaliarCondicoes(r.conditions, it.json, ix));
+          if (i >= 0) outs[i].push(it); else if (extra) outs[regras.length].push(it);
         }
+      } else if (n.type.endsWith('.merge')) {
+        outs = [input];
       } else if (n.type.endsWith('.readWriteFile')) {
         const P = n.parameters;
         if (P.operation === 'read') {
@@ -134,13 +209,47 @@ module.exports = function criarMotor({ box, semJszip, fs: disco }) {
         for (const [ix, it] of input.entries()) { mensagens.push({ node: nome, texto: ev(n.parameters.text, it.json, ix) }); outs[0].push(it); }
       } else throw new Error('tipo ' + n.type);
       if (n.alwaysOutputData && (!outs[0] || !outs[0].length) && !(outs[1] && outs[1].length)) outs[0] = [{ json: {} }];
-      const principal = outs[0] && outs[0].length ? outs[0] : (outs[1] || []);
-      runs[nome] = (runs[nome] || []).concat([principal]); ordem.push(nome);
+      const principal = outs[0] && outs[0].length ? outs[0] : (outs.find((o) => o && o.length) || []);
+      runs[nome] = (runs[nome] || []).concat([principal]); saidas[nome] = outs; ordem.push(nome);
+      return outs;
+    }
+
+    // Pilha de trabalho: { nome, input, indiceEntrada }. Merges ficam em `esperando` até poderem rodar.
+    const pilha = [];
+    const esperando = new Map(); // nome do merge -> { [indiceEntrada]: itens[] }
+    function empilharFilhos(nome, outs) {
       const c = wf.connections[nome]; if (!c) return;
-      for (let i = 0; i < c.main.length; i++) { if (!outs[i] || !outs[i].length) continue; for (const d of c.main[i]) await rodar(d.node, outs[i]); }
+      const tarefas = [];
+      for (let i = 0; i < c.main.length; i++) { if (!outs[i] || !outs[i].length) continue; for (const d of (c.main[i] || [])) tarefas.push({ nome: d.node, input: outs[i], indiceEntrada: d.index || 0 }); }
+      for (let k = tarefas.length - 1; k >= 0; k--) pilha.push(tarefas[k]);
+    }
+    const podeRodarMerge = (m) => !pilha.some((t) => t.nome === m || alcancaveis(t.nome).has(m));
+    async function processar() {
+      for (;;) {
+        if (!pilha.length) {
+          const pronto = [...esperando.keys()].find(podeRodarMerge);
+          if (!pronto) break;
+          const entradas = esperando.get(pronto); esperando.delete(pronto);
+          const juntos = Object.keys(entradas).map(Number).sort((a, b) => a - b).flatMap((i) => entradas[i]);
+          const outs = await executarNode(pronto, juntos);
+          empilharFilhos(pronto, outs);
+          continue;
+        }
+        const t = pilha.pop();
+        const n = byName[t.nome];
+        if (!n) throw new Error('simulador: node inexistente "' + t.nome + '"');
+        if (parar.has(t.nome)) { (chegou[t.nome] = chegou[t.nome] || []).push(t.input); ordem.push('[parou em] ' + t.nome); continue; }
+        if (n.type.endsWith('.merge')) {
+          const e = esperando.get(t.nome) || {}; e[t.indiceEntrada] = (e[t.indiceEntrada] || []).concat(t.input); esperando.set(t.nome, e);
+          // roda assim que nada pendente na pilha puder mais alcançá-lo
+          if (podeRodarMerge(t.nome)) { esperando.delete(t.nome); const juntos = Object.keys(e).map(Number).sort((a, b) => a - b).flatMap((i) => e[i]); empilharFilhos(t.nome, await executarNode(t.nome, juntos)); }
+          continue;
+        }
+        empilharFilhos(t.nome, await executarNode(t.nome, t.input));
+      }
     }
     let erro = null;
-    try { await rodar(opcoes.inicio || 'Manual Trigger', opcoes.entrada || []); } catch (e) { erro = e.message; }
-    return { runs, ordem, erro, chegou, mensagens, saida: (n) => runs[n] ? runs[n][runs[n].length - 1][0].json : null };
+    try { pilha.push({ nome: opcoes.inicio || 'Manual Trigger', input: opcoes.entrada || [], indiceEntrada: 0 }); await processar(); } catch (e) { erro = e.message; }
+    return { runs, saidas, ordem, erro, chegou, mensagens, saida: (n) => runs[n] ? runs[n][runs[n].length - 1][0].json : null };
   };
 };

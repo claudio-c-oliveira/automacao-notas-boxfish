@@ -1,5 +1,5 @@
 {
-  "versao": "2026-10-29.2",
+  "versao": "2026-11-07.1",
   "ambiente": "homolog",
   "_origem": "Passo 7 do C.8 (D5(b), D34): ids criados pela execução 657 do ZZ-TEMP preparar homolog do Cost no Box (29/10/2026). Cópias de teste em ZZ-HOMOLOG-COST, donas da conta da Michelle; backups em ZZ-HOMOLOG-COST/BACKUP/S01 e S02.",
   "aba": "NOTAS",
@@ -30,7 +30,7 @@
     "box_id": "2558564203065",
     "nome_esperado": "ZZ-HML_BR_SMTC_S01__COST REPORT_VS_EXECUÇÃO_22.09",
     "dono_esperado": "michelle.mimiaguia@gmail.com",
-    "backup": { "pasta_raiz_id": "432490127188", "subpasta_id": "432485025464", "subpasta_nome": "S01" },
+    "backup": { "pasta_raiz_id": "432490127188", "subpasta_id": "432485025464", "subpasta_nome": "S01", "pasta_nome": "ZZ-HOMOLOG-COST/BACKUP/S01" },
     "estilo_ok_coluna_q": "370"
   },
   "S02": {
@@ -38,7 +38,7 @@
     "box_id": "2558533556606",
     "nome_esperado": "ZZ-HML_BR_SMTC_S02_SOFTPRE_PROVISÓRIO_22.09",
     "dono_esperado": "michelle.mimiaguia@gmail.com",
-    "backup": { "pasta_raiz_id": "432490127188", "subpasta_id": "432485903050", "subpasta_nome": "S02" },
+    "backup": { "pasta_raiz_id": "432490127188", "subpasta_id": "432485903050", "subpasta_nome": "S02", "pasta_nome": "ZZ-HOMOLOG-COST/BACKUP/S02" },
     "estilo_ok_coluna_q": "410"
   }
 }

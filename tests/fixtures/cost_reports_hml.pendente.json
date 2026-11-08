@@ -30,7 +30,7 @@
     "box_id": null,
     "nome_esperado": null,
     "dono_esperado": null,
-    "backup": { "pasta_raiz_id": null, "subpasta_id": null, "subpasta_nome": "S01" },
+    "backup": { "pasta_raiz_id": null, "subpasta_id": null, "subpasta_nome": "S01", "pasta_nome": "ZZ-HOMOLOG-COST/BACKUP/S01" },
     "estilo_ok_coluna_q": "370"
   },
   "S02": {
@@ -38,7 +38,7 @@
     "box_id": null,
     "nome_esperado": null,
     "dono_esperado": null,
-    "backup": { "pasta_raiz_id": null, "subpasta_id": null, "subpasta_nome": "S02" },
+    "backup": { "pasta_raiz_id": null, "subpasta_id": null, "subpasta_nome": "S02", "pasta_nome": "ZZ-HOMOLOG-COST/BACKUP/S02" },
     "estilo_ok_coluna_q": "410"
   }
 }

@@ -273,23 +273,22 @@ function extrairParcela(descricao) {
  * Monta o texto "REF. ..." do ASSUNTO pra caso COLABORADOR (não confundir
  * com o "Ref." do corpo do e-mail, que vem do perfil/apelido) — seção 3.2.
  */
-function montarRefAssuntoColaborador(tipoEmissao, dataEnvio, parcela) {
-  switch (tipoEmissao) {
-    case 'JOB':
-      return parcela ? `REF. JOB (${parcela})` : 'REF. JOB';
-    case 'DIARIA':
-      return 'REF. DIÁRIA';
-    case 'PACOTE':
-      return 'REF. PACOTE';
-    case 'NF_NORMAL':
-    default:
-      // Mês vem do ENVIO, não do vencimento — evidência real (seção 3.2.1,
-      // exemplo Media Arts): envio 25/08 -> "REF. LOCAÇÃO - AGO", vencimento
-      // 20/09 (seria SET se fosse por vencimento). Mesma convenção aplicada
-      // aqui por consistência (não há exemplo NF_NORMAL puro pra confirmar,
-      // mas ambos usam o mesmo padrão "REF. [MÊS]").
-      return `REF. ${MESES_ABREV_PT[dataEnvio.getMonth()]}`;
-  }
+// D63 (32ª rodada): o "REF." do assunto do COLABORADOR vem da DESCRIÇÃO (coluna J) — período e
+// palavra REF/JOB/DIÁRIA —, nunca do mês do envio. A regra está em scripts/lib/ref_assunto.js
+// (decidirRefAssunto), embutida no node "Montar e-mail colaborador"; caso duvidoso = "conferir à
+// mão" (sem rascunho). Este espelho delega para ela.
+const { decidirRefAssunto } = require('./lib/ref_assunto.js');
+
+// Fornecedor (locação, REC/REC+NF): sem mudança na D63 — o mês da data de ENVIO (exemplo Media
+// Arts, seção 3.2.1).
+function mesDoRefAssunto(dataEnvio) {
+  return MESES_ABREV_PT[dataEnvio.getMonth()];
+}
+
+/** @returns {string|null} o "REF. ..." ou null (= conferir à mão, sem rascunho) */
+function montarRefAssuntoColaborador(blocos, parcela) {
+  const d = decidirRefAssunto(blocos, parcela);
+  return d.ok ? d.ref : null;
 }
 
 /**
@@ -469,7 +468,7 @@ function montarAssuntoFornecedor({ apelidoAtual, temNotaFiscal, parcela, dataEnv
   // Mês vem do ENVIO, não do vencimento — confirmado pelo exemplo real da
   // Media Arts (seção 3.2.1): envio 25/08, vencimento 20/09/2026, assunto
   // real é "REF. LOCAÇÃO - AGO" (mês do envio), não "SET" (mês do vencimento).
-  const mes = MESES_ABREV_PT[dataEnvio.getMonth()];
+  const mes = mesDoRefAssunto(dataEnvio);
   const palavraDocumento = temNotaFiscal ? 'EMISSÃO DE FATURA' : 'EMISSÃO DE RECIBO'; // REC puro: a palavra é indiferente por spec — fixamos "RECIBO" por padrão determinístico
   const ref = temNotaFiscal
     ? `REF. LOCAÇÃO E SERVIÇOS - ${mes}`
@@ -483,7 +482,7 @@ function montarAssuntoFornecedor({ apelidoAtual, temNotaFiscal, parcela, dataEnv
 
 const MARCADOR_PROJETO = {
   REUNION: 'REUNION - PEDIDO DE NOTAS',
-  SOFT_PRE: 'SOFT PRE - PEDIDO NOTAS',
+  SOFT_PRE: 'SOFT PRE - PEDIDO DE NOTAS', // D57 (b), 32ª rodada
   AREP: 'AREP - PEDIDO DE NOTAS',
 };
 

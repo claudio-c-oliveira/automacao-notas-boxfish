@@ -573,6 +573,9 @@ function validarConfig(cfg, opcoes) {
     pend('backup.subpasta_id', b.subpasta_id);
     if (b.subpasta_nome !== f) p.push(f + '.backup.subpasta_nome ≠ ' + f);
     if (!b.pasta_raiz_id && !pendenteOk) p.push(f + '.backup.pasta_raiz_id vazio');
+    // D54/D62 (a), 32ª rodada: o nome da pasta de backup que sai no recibo vem da config.
+    if (typeof b.pasta_nome !== 'string' || !b.pasta_nome.trim()) p.push(f + '.backup.pasta_nome vazio');
+    else if (!b.pasta_nome.endsWith('/' + f)) p.push(f + '.backup.pasta_nome deve terminar em /' + f + ': ' + b.pasta_nome);
   }
   return p;
 }
