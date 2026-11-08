@@ -342,7 +342,7 @@
     },
     {
       "parameters": {
-        "jsCode": "/* @@incluir scripts/lib/data_brasilia.js */\n/* @@incluir scripts/lib/ref_assunto.js */\n// Monta o e-mail de pedido pra caso COLABORADOR (secoes 3.2, 3.3, 3.4).\n// Gateia 'liberado' aqui (nao mais antes da IA) e resolve destinatario/assunto por ambiente (secao 7.4).\n\nconst MESES_ABREV_PT = ['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ'];\nconst MARCADOR_PROJETO = { REUNION: 'REUNION - PEDIDO DE NOTAS', SOFT_PRE: 'SOFT PRE - PEDIDO DE NOTAS', AREP: 'AREP - PEDIDO DE NOTAS' };\nconst TOMADOR_HTML = '<p><b>Tomador</b><br>\\n' +\n  'BOXFISH PRODUTORA DE PROGRAMAS TELEVISIVOS, INTERNET E FILMES PUBLICITÁRIOS LTDA.<br>\\n' +\n  'Endereço: Rua Butantã, 194, sala 24, Pinheiros.<br>\\n' +\n  'CEP 05.424-000 - São Paulo, SP<br>\\n' +\n  'CNPJ: 14.788.649/0001-23<br>\\n' +\n  'IM: 4.436.095-9<br>\\n' +\n  'IE: ISENTA</p>';\nconst AVISO_HTML = '<p><i>\"Os dados bancários considerados para pagamento são os que estão cadastrados.<br>\\n' +\n  'O cadastro é feito baseado nas informações cedidas pelo contratado através do preenchimento de ficha cadastral da Box.<br>\\n' +\n  'Qualquer alteração bancária ou mudança na forma de pagamento deve ser notificada por e-mail pelo contratado e se faz necessário atualização da ficha cadastral e envio prévio ao responsável financeiro do projeto.\"</i></p>' +\n  '\\n<p>Muito obrigada!<br>\\nBjs 🌷</p>';\nconst IMPORTANTE_HTML = '<p><b><span style=\"color:#FF0000;\">Importante: Peço a gentileza de enviar a sua nota nestes e-mails:</span></b><br>\\n' +\n  'financeiro@novorealitybox.com<br>\\nfinanceiro1@novorealitybox.com</p>';\nconst EMAIL_TESTE_HOMOLOG = 'grandesnegocioseoportunidades+colaborador@gmail.com';\n// Cópia (CC) por ambiente — seção 3.1.7. Em homolog vai pro endereço de teste da\n// Danielle; em produção, pro e-mail real da controller. O destinatário principal\n// segue a mesma lógica: fixo de teste em homolog, coluna R em produção.\nconst EMAIL_COPIA_HOMOLOG = 'grandesnegocioseoportunidades+danielle@gmail.com';\nconst EMAIL_COPIA_PRODUCAO = 'financeiro@novorealitybox.com'; // seção 7.4 — endereço de teste do Claudio (Danielle homolog)\n\n// ─── Formatação do e-mail — valores EXATOS da seção 3.5 do spec, extraídos de um e-mail\n// real de produção. Vale igual em homolog: o e-mail de teste tem que ser visualmente\n// idêntico ao de produção, mudando só destinatário e credencial (seções 7.4 e 3.5).\nconst FONTE_EMAIL = 'Verdana, Geneva, sans-serif';\nconst COR_DATA_ENVIO = '#cc0000';      // só a data do \"enviada até o dia\" — em negrito (3.5)\nconst FUNDO_VENCIMENTO = '#CFE2F3';    // só os números da data de vencimento\nconst FUNDO_BLOCO_EMITIR = '#FFE599';  // bloco \"N- Emitir ... no valor de R$ X\"\nconst COR_IMPORTANTE = '#FF0000';      // \"Importante: Peço a gentileza...\"\n\nfunction envolverCorpo(partes) {\n  return '<div style=\"font-family:' + FONTE_EMAIL + ';\">\\n' + partes.filter(Boolean).join('\\n') + '\\n</div>';\n}\n\n// \"...enviada até o dia DD/MM\" -> cor só na data. \"vencimento em DD/MM/AAAA.\" -> negrito no\n// trecho inteiro, com highlight só nos números da data.\n// Abertura por tipo de documento do e-mail:\n//   'recibo_e_nf' -> fornecedor REC+NF (dois documentos, seção 3.2.1)\n//   'fatura'      -> fornecedor só RECIBO. NUNCA \"nota fiscal\" aqui: locação se cobra por\n//                    recibo/fatura, e trocar a palavra é erro fiscal (seção 3.2).\n//   'varias_nf'   -> colaborador com mais de um bloco -> plural (seção 3.2.1)\n//   'uma_nf'      -> colaborador com um bloco só\nfunction paragrafoAbertura(dataEnvio, dataVencimento, tipoAbertura) {\n  const VERBOS = {\n    recibo_e_nf: 'Seguem as instruções para a emissão do RECIBO e da NOTA FISCAL que deverão ser enviadas ',\n    fatura: 'Seguem as instruções para a emissão da sua FATURA que deverá ser enviada ',\n    varias_nf: 'Seguem as instruções para a emissão das suas notas fiscais que deverão ser enviadas ',\n    uma_nf: 'Seguem as instruções para a emissão da sua nota fiscal que deverá ser enviada ',\n  };\n  const verbo = VERBOS[tipoAbertura] || VERBOS.uma_nf;\n  // \"até o dia DD/MM\" INTEIRO em vermelho; só os números da data em negrito (3.5).\n  const ateODia = '<span style=\"color:' + COR_DATA_ENVIO + ';\"><b>até o dia ' + formatarDataDiaMes(dataEnvio) + '</b></span>';\n  // \"vencimento em DD/MM/AAAA.\" INTEIRO com o highlight; o ponto final fica DENTRO do\n  // highlight e FORA do negrito (3.5).\n  const vencimento = '<span style=\"background-color:' + FUNDO_VENCIMENTO + ';\">' +\n    '<b>vencimento em ' + formatarDataBR(dataVencimento) + '</b>.</span>';\n  return '<p>' + verbo + ateODia + ' com ' + vencimento + '</p>';\n}\n\nfunction blocoEmitir(numero, textoDocumento, valor) {\n  const valorFmt = valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });\n  return '<p><span style=\"background-color:' + FUNDO_BLOCO_EMITIR + ';\">' + numero +\n    '- Emitir ' + textoDocumento + ' no valor de <b>R$ ' + valorFmt + '</b> com os dados abaixo no corpo da nota:</span></p>';\n}\n\nfunction blocoDadosBancarios() {\n  // Sem <p> vazio entre \"Período de\" e \"Dados bancários\": a 3.5 (referência Paulo Bento)\n  // pede parágrafos sequenciais, com o espaçamento vindo só da margem padrão do <p>.\n  return '<p><b>Dados bancários:</b></p>\\n<p><b>Chave pix:</b></p>\\n' +\n    '<p>---------------------------------------------------------------------</p>';\n}\n\nfunction formatarDataBR(d) { return String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0') + '/' + d.getFullYear(); }\n// Data do \"ate o dia\" no CORPO: DD/MM, sem ano — formato diferente do vencimento\n// (DD/MM/AAAA), de proposito (3.5, confirmado com e-mail padrao de producao).\n// Nao confundir com formatarDataCurta, que e DD.MM com PONTO e vale pro ASSUNTO.\nfunction formatarDataDiaMes(d) { return String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0'); }\nfunction formatarDataCurta(d) { return String(d.getDate()).padStart(2,'0') + '.' + String(d.getMonth()+1).padStart(2,'0'); }\nfunction montarPeriodoTexto(periodo, tipoEmissao) {\n  if (!periodo) return '';\n  const PALAVRA_CHAVE = { JOB: 'JOB', DIARIA: 'DIÁRIA', PACOTE: 'PACOTE' };\n  const palavra = PALAVRA_CHAVE[tipoEmissao];\n  return palavra ? (periodo + ' (' + palavra + ')') : periodo;\n}\n// D63 (32ª rodada): o \"REF.\" do assunto vem da DESCRIÇÃO (coluna J) — decidirRefAssunto(), da\n// scripts/lib/ref_assunto.js. Nunca o mês do envio.\n\nfunction montarCorpoEmailColaborador(p) {\n  // Um bloco numerado POR LINHA da planilha (spec 3.2/3.2.1): cada linha e um documento\n  // distinto, com seu proprio periodo e valor. Com uma linha so, sai identico ao formato\n  // anterior — o \"1-\" ja era o numero usado.\n  const blocos = p.blocos.map((b, i) => [\n    blocoEmitir(i + 1, 'nota fiscal', b.valor),\n    '<p>Ref. \"' + p.textoRef + '\"</p>',\n    '<p><b>Serviço Prestado como</b> ' + b.cargo + '</p>',\n    '<p><b>Colaborador:</b> ' + p.nomeColaborador + '</p>',\n    b.periodoTexto ? ('<p><b>Período de</b> ' + b.periodoTexto + '</p>') : '',\n    blocoDadosBancarios(),\n  ].filter(Boolean).join('\\n'));\n\n  return envolverCorpo([\n    '<p>Olá ' + p.primeiroNome + '! Tudo bem? 😊</p>',\n    paragrafoAbertura(p.dataEnvio, p.dataVencimento, p.blocos.length > 1 ? 'varias_nf' : 'uma_nf'),\n    TOMADOR_HTML,\n    blocos.join('\\n'),\n    IMPORTANTE_HTML,\n    AVISO_HTML,\n  ]);\n}\n\nfunction normalizarNome(t) {\n  return t ? String(t).normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toUpperCase().trim().replace(/\\s+/g, ' ') : '';\n}\n\n// ─── Período em ordem cronológica ASCENDENTE (spec 3.2.1) ───\n// A planilha às vezes traz as datas invertidas por erro de digitação (\"05/08 A 26/07\") e o\n// e-mail não pode reproduzir isso.\n//\n// Sem ano na origem, \"26/12 A 05/01\" é virada de ano legítima, não inversão. Das duas\n// leituras possíveis escolhemos a de PERÍODO MAIS CURTO — período de trabalho tem dias ou\n// semanas: 26/12→05/01 dá 10 dias e vence 05/01→26/12, que daria 355; e o par de fato\n// invertido \"05/08 A 26/07\" é corrigido pelo mesmo critério, sem regra especial.\nfunction diasEntre(diaA, mesA, diaB, mesB) {\n  const ini = Date.UTC(2001, mesA - 1, diaA);\n  let fim = Date.UTC(2001, mesB - 1, diaB);\n  if (fim < ini) fim = Date.UTC(2002, mesB - 1, diaB); // virou o ano\n  return (fim - ini) / 86400000;\n}\n\nfunction normalizarPeriodo(periodo) {\n  const txt = String(periodo || '');\n  const datas = txt.match(/\\d{1,2}\\s*\\/\\s*\\d{1,2}/g);\n  if (!datas || datas.length < 2) return txt;\n  const [a, b] = datas;\n  const pa = a.split('/').map((x) => parseInt(x, 10));\n  const pb = b.split('/').map((x) => parseInt(x, 10));\n  const comoEscrito = diasEntre(pa[0], pa[1], pb[0], pb[1]);\n  const invertido = diasEntre(pb[0], pb[1], pa[0], pa[1]);\n  if (invertido >= comoEscrito) return txt;\n  let n = 0;\n  return txt.replace(/\\d{1,2}\\s*\\/\\s*\\d{1,2}/g, () => (n++ === 0 ? b : a));\n}\n\n// Meses citados por um período. Um período que atravessa a virada do mês devolve OS DOIS\n// (spec 3.2.1) — não escolhe um. Já vem em ordem cronológica, porque roda sobre o período\n// normalizado.\nfunction mesesDoPeriodo(periodo) {\n  const datas = String(periodo || '').match(/\\d{1,2}\\s*\\/\\s*\\d{1,2}/g) || [];\n  const meses = [];\n  for (const d of datas) {\n    const mes = parseInt(d.split('/')[1], 10);\n    if (mes >= 1 && mes <= 12) {\n      const nome = MESES_ABREV_PT[mes - 1];\n      if (meses.indexOf(nome) === -1) meses.push(nome);\n    }\n  }\n  return meses;\n}\n\n// O apelido de projeto (apelidos.json) e so o identificador: \"AREP\", \"SMTC - S01 | REUNION\".\n// Ja o prefixo_assunto_pedido do perfil vem com \"| EMISSAO DE NF\" embutido (spec secao 6).\n// Como o assunto concatena a palavra do documento logo depois, usar o prefixo cru no\n// fallback duplicava o trecho (\"... | EMISSAO DE NF | EMISSAO DE NF | REF. ...\"). Nao\n// aparecia em execucao porque hoje o apelidos.json cobre os 3 projetos e o fallback nunca\n// roda — mas passaria a aparecer se um projeto sumisse do arquivo.\nfunction apelidoDoPerfil(perfil) {\n  return String((perfil && perfil.prefixo_assunto_pedido) || '')\n    .replace(/\\s*\\|\\s*EMISS[ÃA]O DE .*$/i, '')\n    .trim();\n}\nfunction ehModoAutomatico(config) { return config && config.modo === 'automatico'; }\n// Status Box que ainda representam \"antes do envio\". Só esses podem virar \"SOLICITADA MI\"\n// (spec 3.1.8): se a linha ja avancou (ENTREGUE MI, ENTREGUE MI R1...), a automacao nao pode\n// regredir um estagio alcancado manualmente.\nfunction statusBoxAindaAntesDoEnvio(statusBox) {\n  const s = String(statusBox || '').normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toUpperCase().trim();\n  return /^PROGRAMAR ATE/.test(s) || /^SOLICITAR/.test(s);\n}\n\n// Compara so a data do calendario, ignorando hora.\nfunction chegouNaDataAlvo(dataAlvoISO, hoje) {\n  if (!dataAlvoISO) return true;\n  const alvoYMD = String(dataAlvoISO).slice(0, 10);\n  const hojeYMD = new Date(hoje.getTime() - hoje.getTimezoneOffset() * 60000).toISOString().slice(0, 10);\n  return hojeYMD >= alvoYMD;\n}\n\nfunction decidirAcaoEnvio(gatilho, modoAutomatico, forcarRascunho, contexto) {\n  // \"SOLICITAR / AGUARDAR DOCS\" (escala 5) SEMPRE fica em rascunho, mesmo em\n  // MODO_EXECUCAO=automatico e ambiente producao — unica excecao do sistema (secao 3.1.4).\n  // O flag vem pronto do node de filtro: nao reinterpretamos o Status Box aqui, pra que a\n  // excecao nao possa vazar pra outras variantes.\n  if (forcarRascunho) return { acaoGmail: 'criar_rascunho', atualizarColunaL: false };\n\n  // ── PROGRAMAR ATE (spec 3.1.8) ──────────────────────────────────────────────\n  // A API do Gmail nao tem envio agendado — isso so existe na interface web. O contorno e\n  // criar o rascunho desde ja e enviar numa execucao do dia do prazo.\n  if (gatilho === 'PROGRAMAR_ATE') {\n    const ctx = contexto || {};\n    const rascunhoGuardado = ctx.estado && ctx.estado.draftId;\n\n    // ainda nao existe rascunho -> cria agora. Coluna L NAO muda (item 2 da 3.1.8).\n    if (!rascunhoGuardado) {\n      return { acaoGmail: 'criar_rascunho', atualizarColunaL: false, programado: true };\n    }\n    // ja existe rascunho e a data nao chegou -> nao faz nada, nao duplica (item 3)\n    if (!chegouNaDataAlvo(ctx.dataAlvo, ctx.hoje)) {\n      return { acaoGmail: 'aguardando_data', atualizarColunaL: false };\n    }\n    // chegou a data, mas modo rascunho nunca envia sozinho (item 4)\n    if (!modoAutomatico) {\n      return { acaoGmail: 'aguardando_revisao_manual', atualizarColunaL: false };\n    }\n    // chegou a data em modo automatico -> o ramo de envio checa se o rascunho existe.\n    // Coluna L fica false AQUI de proposito: quem decide grava-la e o ramo, depois de\n    // confirmar o envio (spec 3.1.5).\n    return { acaoGmail: 'enviar_programado', atualizarColunaL: false, draftIdProgramado: ctx.estado.draftId };\n  }\n\n  if (!modoAutomatico) return { acaoGmail: 'criar_rascunho', atualizarColunaL: false };\n  return { acaoGmail: 'enviar_direto', atualizarColunaL: true, novoValorColunaL: 'SOLICITADA MI' };\n}\n\n// D59: o dia de Brasília (o container é UTC). Meio-dia local: getDate()/getMonth()/setDate()\n// dão o calendário de Brasília em qualquer fuso de máquina.\nconst hoje = dataBrasilia();\nconst saida = [];\nconst grupos = new Map();\n\n// 1a passada: o que nao gera e-mail sai por linha; o resto e agrupado.\n// Agrupamento por projeto + colaborador + vencimento (spec 3.2, \"COLABORADOR, 2 PERIODOS,\n// MESMO VENCIMENTO\"): duas linhas do mesmo colaborador vencendo no mesmo dia viram UM\n// e-mail com dois blocos numerados, nao dois e-mails.\nfor (const item of $input.all()) {\n  const d = item.json;\n\n  if (!d.liberado) {\n    saida.push({ json: { ...d, acao: 'pendente_contrato' } });\n    continue;\n  }\n\n  // Deduplicação do pedido (3.1.6) — SÓ em produção. Se já existe entrada em\n  // cobrancas.json para esta linha com threadId preenchido, o pedido já foi criado antes\n  // e a linha só continua batendo no filtro porque o Status Box ainda não foi atualizado\n  // à mão. Não gera e-mail novo; segue elegível pro monitoramento da 3.1.1.\n  //\n  // Em homolog não há trava, de propósito (3.1.6): o Claudio controla quais linhas\n  // processar mudando o Status Box na planilha de teste.\n  //\n  // A chave é a MESMA que o fluxo grava em cobrancas.json (retranca + '_L' + linha) — usar\n  // aqui uma chave diferente da que é gravada faria a checagem nunca casar.\n  const chaveDedup = d.perfil.retranca + '_L' + d.nota.linha;\n  const entradaAnterior = (d.cobrancas || {})[chaveDedup];\n  if (d.config && d.config.ambiente === 'producao' && entradaAnterior && entradaAnterior.threadId) {\n    saida.push({ json: { ...d, acao: 'pedido_ja_criado', chaveCobranca: chaveDedup, threadIdExistente: entradaAnterior.threadId } });\n    continue;\n  }\n\n  const nomeItem = (d.nomeColaborador === 'FALTA INFORMAÇÃO' || d.nomeColaborador === 'FALTA INFORMACAO')\n    ? 'FALTA INFORMAÇÃO'\n    : (d.nomeColaborador || d.nota.colunaH);\n  const chave = [d.nota.projetoId, normalizarNome(nomeItem), d.nota.colunaG].join('|');\n  if (!grupos.has(chave)) grupos.set(chave, []);\n  grupos.get(chave).push({ ...d, nomeItem });\n}\n\n// 2a passada: um e-mail por grupo.\nfor (const grupo of grupos.values()) {\n  const d = grupo[0];\n\n  const nomeColaborador = d.nomeItem;\n  const primeiroNome = (nomeColaborador === 'FALTA INFORMAÇÃO' ? 'Colaborador' : nomeColaborador).split(' ')[0];\n\n  const blocos = grupo.map((linha) => {\n    const cargo = (linha.cargo === 'FALTA INFORMAÇÃO' || linha.cargo === 'FALTA INFORMACAO')\n      ? 'FALTA INFORMAÇÃO'\n      : (linha.cargo || linha.nota.colunaJ);\n    const tipo = linha.tipoEmissao || 'NF_NORMAL';\n    const periodo = normalizarPeriodo(linha.periodo);\n    return {\n      cargo,\n      valor: linha.nota.colunaK,\n      periodoTexto: montarPeriodoTexto(periodo, tipo),\n      meses: mesesDoPeriodo(periodo),\n    };\n  });\n\n  const temLacuna = nomeColaborador === 'FALTA INFORMAÇÃO' || blocos.some((b) => b.cargo === 'FALTA INFORMAÇÃO');\n\n  const dataVencimento = new Date(d.nota.colunaG);\n  const dataBase = d.gatilho === 'PROGRAMAR_ATE' ? new Date(d.dataProgramarAte) : hoje;\n  const dataEnvio = d.gatilho === 'PROGRAMAR_ATE' ? (function(){ const dd = new Date(dataBase); dd.setDate(dd.getDate()+5); return dd; })() : dataBase;\n\n  // D63: o \"REF.\" vem da DESCRIÇÃO de cada linha do grupo (período e palavra REF/JOB/DIÁRIA).\n  // Com mais de um bloco, os meses na ordem de aparição na planilha (spec 3.2.1). Caso duvidoso\n  // ou contraditório: \"conferir à mão\" — não cria rascunho e a linha vai para o Relatório.\n  const decisaoRef = decidirRefAssunto(grupo.map((l) => ({ descricao: l.nota.colunaJ, tipoEmissaoIA: l.tipoEmissao, periodoIA: l.periodo, linha: l.nota.linha })), d.parcela);\n  if (!decisaoRef.ok) {\n    saida.push({ json: { ...d, acao: 'conferir_ref_mao', motivosConferirRef: decisaoRef.motivos,\n      // a coluna N (contrato) continua sendo gravada: não depende do e-mail (spec 3.1.3)\n      linhasAfetadas: grupo.map((l) => ({ projetoId: l.nota.projetoId, linha: l.nota.linha, atualizarColunaNPara: l.atualizarColunaNPara })) } });\n    continue;\n  }\n  const refAssunto = decisaoRef.ref;  const apelidoAtual = (d.apelidos && d.apelidos[d.nota.projetoId] && d.apelidos[d.nota.projetoId].length) ? d.apelidos[d.nota.projetoId][d.apelidos[d.nota.projetoId].length - 1] : apelidoDoPerfil(d.perfil);\n\n  const corpo = montarCorpoEmailColaborador({ primeiroNome, dataEnvio, dataVencimento, textoRef: d.perfil.texto_ref, nomeColaborador, blocos });\n  let assunto = apelidoAtual + ' | EMISSÃO DE NF | ' + refAssunto + ' (ENVIAR ATÉ ' + formatarDataCurta(dataEnvio) + ') | ' + nomeColaborador;\n  // Escala 0 (\"SOLICITAR URG\") leva \"URG |\" no inicio do assunto (secoes 3.1.4 e 3.5).\n  if (grupo.some((l) => l.escalaUrgencia === 0)) assunto = 'URG | ' + assunto;\n\n  // Ambiente troca APENAS o destinatario e a credencial (spec 7.4 e 3.5): o e-mail de\n  // homologacao tem que ser identico em conteudo ao de producao.\n  const ehHomolog = d.config && d.config.ambiente === 'homolog';\n  const emailDestino = ehHomolog ? EMAIL_TESTE_HOMOLOG : d.nota.colunaR;\n  const emailCopia = ehHomolog ? EMAIL_COPIA_HOMOLOG : EMAIL_COPIA_PRODUCAO;\n\n  const decisao = decidirAcaoEnvio(d.gatilho, ehModoAutomatico(d.config), grupo.some((l) => l.forcarRascunho), {\n    estado: (d.cobrancas || {})[d.perfil.retranca + '_L' + d.nota.linha],\n    dataAlvo: d.dataProgramarAte,\n    hoje,\n  });\n\n  saida.push({ json: {\n    ...d,\n    acao: decisao.acaoGmail,\n    // PROGRAMAR ATE: viaja junto pro node que grava cobrancas.json (3.1.8)\n    dataAlvoEnvio: decisao.programado ? d.dataProgramarAte : undefined,\n    draftIdProgramado: decisao.draftIdProgramado,\n    atualizarColunaL: decisao.atualizarColunaL,\n    novoValorColunaL: decisao.novoValorColunaL,\n    emailDestino,\n    emailCopia,\n    assunto,\n    corpoHtml: corpo,\n    marcadores: ['IA', MARCADOR_PROJETO[d.nota.projetoId]],\n    temLacunaInformacao: temLacuna,\n    chaveCobranca: d.perfil.retranca + '_L' + d.nota.linha,\n    // Uma linha da planilha por bloco — o consolidador grava coluna N/L em todas elas.\n    linhasAfetadas: grupo.map((l) => ({ projetoId: l.nota.projetoId, linha: l.nota.linha, atualizarColunaNPara: l.atualizarColunaNPara })),\n  } });\n}\n\nreturn saida;"
+        "jsCode": "/* @@incluir scripts/lib/data_brasilia.js */\n/* @@incluir scripts/lib/ref_assunto.js */\n// Monta o e-mail de pedido pra caso COLABORADOR (secoes 3.2, 3.3, 3.4).\n// Gateia 'liberado' aqui (nao mais antes da IA) e resolve destinatario/assunto por ambiente (secao 7.4).\n\nconst MESES_ABREV_PT = ['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ'];\nconst MARCADOR_PROJETO = { REUNION: 'REUNION - PEDIDO DE NOTAS', SOFT_PRE: 'SOFT PRE - PEDIDO DE NOTAS', AREP: 'AREP - PEDIDO DE NOTAS' };\nconst TOMADOR_HTML = '<p><b>Tomador</b><br>\\n' +\n  'BOXFISH PRODUTORA DE PROGRAMAS TELEVISIVOS, INTERNET E FILMES PUBLICITÁRIOS LTDA.<br>\\n' +\n  'Endereço: Rua Butantã, 194, sala 24, Pinheiros.<br>\\n' +\n  'CEP 05.424-000 - São Paulo, SP<br>\\n' +\n  'CNPJ: 14.788.649/0001-23<br>\\n' +\n  'IM: 4.436.095-9<br>\\n' +\n  'IE: ISENTA</p>';\nconst AVISO_HTML = '<p><i>\"Os dados bancários considerados para pagamento são os que estão cadastrados.<br>\\n' +\n  'O cadastro é feito baseado nas informações cedidas pelo contratado através do preenchimento de ficha cadastral da Box.<br>\\n' +\n  'Qualquer alteração bancária ou mudança na forma de pagamento deve ser notificada por e-mail pelo contratado e se faz necessário atualização da ficha cadastral e envio prévio ao responsável financeiro do projeto.\"</i></p>' +\n  '\\n<p>Muito obrigada!<br>\\nBjs 🌷</p>';\nconst IMPORTANTE_HTML = '<p><b><span style=\"color:#FF0000;\">Importante: Peço a gentileza de enviar a sua nota nestes e-mails:</span></b><br>\\n' +\n  'financeiro@novorealitybox.com<br>\\nfinanceiro1@novorealitybox.com</p>';\nconst EMAIL_TESTE_HOMOLOG = 'grandesnegocioseoportunidades+colaborador@gmail.com';\n// Cópia (CC) por ambiente — seção 3.1.7. Em homolog vai pro endereço de teste da\n// Danielle; em produção, pro e-mail real da controller. O destinatário principal\n// segue a mesma lógica: fixo de teste em homolog, coluna R em produção.\nconst EMAIL_COPIA_HOMOLOG = 'grandesnegocioseoportunidades+danielle@gmail.com';\nconst EMAIL_COPIA_PRODUCAO = 'financeiro@novorealitybox.com'; // seção 7.4 — endereço de teste do Claudio (Danielle homolog)\n\n// ─── Formatação do e-mail — valores EXATOS da seção 3.5 do spec, extraídos de um e-mail\n// real de produção. Vale igual em homolog: o e-mail de teste tem que ser visualmente\n// idêntico ao de produção, mudando só destinatário e credencial (seções 7.4 e 3.5).\nconst FONTE_EMAIL = 'Verdana, Geneva, sans-serif';\nconst COR_DATA_ENVIO = '#cc0000';      // só a data do \"enviada até o dia\" — em negrito (3.5)\nconst FUNDO_VENCIMENTO = '#CFE2F3';    // só os números da data de vencimento\nconst FUNDO_BLOCO_EMITIR = '#FFE599';  // bloco \"N- Emitir ... no valor de R$ X\"\nconst COR_IMPORTANTE = '#FF0000';      // \"Importante: Peço a gentileza...\"\n\nfunction envolverCorpo(partes) {\n  return '<div style=\"font-family:' + FONTE_EMAIL + ';\">\\n' + partes.filter(Boolean).join('\\n') + '\\n</div>';\n}\n\n// \"...enviada até o dia DD/MM\" -> cor só na data. \"vencimento em DD/MM/AAAA.\" -> negrito no\n// trecho inteiro, com highlight só nos números da data.\n// Abertura por tipo de documento do e-mail:\n//   'recibo_e_nf' -> fornecedor REC+NF (dois documentos, seção 3.2.1)\n//   'fatura'      -> fornecedor só RECIBO. NUNCA \"nota fiscal\" aqui: locação se cobra por\n//                    recibo/fatura, e trocar a palavra é erro fiscal (seção 3.2).\n//   'varias_nf'   -> colaborador com mais de um bloco -> plural (seção 3.2.1)\n//   'uma_nf'      -> colaborador com um bloco só\nfunction paragrafoAbertura(dataEnvio, dataVencimento, tipoAbertura) {\n  const VERBOS = {\n    recibo_e_nf: 'Seguem as instruções para a emissão do RECIBO e da NOTA FISCAL que deverão ser enviadas ',\n    fatura: 'Seguem as instruções para a emissão da sua FATURA que deverá ser enviada ',\n    varias_nf: 'Seguem as instruções para a emissão das suas notas fiscais que deverão ser enviadas ',\n    uma_nf: 'Seguem as instruções para a emissão da sua nota fiscal que deverá ser enviada ',\n  };\n  const verbo = VERBOS[tipoAbertura] || VERBOS.uma_nf;\n  // \"até o dia DD/MM\" INTEIRO em vermelho; só os números da data em negrito (3.5).\n  const ateODia = '<span style=\"color:' + COR_DATA_ENVIO + ';\"><b>até o dia ' + formatarDataDiaMes(dataEnvio) + '</b></span>';\n  // \"vencimento em DD/MM/AAAA.\" INTEIRO com o highlight; o ponto final fica DENTRO do\n  // highlight e FORA do negrito (3.5).\n  const vencimento = '<span style=\"background-color:' + FUNDO_VENCIMENTO + ';\">' +\n    '<b>vencimento em ' + formatarDataBR(dataVencimento) + '</b>.</span>';\n  return '<p>' + verbo + ateODia + ' com ' + vencimento + '</p>';\n}\n\nfunction blocoEmitir(numero, textoDocumento, valor) {\n  const valorFmt = valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });\n  return '<p><span style=\"background-color:' + FUNDO_BLOCO_EMITIR + ';\">' + numero +\n    '- Emitir ' + textoDocumento + ' no valor de <b>R$ ' + valorFmt + '</b> com os dados abaixo no corpo da nota:</span></p>';\n}\n\nfunction blocoDadosBancarios() {\n  // Sem <p> vazio entre \"Período de\" e \"Dados bancários\": a 3.5 (referência Paulo Bento)\n  // pede parágrafos sequenciais, com o espaçamento vindo só da margem padrão do <p>.\n  return '<p><b>Dados bancários:</b></p>\\n<p><b>Chave pix:</b></p>\\n' +\n    '<p>---------------------------------------------------------------------</p>';\n}\n\nfunction formatarDataBR(d) { return String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0') + '/' + d.getFullYear(); }\n// Data do \"ate o dia\" no CORPO: DD/MM, sem ano — formato diferente do vencimento\n// (DD/MM/AAAA), de proposito (3.5, confirmado com e-mail padrao de producao).\n// Nao confundir com formatarDataCurta, que e DD.MM com PONTO e vale pro ASSUNTO.\nfunction formatarDataDiaMes(d) { return String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0'); }\nfunction formatarDataCurta(d) { return String(d.getDate()).padStart(2,'0') + '.' + String(d.getMonth()+1).padStart(2,'0'); }\nfunction montarPeriodoTexto(periodo, tipoEmissao) {\n  if (!periodo) return '';\n  const PALAVRA_CHAVE = { JOB: 'JOB', DIARIA: 'DIÁRIA', PACOTE: 'PACOTE' };\n  const palavra = PALAVRA_CHAVE[tipoEmissao];\n  return palavra ? (periodo + ' (' + palavra + ')') : periodo;\n}\n// D63 (32ª rodada): o \"REF.\" do assunto vem da DESCRIÇÃO (coluna J) — decidirRefAssunto(), da\n// scripts/lib/ref_assunto.js. Nunca o mês do envio.\n\nfunction montarCorpoEmailColaborador(p) {\n  // Um bloco numerado POR LINHA da planilha (spec 3.2/3.2.1): cada linha e um documento\n  // distinto, com seu proprio periodo e valor. Com uma linha so, sai identico ao formato\n  // anterior — o \"1-\" ja era o numero usado.\n  const blocos = p.blocos.map((b, i) => [\n    blocoEmitir(i + 1, 'nota fiscal', b.valor),\n    '<p>Ref. \"' + p.textoRef + '\"</p>',\n    '<p><b>Serviço Prestado como</b> ' + b.cargo + '</p>',\n    '<p><b>Colaborador:</b> ' + p.nomeColaborador + '</p>',\n    b.periodoTexto ? ('<p><b>Período de</b> ' + b.periodoTexto + '</p>') : '',\n    blocoDadosBancarios(),\n  ].filter(Boolean).join('\\n'));\n\n  return envolverCorpo([\n    '<p>Olá ' + p.primeiroNome + '! Tudo bem? 😊</p>',\n    paragrafoAbertura(p.dataEnvio, p.dataVencimento, p.blocos.length > 1 ? 'varias_nf' : 'uma_nf'),\n    TOMADOR_HTML,\n    blocos.join('\\n'),\n    IMPORTANTE_HTML,\n    AVISO_HTML,\n  ]);\n}\n\nfunction normalizarNome(t) {\n  return t ? String(t).normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toUpperCase().trim().replace(/\\s+/g, ' ') : '';\n}\n\n// ─── Período em ordem cronológica ASCENDENTE (spec 3.2.1) ───\n// A planilha às vezes traz as datas invertidas por erro de digitação (\"05/08 A 26/07\") e o\n// e-mail não pode reproduzir isso.\n//\n// Sem ano na origem, \"26/12 A 05/01\" é virada de ano legítima, não inversão. Das duas\n// leituras possíveis escolhemos a de PERÍODO MAIS CURTO — período de trabalho tem dias ou\n// semanas: 26/12→05/01 dá 10 dias e vence 05/01→26/12, que daria 355; e o par de fato\n// invertido \"05/08 A 26/07\" é corrigido pelo mesmo critério, sem regra especial.\nfunction diasEntre(diaA, mesA, diaB, mesB) {\n  const ini = Date.UTC(2001, mesA - 1, diaA);\n  let fim = Date.UTC(2001, mesB - 1, diaB);\n  if (fim < ini) fim = Date.UTC(2002, mesB - 1, diaB); // virou o ano\n  return (fim - ini) / 86400000;\n}\n\nfunction normalizarPeriodo(periodo) {\n  const txt = String(periodo || '');\n  const datas = txt.match(/\\d{1,2}\\s*\\/\\s*\\d{1,2}/g);\n  if (!datas || datas.length < 2) return txt;\n  const [a, b] = datas;\n  const pa = a.split('/').map((x) => parseInt(x, 10));\n  const pb = b.split('/').map((x) => parseInt(x, 10));\n  const comoEscrito = diasEntre(pa[0], pa[1], pb[0], pb[1]);\n  const invertido = diasEntre(pb[0], pb[1], pa[0], pa[1]);\n  if (invertido >= comoEscrito) return txt;\n  let n = 0;\n  return txt.replace(/\\d{1,2}\\s*\\/\\s*\\d{1,2}/g, () => (n++ === 0 ? b : a));\n}\n\n// Meses citados por um período. Um período que atravessa a virada do mês devolve OS DOIS\n// (spec 3.2.1) — não escolhe um. Já vem em ordem cronológica, porque roda sobre o período\n// normalizado.\nfunction mesesDoPeriodo(periodo) {\n  const datas = String(periodo || '').match(/\\d{1,2}\\s*\\/\\s*\\d{1,2}/g) || [];\n  const meses = [];\n  for (const d of datas) {\n    const mes = parseInt(d.split('/')[1], 10);\n    if (mes >= 1 && mes <= 12) {\n      const nome = MESES_ABREV_PT[mes - 1];\n      if (meses.indexOf(nome) === -1) meses.push(nome);\n    }\n  }\n  return meses;\n}\n\n// O apelido de projeto (apelidos.json) e so o identificador: \"AREP\", \"SMTC - S01 | REUNION\".\n// Ja o prefixo_assunto_pedido do perfil vem com \"| EMISSAO DE NF\" embutido (spec secao 6).\n// Como o assunto concatena a palavra do documento logo depois, usar o prefixo cru no\n// fallback duplicava o trecho (\"... | EMISSAO DE NF | EMISSAO DE NF | REF. ...\"). Nao\n// aparecia em execucao porque hoje o apelidos.json cobre os 3 projetos e o fallback nunca\n// roda — mas passaria a aparecer se um projeto sumisse do arquivo.\nfunction apelidoDoPerfil(perfil) {\n  return String((perfil && perfil.prefixo_assunto_pedido) || '')\n    .replace(/\\s*\\|\\s*EMISS[ÃA]O DE .*$/i, '')\n    .trim();\n}\n// Status Box que ainda representam \"antes do envio\". Só esses podem virar \"SOLICITADA MI\"\n// (spec 3.1.8): se a linha ja avancou (ENTREGUE MI, ENTREGUE MI R1...), a automacao nao pode\n// regredir um estagio alcancado manualmente.\nfunction statusBoxAindaAntesDoEnvio(statusBox) {\n  const s = String(statusBox || '').normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toUpperCase().trim();\n  return /^PROGRAMAR ATE/.test(s) || /^SOLICITAR/.test(s);\n}\n\n\n// D64 (33ª rodada): a automação NUNCA envia e-mail, em nenhum modo nem ambiente. Todo pedido é\n// criado como RASCUNHO, para a Michelle disparar. O PROGRAMAR ATÉ (3.1.8) só guarda a data-alvo;\n// não há mais envio na data. A coluna L é decidida depois que o Gmail devolve o rascunho (D65,\n// \"Capturar threadId (rascunho)\").\nfunction decidirAcaoEnvio(gatilho) {\n  return { acaoGmail: 'criar_rascunho', programado: gatilho === 'PROGRAMAR_ATE' };\n}\n\n// Deduplicação do pedido (3.1.6), em produção E em homolog desde a 33ª rodada (D65): a coluna L\n// passou a ser gravada na criação do rascunho; se essa gravação parar (portão, janela de\n// silêncio, trava, Passo 0, erro), a linha continua SOLICITAR/PROGRAMAR na planilha, mas o\n// cobrancas já tem o pedido. A chave é a mesma que o fluxo grava (retranca + '_L' + linha); um\n// e-mail de 2 blocos guarda também as \"linhas\" dele, para a 2ª linha não virar pedido novo.\nfunction pedidoJaRegistrado(cobrancas, retranca, linha) {\n  const prefixo = retranca + '_L';\n  for (const [chave, e] of Object.entries(cobrancas || {})) {\n    if (!e || !(e.threadId || e.draftId)) continue;\n    if (chave === prefixo + linha) return chave;\n    if (chave.indexOf(prefixo) === 0 && Array.isArray(e.linhas) && e.linhas.indexOf(linha) !== -1) return chave;\n  }\n  return null;\n}\n\n// D59: o dia de Brasília (o container é UTC). Meio-dia local: getDate()/getMonth()/setDate()\n// dão o calendário de Brasília em qualquer fuso de máquina.\nconst hoje = dataBrasilia();\nconst saida = [];\nconst grupos = new Map();\n\n// 1a passada: o que nao gera e-mail sai por linha; o resto e agrupado.\n// Agrupamento por projeto + colaborador + vencimento (spec 3.2, \"COLABORADOR, 2 PERIODOS,\n// MESMO VENCIMENTO\"): duas linhas do mesmo colaborador vencendo no mesmo dia viram UM\n// e-mail com dois blocos numerados, nao dois e-mails.\nfor (const item of $input.all()) {\n  const d = item.json;\n\n  if (!d.liberado) {\n    saida.push({ json: { ...d, acao: 'pendente_contrato' } });\n    continue;\n  }\n\n  // Deduplicação do pedido (3.1.6; D65: também em homolog) — ver pedidoJaRegistrado().\n  const chaveDedup = pedidoJaRegistrado(d.cobrancas, d.perfil.retranca, d.nota.linha);\n  if (chaveDedup) {\n    saida.push({ json: { ...d, acao: 'pedido_ja_criado', chaveCobranca: chaveDedup, threadIdExistente: (d.cobrancas[chaveDedup] || {}).threadId || null } });\n    continue;\n  }\n\n  const nomeItem = (d.nomeColaborador === 'FALTA INFORMAÇÃO' || d.nomeColaborador === 'FALTA INFORMACAO')\n    ? 'FALTA INFORMAÇÃO'\n    : (d.nomeColaborador || d.nota.colunaH);\n  const chave = [d.nota.projetoId, normalizarNome(nomeItem), d.nota.colunaG].join('|');\n  if (!grupos.has(chave)) grupos.set(chave, []);\n  grupos.get(chave).push({ ...d, nomeItem });\n}\n\n// 2a passada: um e-mail por grupo.\nfor (const grupo of grupos.values()) {\n  const d = grupo[0];\n\n  const nomeColaborador = d.nomeItem;\n  const primeiroNome = (nomeColaborador === 'FALTA INFORMAÇÃO' ? 'Colaborador' : nomeColaborador).split(' ')[0];\n\n  const blocos = grupo.map((linha) => {\n    const cargo = (linha.cargo === 'FALTA INFORMAÇÃO' || linha.cargo === 'FALTA INFORMACAO')\n      ? 'FALTA INFORMAÇÃO'\n      : (linha.cargo || linha.nota.colunaJ);\n    const tipo = linha.tipoEmissao || 'NF_NORMAL';\n    const periodo = normalizarPeriodo(linha.periodo);\n    return {\n      cargo,\n      valor: linha.nota.colunaK,\n      periodoTexto: montarPeriodoTexto(periodo, tipo),\n      meses: mesesDoPeriodo(periodo),\n    };\n  });\n\n  const temLacuna = nomeColaborador === 'FALTA INFORMAÇÃO' || blocos.some((b) => b.cargo === 'FALTA INFORMAÇÃO');\n\n  const dataVencimento = new Date(d.nota.colunaG);\n  const dataBase = d.gatilho === 'PROGRAMAR_ATE' ? new Date(d.dataProgramarAte) : hoje;\n  const dataEnvio = d.gatilho === 'PROGRAMAR_ATE' ? (function(){ const dd = new Date(dataBase); dd.setDate(dd.getDate()+5); return dd; })() : dataBase;\n\n  // D63: o \"REF.\" vem da DESCRIÇÃO de cada linha do grupo (período e palavra REF/JOB/DIÁRIA).\n  // Com mais de um bloco, os meses na ordem de aparição na planilha (spec 3.2.1). Caso duvidoso\n  // ou contraditório: \"conferir à mão\" — não cria rascunho e a linha vai para o Relatório.\n  const decisaoRef = decidirRefAssunto(grupo.map((l) => ({ descricao: l.nota.colunaJ, tipoEmissaoIA: l.tipoEmissao, periodoIA: l.periodo, linha: l.nota.linha })), d.parcela);\n  if (!decisaoRef.ok) {\n    saida.push({ json: { ...d, acao: 'conferir_ref_mao', motivosConferirRef: decisaoRef.motivos,\n      // a coluna N (contrato) continua sendo gravada: não depende do e-mail (spec 3.1.3)\n      linhasAfetadas: grupo.map((l) => ({ projetoId: l.nota.projetoId, linha: l.nota.linha, atualizarColunaNPara: l.atualizarColunaNPara })) } });\n    continue;\n  }\n  const refAssunto = decisaoRef.ref;  const apelidoAtual = (d.apelidos && d.apelidos[d.nota.projetoId] && d.apelidos[d.nota.projetoId].length) ? d.apelidos[d.nota.projetoId][d.apelidos[d.nota.projetoId].length - 1] : apelidoDoPerfil(d.perfil);\n\n  const corpo = montarCorpoEmailColaborador({ primeiroNome, dataEnvio, dataVencimento, textoRef: d.perfil.texto_ref, nomeColaborador, blocos });\n  let assunto = apelidoAtual + ' | EMISSÃO DE NF | ' + refAssunto + ' (ENVIAR ATÉ ' + formatarDataCurta(dataEnvio) + ') | ' + nomeColaborador;\n  // Escala 0 (\"SOLICITAR URG\") leva \"URG |\" no inicio do assunto (secoes 3.1.4 e 3.5).\n  if (grupo.some((l) => l.escalaUrgencia === 0)) assunto = 'URG | ' + assunto;\n\n  // Ambiente troca APENAS o destinatario e a credencial (spec 7.4 e 3.5): o e-mail de\n  // homologacao tem que ser identico em conteudo ao de producao.\n  const ehHomolog = d.config && d.config.ambiente === 'homolog';\n  const emailDestino = ehHomolog ? EMAIL_TESTE_HOMOLOG : d.nota.colunaR;\n  const emailCopia = ehHomolog ? EMAIL_COPIA_HOMOLOG : EMAIL_COPIA_PRODUCAO;\n\n  const decisao = decidirAcaoEnvio(d.gatilho);\n  const DATA_BASE_COBRANCA = d.gatilho === 'PROGRAMAR_ATE' ? ymdBrasilia(new Date(d.dataProgramarAte)) : ymdBrasilia(hoje);\n\n  saida.push({ json: {\n    ...d,\n    acao: decisao.acaoGmail,\n    // PROGRAMAR ATE: viaja junto pro node que grava cobrancas.json (3.1.8)\n    dataAlvoEnvio: decisao.programado ? d.dataProgramarAte : undefined,\n    // D61': data base da 1ª cobrança (3.1.1) — PROGRAMAR ATÉ: a data do PROGRAMAR ATÉ; SOLICITAR:\n    // o dia do pedido. Vai para o cobrancas na criação do pedido.\n    dataBaseCobranca: DATA_BASE_COBRANCA,\n    emailDestino,\n    emailCopia,\n    assunto,\n    corpoHtml: corpo,\n    marcadores: ['IA', MARCADOR_PROJETO[d.nota.projetoId]],\n    temLacunaInformacao: temLacuna,\n    chaveCobranca: d.perfil.retranca + '_L' + d.nota.linha,\n    // Uma linha da planilha por bloco — o consolidador grava coluna N/L em todas elas.\n    linhasAfetadas: grupo.map((l) => ({ projetoId: l.nota.projetoId, linha: l.nota.linha, atualizarColunaNPara: l.atualizarColunaNPara })),\n  } });\n}\n\nreturn saida;"
       },
       "id": "n20k-montar-email-colaborador",
       "name": "Montar e-mail colaborador",
@@ -356,7 +356,7 @@
     },
     {
       "parameters": {
-        "jsCode": "/* @@incluir scripts/lib/data_brasilia.js */\n// Agrupa linhas FORNECEDOR (mesmo projeto+fornecedor+vencimento) e monta 1 e-mail\n// multi-bloco por grupo (secao 3.2.1). Roda 1x pra TODOS os itens fornecedor da execucao\n// (mode = runOnceForAllItems).\n//\n// NOVO (secao 3.2.1, fechamento): o gate de contrato acontece por GRUPO, nao por linha.\n// Se qualquer linha do grupo tiver liberado=true, o grupo inteiro e tratado como liberado,\n// as linhas que nao tinham coluna N = OK-ASSINADO sao corrigidas, e um aviso extra e\n// enviado pro Telegram avisando a correcao (fornecedor + valor da nota corrigida).\n\nconst MESES_ABREV_PT = ['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ'];\nconst MARCADOR_PROJETO = { REUNION: 'REUNION - PEDIDO DE NOTAS', SOFT_PRE: 'SOFT PRE - PEDIDO DE NOTAS', AREP: 'AREP - PEDIDO DE NOTAS' };\nconst TOMADOR_HTML = '<p><b>Tomador</b><br>\\n' +\n  'BOXFISH PRODUTORA DE PROGRAMAS TELEVISIVOS, INTERNET E FILMES PUBLICITÁRIOS LTDA.<br>\\n' +\n  'Endereço: Rua Butantã, 194, sala 24, Pinheiros.<br>\\n' +\n  'CEP 05.424-000 - São Paulo, SP<br>\\n' +\n  'CNPJ: 14.788.649/0001-23<br>\\n' +\n  'IM: 4.436.095-9<br>\\n' +\n  'IE: ISENTA</p>';\nconst AVISO_HTML = '<p><i>\"Os dados bancários considerados para pagamento são os que estão cadastrados.<br>\\n' +\n  'O cadastro é feito baseado nas informações cedidas pelo contratado através do preenchimento de ficha cadastral da Box.<br>\\n' +\n  'Qualquer alteração bancária ou mudança na forma de pagamento deve ser notificada por e-mail pelo contratado e se faz necessário atualização da ficha cadastral e envio prévio ao responsável financeiro do projeto.\"</i></p>' +\n  '\\n<p>Muito obrigada!<br>\\nBjs 🌷</p>';\nconst IMPORTANTE_HTML = '<p><b><span style=\"color:#FF0000;\">Importante: Peço a gentileza de enviar a sua nota nestes e-mails:</span></b><br>\\n' +\n  'financeiro@novorealitybox.com<br>\\nfinanceiro1@novorealitybox.com</p>';\nconst EMAIL_TESTE_HOMOLOG = 'grandesnegocioseoportunidades+colaborador@gmail.com';\n// Cópia (CC) por ambiente — seção 3.1.7. Em homolog vai pro endereço de teste da\n// Danielle; em produção, pro e-mail real da controller. O destinatário principal\n// segue a mesma lógica: fixo de teste em homolog, coluna R em produção.\nconst EMAIL_COPIA_HOMOLOG = 'grandesnegocioseoportunidades+danielle@gmail.com';\nconst EMAIL_COPIA_PRODUCAO = 'financeiro@novorealitybox.com';\n\n// ─── Formatação do e-mail — valores EXATOS da seção 3.5 do spec, extraídos de um e-mail\n// real de produção. Vale igual em homolog: o e-mail de teste tem que ser visualmente\n// idêntico ao de produção, mudando só destinatário e credencial (seções 7.4 e 3.5).\nconst FONTE_EMAIL = 'Verdana, Geneva, sans-serif';\nconst COR_DATA_ENVIO = '#cc0000';      // só a data do \"enviada até o dia\" — em negrito (3.5)\nconst FUNDO_VENCIMENTO = '#CFE2F3';    // só os números da data de vencimento\nconst FUNDO_BLOCO_EMITIR = '#FFE599';  // bloco \"N- Emitir ... no valor de R$ X\"\nconst COR_IMPORTANTE = '#FF0000';      // \"Importante: Peço a gentileza...\"\n\nfunction envolverCorpo(partes) {\n  return '<div style=\"font-family:' + FONTE_EMAIL + ';\">\\n' + partes.filter(Boolean).join('\\n') + '\\n</div>';\n}\n\n// \"...enviada até o dia DD/MM\" -> cor só na data. \"vencimento em DD/MM/AAAA.\" -> negrito no\n// trecho inteiro, com highlight só nos números da data.\n// Abertura por tipo de documento do e-mail:\n//   'recibo_e_nf' -> fornecedor REC+NF (dois documentos, seção 3.2.1)\n//   'fatura'      -> fornecedor só RECIBO. NUNCA \"nota fiscal\" aqui: locação se cobra por\n//                    recibo/fatura, e trocar a palavra é erro fiscal (seção 3.2).\n//   'varias_nf'   -> colaborador com mais de um bloco -> plural (seção 3.2.1)\n//   'uma_nf'      -> colaborador com um bloco só\nfunction paragrafoAbertura(dataEnvio, dataVencimento, tipoAbertura) {\n  const VERBOS = {\n    recibo_e_nf: 'Seguem as instruções para a emissão do RECIBO e da NOTA FISCAL que deverão ser enviadas ',\n    fatura: 'Seguem as instruções para a emissão da sua FATURA que deverá ser enviada ',\n    varias_nf: 'Seguem as instruções para a emissão das suas notas fiscais que deverão ser enviadas ',\n    uma_nf: 'Seguem as instruções para a emissão da sua nota fiscal que deverá ser enviada ',\n  };\n  const verbo = VERBOS[tipoAbertura] || VERBOS.uma_nf;\n  // \"até o dia DD/MM\" INTEIRO em vermelho; só os números da data em negrito (3.5).\n  const ateODia = '<span style=\"color:' + COR_DATA_ENVIO + ';\"><b>até o dia ' + formatarDataDiaMes(dataEnvio) + '</b></span>';\n  // \"vencimento em DD/MM/AAAA.\" INTEIRO com o highlight; o ponto final fica DENTRO do\n  // highlight e FORA do negrito (3.5).\n  const vencimento = '<span style=\"background-color:' + FUNDO_VENCIMENTO + ';\">' +\n    '<b>vencimento em ' + formatarDataBR(dataVencimento) + '</b>.</span>';\n  return '<p>' + verbo + ateODia + ' com ' + vencimento + '</p>';\n}\n\nfunction blocoEmitir(numero, textoDocumento, valor) {\n  const valorFmt = valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });\n  return '<p><span style=\"background-color:' + FUNDO_BLOCO_EMITIR + ';\">' + numero +\n    '- Emitir ' + textoDocumento + ' no valor de <b>R$ ' + valorFmt + '</b> com os dados abaixo no corpo da nota:</span></p>';\n}\n\nfunction blocoDadosBancarios() {\n  // Sem <p> vazio entre \"Período de\" e \"Dados bancários\": a 3.5 (referência Paulo Bento)\n  // pede parágrafos sequenciais, com o espaçamento vindo só da margem padrão do <p>.\n  return '<p><b>Dados bancários:</b></p>\\n<p><b>Chave pix:</b></p>\\n' +\n    '<p>---------------------------------------------------------------------</p>';\n}\n\n// ─── Período em ordem cronológica ASCENDENTE (spec 3.2.1) ───\n// A planilha às vezes traz as datas invertidas por erro de digitação (\"05/08 A 26/07\") e o\n// e-mail não pode reproduzir isso.\n//\n// Sem ano na origem, \"26/12 A 05/01\" é virada de ano legítima, não inversão. Das duas\n// leituras possíveis escolhemos a de PERÍODO MAIS CURTO — período de trabalho tem dias ou\n// semanas: 26/12→05/01 dá 10 dias e vence 05/01→26/12, que daria 355; e o par de fato\n// invertido \"05/08 A 26/07\" é corrigido pelo mesmo critério, sem regra especial.\nfunction diasEntre(diaA, mesA, diaB, mesB) {\n  const ini = Date.UTC(2001, mesA - 1, diaA);\n  let fim = Date.UTC(2001, mesB - 1, diaB);\n  if (fim < ini) fim = Date.UTC(2002, mesB - 1, diaB); // virou o ano\n  return (fim - ini) / 86400000;\n}\n\nfunction normalizarPeriodo(periodo) {\n  const txt = String(periodo || '');\n  const datas = txt.match(/\\d{1,2}\\s*\\/\\s*\\d{1,2}/g);\n  if (!datas || datas.length < 2) return txt;\n  const [a, b] = datas;\n  const pa = a.split('/').map((x) => parseInt(x, 10));\n  const pb = b.split('/').map((x) => parseInt(x, 10));\n  const comoEscrito = diasEntre(pa[0], pa[1], pb[0], pb[1]);\n  const invertido = diasEntre(pb[0], pb[1], pa[0], pa[1]);\n  if (invertido >= comoEscrito) return txt;\n  let n = 0;\n  return txt.replace(/\\d{1,2}\\s*\\/\\s*\\d{1,2}/g, () => (n++ === 0 ? b : a));\n}\n\n// Meses citados por um período. Um período que atravessa a virada do mês devolve OS DOIS\n// (spec 3.2.1) — não escolhe um. Já vem em ordem cronológica, porque roda sobre o período\n// normalizado.\nfunction mesesDoPeriodo(periodo) {\n  const datas = String(periodo || '').match(/\\d{1,2}\\s*\\/\\s*\\d{1,2}/g) || [];\n  const meses = [];\n  for (const d of datas) {\n    const mes = parseInt(d.split('/')[1], 10);\n    if (mes >= 1 && mes <= 12) {\n      const nome = MESES_ABREV_PT[mes - 1];\n      if (meses.indexOf(nome) === -1) meses.push(nome);\n    }\n  }\n  return meses;\n}\n\nfunction normalizar(t) { return t ? String(t).normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toLowerCase().trim() : ''; }\nfunction formatarDataBR(d) { return String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0') + '/' + d.getFullYear(); }\n// Data do \"ate o dia\" no CORPO: DD/MM, sem ano — formato diferente do vencimento\n// (DD/MM/AAAA), de proposito (3.5, confirmado com e-mail padrao de producao).\n// Nao confundir com formatarDataCurta, que e DD.MM com PONTO e vale pro ASSUNTO.\nfunction formatarDataDiaMes(d) { return String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0'); }\nfunction formatarDataCurta(d) { return String(d.getDate()).padStart(2,'0') + '.' + String(d.getMonth()+1).padStart(2,'0'); }\n// O apelido de projeto (apelidos.json) e so o identificador: \"AREP\", \"SMTC - S01 | REUNION\".\n// Ja o prefixo_assunto_pedido do perfil vem com \"| EMISSAO DE NF\" embutido (spec secao 6).\n// Como o assunto concatena a palavra do documento logo depois, usar o prefixo cru no\n// fallback duplicava o trecho (\"... | EMISSAO DE NF | EMISSAO DE NF | REF. ...\"). Nao\n// aparecia em execucao porque hoje o apelidos.json cobre os 3 projetos e o fallback nunca\n// roda — mas passaria a aparecer se um projeto sumisse do arquivo.\nfunction apelidoDoPerfil(perfil) {\n  return String((perfil && perfil.prefixo_assunto_pedido) || '')\n    .replace(/\\s*\\|\\s*EMISS[ÃA]O DE .*$/i, '')\n    .trim();\n}\nfunction ehModoAutomatico(config) { return config && config.modo === 'automatico'; }\n// Status Box que ainda representam \"antes do envio\". Só esses podem virar \"SOLICITADA MI\"\n// (spec 3.1.8): se a linha ja avancou (ENTREGUE MI, ENTREGUE MI R1...), a automacao nao pode\n// regredir um estagio alcancado manualmente.\nfunction statusBoxAindaAntesDoEnvio(statusBox) {\n  const s = String(statusBox || '').normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toUpperCase().trim();\n  return /^PROGRAMAR ATE/.test(s) || /^SOLICITAR/.test(s);\n}\n\n// Compara so a data do calendario, ignorando hora.\nfunction chegouNaDataAlvo(dataAlvoISO, hoje) {\n  if (!dataAlvoISO) return true;\n  const alvoYMD = String(dataAlvoISO).slice(0, 10);\n  const hojeYMD = new Date(hoje.getTime() - hoje.getTimezoneOffset() * 60000).toISOString().slice(0, 10);\n  return hojeYMD >= alvoYMD;\n}\n\nfunction decidirAcaoEnvio(gatilho, modoAutomatico, forcarRascunho, contexto) {\n  // \"SOLICITAR / AGUARDAR DOCS\" (escala 5) SEMPRE fica em rascunho, mesmo em\n  // MODO_EXECUCAO=automatico e ambiente producao — unica excecao do sistema (secao 3.1.4).\n  // O flag vem pronto do node de filtro: nao reinterpretamos o Status Box aqui, pra que a\n  // excecao nao possa vazar pra outras variantes.\n  if (forcarRascunho) return { acaoGmail: 'criar_rascunho', atualizarColunaL: false };\n\n  // ── PROGRAMAR ATE (spec 3.1.8) ──────────────────────────────────────────────\n  // A API do Gmail nao tem envio agendado — isso so existe na interface web. O contorno e\n  // criar o rascunho desde ja e enviar numa execucao do dia do prazo.\n  if (gatilho === 'PROGRAMAR_ATE') {\n    const ctx = contexto || {};\n    const rascunhoGuardado = ctx.estado && ctx.estado.draftId;\n\n    // ainda nao existe rascunho -> cria agora. Coluna L NAO muda (item 2 da 3.1.8).\n    if (!rascunhoGuardado) {\n      return { acaoGmail: 'criar_rascunho', atualizarColunaL: false, programado: true };\n    }\n    // ja existe rascunho e a data nao chegou -> nao faz nada, nao duplica (item 3)\n    if (!chegouNaDataAlvo(ctx.dataAlvo, ctx.hoje)) {\n      return { acaoGmail: 'aguardando_data', atualizarColunaL: false };\n    }\n    // chegou a data, mas modo rascunho nunca envia sozinho (item 4)\n    if (!modoAutomatico) {\n      return { acaoGmail: 'aguardando_revisao_manual', atualizarColunaL: false };\n    }\n    // chegou a data em modo automatico -> o ramo de envio checa se o rascunho existe.\n    // Coluna L fica false AQUI de proposito: quem decide grava-la e o ramo, depois de\n    // confirmar o envio (spec 3.1.5).\n    return { acaoGmail: 'enviar_programado', atualizarColunaL: false, draftIdProgramado: ctx.estado.draftId };\n  }\n\n  if (!modoAutomatico) return { acaoGmail: 'criar_rascunho', atualizarColunaL: false };\n  return { acaoGmail: 'enviar_direto', atualizarColunaL: true, novoValorColunaL: 'SOLICITADA MI' };\n}\nfunction agruparLinhasFornecedor(itens) {\n  const grupos = new Map();\n  for (const item of itens) {\n    const chave = [item.nota.projetoId, normalizar(item.nota.colunaH), item.nota.colunaG].join('|');\n    if (!grupos.has(chave)) grupos.set(chave, []);\n    grupos.get(chave).push(item);\n  }\n  return Array.from(grupos.values());\n}\nfunction ordenarBlocosGrupo(grupo) {\n  const recibos = grupo.filter((i) => i.documentoLinha === 'RECIBO');\n  const notas = grupo.filter((i) => i.documentoLinha === 'NOTA_FISCAL');\n  const semClassificacao = grupo.filter((i) => i.documentoLinha !== 'RECIBO' && i.documentoLinha !== 'NOTA_FISCAL');\n  return { blocosOrdenados: [...recibos, ...notas], semClassificacao };\n}\nfunction montarBlocoRecibo(numero, item, textoRef) {\n  return [\n    blocoEmitir(numero, 'RECIBO', item.nota.colunaK),\n    '<p>Ref. \"' + textoRef + '\"</p>',\n    '<p><b>Fornecedor:</b> ' + item.nota.colunaH + '</p>',\n    '<p><b>Período de</b> ' + normalizarPeriodo(item.periodo) + ' - ' + item.descricaoServicoOuLocacao + '</p>',\n    blocoDadosBancarios(),\n  ].join('\\n');\n}\nfunction montarBlocoNotaFiscal(numero, item, textoRef) {\n  return [\n    blocoEmitir(numero, 'NOTA FISCAL', item.nota.colunaK),\n    '<p>Ref. \"' + textoRef + '\"</p>',\n    '<p><b>Fornecedor:</b> ' + item.nota.colunaH + '</p>',\n    '<p><b>Serviço Prestado:</b> ' + item.descricaoServicoOuLocacao + '</p>',\n    '<p><b>Período de</b> ' + normalizarPeriodo(item.periodo) + '</p>',\n    blocoDadosBancarios(),\n  ].join('\\n');\n}\nfunction montarCorpoEmailFornecedor({ blocosOrdenados, temNotaFiscal, dataEnvio, dataVencimento, textoRef }) {\n  const blocos = blocosOrdenados.map((item, idx) => item.documentoLinha === 'RECIBO'\n    ? montarBlocoRecibo(idx + 1, item, textoRef)\n    : montarBlocoNotaFiscal(idx + 1, item, textoRef));\n  return envolverCorpo([\n    '<p>Olá! Tudo bem? 😊</p>',\n    paragrafoAbertura(dataEnvio, dataVencimento, temNotaFiscal ? 'recibo_e_nf' : 'fatura'),\n    TOMADOR_HTML,\n    blocos.join('\\n'),\n    IMPORTANTE_HTML,\n    AVISO_HTML,\n  ]);\n}\n// D63 (pendente de resposta da Michelle): mês do \"REF.\" do assunto do fornecedor.\n// Regra ATUAL, sem mudança: o mês da data de ENVIO. Isolado aqui para a troca ser num lugar só.\nfunction mesDoRefAssunto(dataEnvio) { return MESES_ABREV_PT[dataEnvio.getMonth()]; }\n\nfunction montarAssuntoFornecedor({ apelidoAtual, temNotaFiscal, parcela, dataEnvio, fornecedor }) {\n  const mes = mesDoRefAssunto(dataEnvio);\n  const palavraDocumento = temNotaFiscal ? 'EMISSÃO DE FATURA' : 'EMISSÃO DE RECIBO';\n  const ref = temNotaFiscal ? ('REF. LOCAÇÃO E SERVIÇOS - ' + mes) : ('REF. LOCAÇÃO - ' + mes + (parcela ? (' - ' + parcela) : ''));\n  return apelidoAtual + ' | ' + palavraDocumento + ' | ' + ref + ' | (ENVIAR ATÉ ' + formatarDataCurta(dataEnvio) + ') | ' + fornecedor;\n}\n\n// D59: o dia de Brasília (o container é UTC). Meio-dia local: getDate()/getMonth()/setDate()\n// dão o calendário de Brasília em qualquer fuso de máquina.\nconst hoje = dataBrasilia();\nconst itens = $input.all().map((i) => i.json);\nconst grupos = agruparLinhasFornecedor(itens);\nconst saida = [];\n\nfor (const grupo of grupos) {\n  const { blocosOrdenados, semClassificacao } = ordenarBlocosGrupo(grupo);\n\n  if (semClassificacao.length > 0) {\n    saida.push({ json: { ...semClassificacao[0], acao: 'alerta_situacao_nao_mapeada', situacaoNaoMapeada: 'Não foi possível classificar RECIBO/NOTA_FISCAL para ' + semClassificacao.length + ' linha(s) do fornecedor ' + grupo[0].nota.colunaH } });\n    continue;\n  }\n  if (blocosOrdenados.length === 0) continue;\n\n  // Gate de contrato POR GRUPO (secao 3.2.1, fechamento): se qualquer linha liberada, grupo inteiro libera.\n  const algumaLiberada = blocosOrdenados.some((b) => b.liberado);\n  if (!algumaLiberada) {\n    saida.push({ json: { ...blocosOrdenados[0], acao: 'pendente_contrato' } });\n    continue;\n  }\n  const linhasCorrigidas = blocosOrdenados.filter((b) => !b.liberado);\n\n  const primeiro = blocosOrdenados[0];\n  // Deduplicação do pedido (3.1.6) — SÓ em produção. Ver comentário equivalente no node\n  // \"Montar e-mail colaborador\". No caso de fornecedor a chave é a da PRIMEIRA linha do\n  // grupo, que é exatamente a que o fluxo grava em cobrancas.json para o grupo.\n  const chaveDedup = primeiro.perfil.retranca + '_L' + primeiro.nota.linha;\n  const entradaAnterior = (primeiro.cobrancas || {})[chaveDedup];\n  if (primeiro.config && primeiro.config.ambiente === 'producao' && entradaAnterior && entradaAnterior.threadId) {\n    saida.push({ json: { ...primeiro, acao: 'pedido_ja_criado', chaveCobranca: chaveDedup, threadIdExistente: entradaAnterior.threadId } });\n    continue;\n  }\n\n  const temNotaFiscal = blocosOrdenados.some((b) => b.documentoLinha === 'NOTA_FISCAL');\n  const dataVencimento = new Date(primeiro.nota.colunaG);\n  const dataBase = primeiro.gatilho === 'PROGRAMAR_ATE' ? new Date(primeiro.dataProgramarAte) : hoje;\n  const dataEnvio = primeiro.gatilho === 'PROGRAMAR_ATE' ? (function(){ const dd = new Date(dataBase); dd.setDate(dd.getDate()+5); return dd; })() : dataBase;\n  const apelidoAtual = (primeiro.apelidos && primeiro.apelidos[primeiro.nota.projetoId] && primeiro.apelidos[primeiro.nota.projetoId].length) ? primeiro.apelidos[primeiro.nota.projetoId][primeiro.apelidos[primeiro.nota.projetoId].length - 1] : apelidoDoPerfil(primeiro.perfil);\n\n  const corpo = montarCorpoEmailFornecedor({ blocosOrdenados, temNotaFiscal, dataEnvio, dataVencimento, textoRef: primeiro.perfil.texto_ref });\n  let assunto = montarAssuntoFornecedor({ apelidoAtual, temNotaFiscal, parcela: primeiro.parcela, dataEnvio, fornecedor: primeiro.nota.colunaH });\n  if (primeiro.escalaUrgencia === 0) assunto = 'URG | ' + assunto;\n\n  // Ambiente troca APENAS destinatario e credencial (spec 7.4 e 3.5) — sem marca de\n  // ambiente no assunto nem no corpo. Ver comentario no \"Montar e-mail colaborador\".\n  const ehHomolog = primeiro.config && primeiro.config.ambiente === 'homolog';\n  const emailDestino = ehHomolog ? EMAIL_TESTE_HOMOLOG : primeiro.nota.colunaR;\n  const emailCopia = ehHomolog ? EMAIL_COPIA_HOMOLOG : EMAIL_COPIA_PRODUCAO;\n\n  const decisao = decidirAcaoEnvio(primeiro.gatilho, ehModoAutomatico(primeiro.config), primeiro.forcarRascunho, {\n    estado: (primeiro.cobrancas || {})[primeiro.perfil.retranca + '_L' + primeiro.nota.linha],\n    dataAlvo: primeiro.dataProgramarAte,\n    hoje,\n  });\n\n  saida.push({ json: {\n    ...primeiro,\n    acao: decisao.acaoGmail,\n    // PROGRAMAR ATE: viaja junto pro node que grava cobrancas.json (3.1.8)\n    dataAlvoEnvio: decisao.programado ? primeiro.dataProgramarAte : undefined,\n    draftIdProgramado: decisao.draftIdProgramado,\n    atualizarColunaL: decisao.atualizarColunaL,\n    novoValorColunaL: decisao.novoValorColunaL,\n    emailDestino,\n    emailCopia,\n    assunto,\n    corpoHtml: corpo,\n    marcadores: ['IA', MARCADOR_PROJETO[primeiro.nota.projetoId]],\n    chaveCobranca: primeiro.perfil.retranca + '_L' + primeiro.nota.linha,\n    linhasAfetadas: blocosOrdenados.map((b) => ({ projetoId: b.nota.projetoId, linha: b.nota.linha, atualizarColunaNPara: b.liberado ? b.atualizarColunaNPara : 'OK - ASSINADO' })),\n  } });\n\n  if (linhasCorrigidas.length > 0) {\n    saida.push({ json: {\n      acao: 'avisar_correcao_contrato',\n      fornecedor: primeiro.nota.colunaH,\n      linhasCorrigidas: linhasCorrigidas.map((b) => ({ linha: b.nota.linha, valor: b.nota.colunaK })),\n    } });\n  }\n}\n\nreturn saida;",
+        "jsCode": "/* @@incluir scripts/lib/data_brasilia.js */\n// Agrupa linhas FORNECEDOR (mesmo projeto+fornecedor+vencimento) e monta 1 e-mail\n// multi-bloco por grupo (secao 3.2.1). Roda 1x pra TODOS os itens fornecedor da execucao\n// (mode = runOnceForAllItems).\n//\n// NOVO (secao 3.2.1, fechamento): o gate de contrato acontece por GRUPO, nao por linha.\n// Se qualquer linha do grupo tiver liberado=true, o grupo inteiro e tratado como liberado,\n// as linhas que nao tinham coluna N = OK-ASSINADO sao corrigidas, e um aviso extra e\n// enviado pro Telegram avisando a correcao (fornecedor + valor da nota corrigida).\n\nconst MESES_ABREV_PT = ['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ'];\nconst MARCADOR_PROJETO = { REUNION: 'REUNION - PEDIDO DE NOTAS', SOFT_PRE: 'SOFT PRE - PEDIDO DE NOTAS', AREP: 'AREP - PEDIDO DE NOTAS' };\nconst TOMADOR_HTML = '<p><b>Tomador</b><br>\\n' +\n  'BOXFISH PRODUTORA DE PROGRAMAS TELEVISIVOS, INTERNET E FILMES PUBLICITÁRIOS LTDA.<br>\\n' +\n  'Endereço: Rua Butantã, 194, sala 24, Pinheiros.<br>\\n' +\n  'CEP 05.424-000 - São Paulo, SP<br>\\n' +\n  'CNPJ: 14.788.649/0001-23<br>\\n' +\n  'IM: 4.436.095-9<br>\\n' +\n  'IE: ISENTA</p>';\nconst AVISO_HTML = '<p><i>\"Os dados bancários considerados para pagamento são os que estão cadastrados.<br>\\n' +\n  'O cadastro é feito baseado nas informações cedidas pelo contratado através do preenchimento de ficha cadastral da Box.<br>\\n' +\n  'Qualquer alteração bancária ou mudança na forma de pagamento deve ser notificada por e-mail pelo contratado e se faz necessário atualização da ficha cadastral e envio prévio ao responsável financeiro do projeto.\"</i></p>' +\n  '\\n<p>Muito obrigada!<br>\\nBjs 🌷</p>';\nconst IMPORTANTE_HTML = '<p><b><span style=\"color:#FF0000;\">Importante: Peço a gentileza de enviar a sua nota nestes e-mails:</span></b><br>\\n' +\n  'financeiro@novorealitybox.com<br>\\nfinanceiro1@novorealitybox.com</p>';\nconst EMAIL_TESTE_HOMOLOG = 'grandesnegocioseoportunidades+colaborador@gmail.com';\n// Cópia (CC) por ambiente — seção 3.1.7. Em homolog vai pro endereço de teste da\n// Danielle; em produção, pro e-mail real da controller. O destinatário principal\n// segue a mesma lógica: fixo de teste em homolog, coluna R em produção.\nconst EMAIL_COPIA_HOMOLOG = 'grandesnegocioseoportunidades+danielle@gmail.com';\nconst EMAIL_COPIA_PRODUCAO = 'financeiro@novorealitybox.com';\n\n// ─── Formatação do e-mail — valores EXATOS da seção 3.5 do spec, extraídos de um e-mail\n// real de produção. Vale igual em homolog: o e-mail de teste tem que ser visualmente\n// idêntico ao de produção, mudando só destinatário e credencial (seções 7.4 e 3.5).\nconst FONTE_EMAIL = 'Verdana, Geneva, sans-serif';\nconst COR_DATA_ENVIO = '#cc0000';      // só a data do \"enviada até o dia\" — em negrito (3.5)\nconst FUNDO_VENCIMENTO = '#CFE2F3';    // só os números da data de vencimento\nconst FUNDO_BLOCO_EMITIR = '#FFE599';  // bloco \"N- Emitir ... no valor de R$ X\"\nconst COR_IMPORTANTE = '#FF0000';      // \"Importante: Peço a gentileza...\"\n\nfunction envolverCorpo(partes) {\n  return '<div style=\"font-family:' + FONTE_EMAIL + ';\">\\n' + partes.filter(Boolean).join('\\n') + '\\n</div>';\n}\n\n// \"...enviada até o dia DD/MM\" -> cor só na data. \"vencimento em DD/MM/AAAA.\" -> negrito no\n// trecho inteiro, com highlight só nos números da data.\n// Abertura por tipo de documento do e-mail:\n//   'recibo_e_nf' -> fornecedor REC+NF (dois documentos, seção 3.2.1)\n//   'fatura'      -> fornecedor só RECIBO. NUNCA \"nota fiscal\" aqui: locação se cobra por\n//                    recibo/fatura, e trocar a palavra é erro fiscal (seção 3.2).\n//   'varias_nf'   -> colaborador com mais de um bloco -> plural (seção 3.2.1)\n//   'uma_nf'      -> colaborador com um bloco só\nfunction paragrafoAbertura(dataEnvio, dataVencimento, tipoAbertura) {\n  const VERBOS = {\n    recibo_e_nf: 'Seguem as instruções para a emissão do RECIBO e da NOTA FISCAL que deverão ser enviadas ',\n    fatura: 'Seguem as instruções para a emissão da sua FATURA que deverá ser enviada ',\n    varias_nf: 'Seguem as instruções para a emissão das suas notas fiscais que deverão ser enviadas ',\n    uma_nf: 'Seguem as instruções para a emissão da sua nota fiscal que deverá ser enviada ',\n  };\n  const verbo = VERBOS[tipoAbertura] || VERBOS.uma_nf;\n  // \"até o dia DD/MM\" INTEIRO em vermelho; só os números da data em negrito (3.5).\n  const ateODia = '<span style=\"color:' + COR_DATA_ENVIO + ';\"><b>até o dia ' + formatarDataDiaMes(dataEnvio) + '</b></span>';\n  // \"vencimento em DD/MM/AAAA.\" INTEIRO com o highlight; o ponto final fica DENTRO do\n  // highlight e FORA do negrito (3.5).\n  const vencimento = '<span style=\"background-color:' + FUNDO_VENCIMENTO + ';\">' +\n    '<b>vencimento em ' + formatarDataBR(dataVencimento) + '</b>.</span>';\n  return '<p>' + verbo + ateODia + ' com ' + vencimento + '</p>';\n}\n\nfunction blocoEmitir(numero, textoDocumento, valor) {\n  const valorFmt = valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });\n  return '<p><span style=\"background-color:' + FUNDO_BLOCO_EMITIR + ';\">' + numero +\n    '- Emitir ' + textoDocumento + ' no valor de <b>R$ ' + valorFmt + '</b> com os dados abaixo no corpo da nota:</span></p>';\n}\n\nfunction blocoDadosBancarios() {\n  // Sem <p> vazio entre \"Período de\" e \"Dados bancários\": a 3.5 (referência Paulo Bento)\n  // pede parágrafos sequenciais, com o espaçamento vindo só da margem padrão do <p>.\n  return '<p><b>Dados bancários:</b></p>\\n<p><b>Chave pix:</b></p>\\n' +\n    '<p>---------------------------------------------------------------------</p>';\n}\n\n// ─── Período em ordem cronológica ASCENDENTE (spec 3.2.1) ───\n// A planilha às vezes traz as datas invertidas por erro de digitação (\"05/08 A 26/07\") e o\n// e-mail não pode reproduzir isso.\n//\n// Sem ano na origem, \"26/12 A 05/01\" é virada de ano legítima, não inversão. Das duas\n// leituras possíveis escolhemos a de PERÍODO MAIS CURTO — período de trabalho tem dias ou\n// semanas: 26/12→05/01 dá 10 dias e vence 05/01→26/12, que daria 355; e o par de fato\n// invertido \"05/08 A 26/07\" é corrigido pelo mesmo critério, sem regra especial.\nfunction diasEntre(diaA, mesA, diaB, mesB) {\n  const ini = Date.UTC(2001, mesA - 1, diaA);\n  let fim = Date.UTC(2001, mesB - 1, diaB);\n  if (fim < ini) fim = Date.UTC(2002, mesB - 1, diaB); // virou o ano\n  return (fim - ini) / 86400000;\n}\n\nfunction normalizarPeriodo(periodo) {\n  const txt = String(periodo || '');\n  const datas = txt.match(/\\d{1,2}\\s*\\/\\s*\\d{1,2}/g);\n  if (!datas || datas.length < 2) return txt;\n  const [a, b] = datas;\n  const pa = a.split('/').map((x) => parseInt(x, 10));\n  const pb = b.split('/').map((x) => parseInt(x, 10));\n  const comoEscrito = diasEntre(pa[0], pa[1], pb[0], pb[1]);\n  const invertido = diasEntre(pb[0], pb[1], pa[0], pa[1]);\n  if (invertido >= comoEscrito) return txt;\n  let n = 0;\n  return txt.replace(/\\d{1,2}\\s*\\/\\s*\\d{1,2}/g, () => (n++ === 0 ? b : a));\n}\n\n// Meses citados por um período. Um período que atravessa a virada do mês devolve OS DOIS\n// (spec 3.2.1) — não escolhe um. Já vem em ordem cronológica, porque roda sobre o período\n// normalizado.\nfunction mesesDoPeriodo(periodo) {\n  const datas = String(periodo || '').match(/\\d{1,2}\\s*\\/\\s*\\d{1,2}/g) || [];\n  const meses = [];\n  for (const d of datas) {\n    const mes = parseInt(d.split('/')[1], 10);\n    if (mes >= 1 && mes <= 12) {\n      const nome = MESES_ABREV_PT[mes - 1];\n      if (meses.indexOf(nome) === -1) meses.push(nome);\n    }\n  }\n  return meses;\n}\n\nfunction normalizar(t) { return t ? String(t).normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toLowerCase().trim() : ''; }\nfunction formatarDataBR(d) { return String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0') + '/' + d.getFullYear(); }\n// Data do \"ate o dia\" no CORPO: DD/MM, sem ano — formato diferente do vencimento\n// (DD/MM/AAAA), de proposito (3.5, confirmado com e-mail padrao de producao).\n// Nao confundir com formatarDataCurta, que e DD.MM com PONTO e vale pro ASSUNTO.\nfunction formatarDataDiaMes(d) { return String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0'); }\nfunction formatarDataCurta(d) { return String(d.getDate()).padStart(2,'0') + '.' + String(d.getMonth()+1).padStart(2,'0'); }\n// O apelido de projeto (apelidos.json) e so o identificador: \"AREP\", \"SMTC - S01 | REUNION\".\n// Ja o prefixo_assunto_pedido do perfil vem com \"| EMISSAO DE NF\" embutido (spec secao 6).\n// Como o assunto concatena a palavra do documento logo depois, usar o prefixo cru no\n// fallback duplicava o trecho (\"... | EMISSAO DE NF | EMISSAO DE NF | REF. ...\"). Nao\n// aparecia em execucao porque hoje o apelidos.json cobre os 3 projetos e o fallback nunca\n// roda — mas passaria a aparecer se um projeto sumisse do arquivo.\nfunction apelidoDoPerfil(perfil) {\n  return String((perfil && perfil.prefixo_assunto_pedido) || '')\n    .replace(/\\s*\\|\\s*EMISS[ÃA]O DE .*$/i, '')\n    .trim();\n}\n// Status Box que ainda representam \"antes do envio\". Só esses podem virar \"SOLICITADA MI\"\n// (spec 3.1.8): se a linha ja avancou (ENTREGUE MI, ENTREGUE MI R1...), a automacao nao pode\n// regredir um estagio alcancado manualmente.\nfunction statusBoxAindaAntesDoEnvio(statusBox) {\n  const s = String(statusBox || '').normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toUpperCase().trim();\n  return /^PROGRAMAR ATE/.test(s) || /^SOLICITAR/.test(s);\n}\n\n\n// D64 (33ª rodada): a automação NUNCA envia e-mail, em nenhum modo nem ambiente. Todo pedido é\n// criado como RASCUNHO, para a Michelle disparar. O PROGRAMAR ATÉ (3.1.8) só guarda a data-alvo;\n// não há mais envio na data. A coluna L é decidida depois que o Gmail devolve o rascunho (D65,\n// \"Capturar threadId (rascunho)\").\nfunction decidirAcaoEnvio(gatilho) {\n  return { acaoGmail: 'criar_rascunho', programado: gatilho === 'PROGRAMAR_ATE' };\n}\n\n// Deduplicação do pedido (3.1.6), em produção E em homolog desde a 33ª rodada (D65): a coluna L\n// passou a ser gravada na criação do rascunho; se essa gravação parar (portão, janela de\n// silêncio, trava, Passo 0, erro), a linha continua SOLICITAR/PROGRAMAR na planilha, mas o\n// cobrancas já tem o pedido. A chave é a mesma que o fluxo grava (retranca + '_L' + linha); um\n// e-mail de 2 blocos guarda também as \"linhas\" dele, para a 2ª linha não virar pedido novo.\nfunction pedidoJaRegistrado(cobrancas, retranca, linha) {\n  const prefixo = retranca + '_L';\n  for (const [chave, e] of Object.entries(cobrancas || {})) {\n    if (!e || !(e.threadId || e.draftId)) continue;\n    if (chave === prefixo + linha) return chave;\n    if (chave.indexOf(prefixo) === 0 && Array.isArray(e.linhas) && e.linhas.indexOf(linha) !== -1) return chave;\n  }\n  return null;\n}\nfunction agruparLinhasFornecedor(itens) {\n  const grupos = new Map();\n  for (const item of itens) {\n    const chave = [item.nota.projetoId, normalizar(item.nota.colunaH), item.nota.colunaG].join('|');\n    if (!grupos.has(chave)) grupos.set(chave, []);\n    grupos.get(chave).push(item);\n  }\n  return Array.from(grupos.values());\n}\nfunction ordenarBlocosGrupo(grupo) {\n  const recibos = grupo.filter((i) => i.documentoLinha === 'RECIBO');\n  const notas = grupo.filter((i) => i.documentoLinha === 'NOTA_FISCAL');\n  const semClassificacao = grupo.filter((i) => i.documentoLinha !== 'RECIBO' && i.documentoLinha !== 'NOTA_FISCAL');\n  return { blocosOrdenados: [...recibos, ...notas], semClassificacao };\n}\nfunction montarBlocoRecibo(numero, item, textoRef) {\n  return [\n    blocoEmitir(numero, 'RECIBO', item.nota.colunaK),\n    '<p>Ref. \"' + textoRef + '\"</p>',\n    '<p><b>Fornecedor:</b> ' + item.nota.colunaH + '</p>',\n    '<p><b>Período de</b> ' + normalizarPeriodo(item.periodo) + ' - ' + item.descricaoServicoOuLocacao + '</p>',\n    blocoDadosBancarios(),\n  ].join('\\n');\n}\nfunction montarBlocoNotaFiscal(numero, item, textoRef) {\n  return [\n    blocoEmitir(numero, 'NOTA FISCAL', item.nota.colunaK),\n    '<p>Ref. \"' + textoRef + '\"</p>',\n    '<p><b>Fornecedor:</b> ' + item.nota.colunaH + '</p>',\n    '<p><b>Serviço Prestado:</b> ' + item.descricaoServicoOuLocacao + '</p>',\n    '<p><b>Período de</b> ' + normalizarPeriodo(item.periodo) + '</p>',\n    blocoDadosBancarios(),\n  ].join('\\n');\n}\nfunction montarCorpoEmailFornecedor({ blocosOrdenados, temNotaFiscal, dataEnvio, dataVencimento, textoRef }) {\n  const blocos = blocosOrdenados.map((item, idx) => item.documentoLinha === 'RECIBO'\n    ? montarBlocoRecibo(idx + 1, item, textoRef)\n    : montarBlocoNotaFiscal(idx + 1, item, textoRef));\n  return envolverCorpo([\n    '<p>Olá! Tudo bem? 😊</p>',\n    paragrafoAbertura(dataEnvio, dataVencimento, temNotaFiscal ? 'recibo_e_nf' : 'fatura'),\n    TOMADOR_HTML,\n    blocos.join('\\n'),\n    IMPORTANTE_HTML,\n    AVISO_HTML,\n  ]);\n}\n// D63 (pendente de resposta da Michelle): mês do \"REF.\" do assunto do fornecedor.\n// Regra ATUAL, sem mudança: o mês da data de ENVIO. Isolado aqui para a troca ser num lugar só.\nfunction mesDoRefAssunto(dataEnvio) { return MESES_ABREV_PT[dataEnvio.getMonth()]; }\n\nfunction montarAssuntoFornecedor({ apelidoAtual, temNotaFiscal, parcela, dataEnvio, fornecedor }) {\n  const mes = mesDoRefAssunto(dataEnvio);\n  const palavraDocumento = temNotaFiscal ? 'EMISSÃO DE FATURA' : 'EMISSÃO DE RECIBO';\n  const ref = temNotaFiscal ? ('REF. LOCAÇÃO E SERVIÇOS - ' + mes) : ('REF. LOCAÇÃO - ' + mes + (parcela ? (' - ' + parcela) : ''));\n  return apelidoAtual + ' | ' + palavraDocumento + ' | ' + ref + ' | (ENVIAR ATÉ ' + formatarDataCurta(dataEnvio) + ') | ' + fornecedor;\n}\n\n// D59: o dia de Brasília (o container é UTC). Meio-dia local: getDate()/getMonth()/setDate()\n// dão o calendário de Brasília em qualquer fuso de máquina.\nconst hoje = dataBrasilia();\nconst itens = $input.all().map((i) => i.json);\nconst grupos = agruparLinhasFornecedor(itens);\nconst saida = [];\n\nfor (const grupo of grupos) {\n  const { blocosOrdenados, semClassificacao } = ordenarBlocosGrupo(grupo);\n\n  if (semClassificacao.length > 0) {\n    saida.push({ json: { ...semClassificacao[0], acao: 'alerta_situacao_nao_mapeada', situacaoNaoMapeada: 'Não foi possível classificar RECIBO/NOTA_FISCAL para ' + semClassificacao.length + ' linha(s) do fornecedor ' + grupo[0].nota.colunaH } });\n    continue;\n  }\n  if (blocosOrdenados.length === 0) continue;\n\n  // Gate de contrato POR GRUPO (secao 3.2.1, fechamento): se qualquer linha liberada, grupo inteiro libera.\n  const algumaLiberada = blocosOrdenados.some((b) => b.liberado);\n  if (!algumaLiberada) {\n    saida.push({ json: { ...blocosOrdenados[0], acao: 'pendente_contrato' } });\n    continue;\n  }\n  const linhasCorrigidas = blocosOrdenados.filter((b) => !b.liberado);\n\n  const primeiro = blocosOrdenados[0];\n  // Deduplicação do pedido (3.1.6; D65: também em homolog) — ver pedidoJaRegistrado(). Basta\n  // uma linha do grupo já ter pedido registrado.\n  const chaveDedup = blocosOrdenados.map((b) => pedidoJaRegistrado(primeiro.cobrancas, primeiro.perfil.retranca, b.nota.linha)).find(Boolean);\n  if (chaveDedup) {\n    saida.push({ json: { ...primeiro, acao: 'pedido_ja_criado', chaveCobranca: chaveDedup, threadIdExistente: (primeiro.cobrancas[chaveDedup] || {}).threadId || null } });\n    continue;\n  }\n\n  const temNotaFiscal = blocosOrdenados.some((b) => b.documentoLinha === 'NOTA_FISCAL');\n  const dataVencimento = new Date(primeiro.nota.colunaG);\n  const dataBase = primeiro.gatilho === 'PROGRAMAR_ATE' ? new Date(primeiro.dataProgramarAte) : hoje;\n  const dataEnvio = primeiro.gatilho === 'PROGRAMAR_ATE' ? (function(){ const dd = new Date(dataBase); dd.setDate(dd.getDate()+5); return dd; })() : dataBase;\n  const apelidoAtual = (primeiro.apelidos && primeiro.apelidos[primeiro.nota.projetoId] && primeiro.apelidos[primeiro.nota.projetoId].length) ? primeiro.apelidos[primeiro.nota.projetoId][primeiro.apelidos[primeiro.nota.projetoId].length - 1] : apelidoDoPerfil(primeiro.perfil);\n\n  const corpo = montarCorpoEmailFornecedor({ blocosOrdenados, temNotaFiscal, dataEnvio, dataVencimento, textoRef: primeiro.perfil.texto_ref });\n  let assunto = montarAssuntoFornecedor({ apelidoAtual, temNotaFiscal, parcela: primeiro.parcela, dataEnvio, fornecedor: primeiro.nota.colunaH });\n  if (primeiro.escalaUrgencia === 0) assunto = 'URG | ' + assunto;\n\n  // Ambiente troca APENAS destinatario e credencial (spec 7.4 e 3.5) — sem marca de\n  // ambiente no assunto nem no corpo. Ver comentario no \"Montar e-mail colaborador\".\n  const ehHomolog = primeiro.config && primeiro.config.ambiente === 'homolog';\n  const emailDestino = ehHomolog ? EMAIL_TESTE_HOMOLOG : primeiro.nota.colunaR;\n  const emailCopia = ehHomolog ? EMAIL_COPIA_HOMOLOG : EMAIL_COPIA_PRODUCAO;\n\n  const decisao = decidirAcaoEnvio(primeiro.gatilho);\n  const DATA_BASE_COBRANCA = primeiro.gatilho === 'PROGRAMAR_ATE' ? ymdBrasilia(new Date(primeiro.dataProgramarAte)) : ymdBrasilia(hoje);\n\n  saida.push({ json: {\n    ...primeiro,\n    acao: decisao.acaoGmail,\n    // PROGRAMAR ATE: viaja junto pro node que grava cobrancas.json (3.1.8)\n    dataAlvoEnvio: decisao.programado ? primeiro.dataProgramarAte : undefined,\n    // D61': data base da 1ª cobrança (3.1.1) — PROGRAMAR ATÉ: a data do PROGRAMAR ATÉ; SOLICITAR:\n    // o dia do pedido. Vai para o cobrancas na criação do pedido.\n    dataBaseCobranca: DATA_BASE_COBRANCA,\n    emailDestino,\n    emailCopia,\n    assunto,\n    corpoHtml: corpo,\n    marcadores: ['IA', MARCADOR_PROJETO[primeiro.nota.projetoId]],\n    chaveCobranca: primeiro.perfil.retranca + '_L' + primeiro.nota.linha,\n    linhasAfetadas: blocosOrdenados.map((b) => ({ projetoId: b.nota.projetoId, linha: b.nota.linha, atualizarColunaNPara: b.liberado ? b.atualizarColunaNPara : 'OK - ASSINADO' })),\n  } });\n\n  if (linhasCorrigidas.length > 0) {\n    saida.push({ json: {\n      acao: 'avisar_correcao_contrato',\n      fornecedor: primeiro.nota.colunaH,\n      linhasCorrigidas: linhasCorrigidas.map((b) => ({ linha: b.nota.linha, valor: b.nota.colunaK })),\n    } });\n  }\n}\n\nreturn saida;",
         "mode": "runOnceForAllItems"
       },
       "id": "n20l-montar-email-fornecedor",
@@ -421,7 +421,7 @@
     },
     {
       "parameters": {
-        "jsCode": "/* @@incluir scripts/lib/data_brasilia.js */\n// Avalia cobranca para linhas ja SOLICITADA MI (fluxo='monitoramento') - secao 3.1.1.\n// Schema de cobrancas.json ALINHADO ao spec.md: threadId, data_ultima_cobranca,\n// contagem_cobrancas, status_ciclo ('em_andamento'|'encerrado_sem_resposta'|'recebido').\n// D59: 'AAAA-MM-DD' (como o cobrancas grava) -> Date ao meio-dia local do mesmo dia.\nfunction dataDeYMD(s) { const m = /^(\\d{4})-(\\d{2})-(\\d{2})$/.exec(String(s || '')); return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12) : new Date(s); }\nfunction somarDias(data, dias) { const d = new Date(data); d.setDate(d.getDate() + dias); return d; }\nfunction diferencaDias(a, b) { const MS = 86400000; const u1 = Date.UTC(a.getFullYear(), a.getMonth(), a.getDate()); const u2 = Date.UTC(b.getFullYear(), b.getMonth(), b.getDate()); return Math.round((u1 - u2) / MS); }\nfunction avaliarCobranca({ hoje, dataProgramarAte, dataVencimentoNF, estadoAtual }) {\n  if (estadoAtual && estadoAtual.status_ciclo && estadoAtual.status_ciclo !== 'em_andamento') return { acao: 'nenhuma' };\n  // D41 (32ª rodada): sem entrada no cobrancas não há pedido registrado pela automação. Não\n  // encerra, não cobra e não grava nada: só relata, para a Michelle conferir à mão.\n  if (!estadoAtual) return { acao: 'monitoramento_sem_pedido' };\n  const fimDoCiclo = somarDias(dataVencimentoNF, -5);\n  if (diferencaDias(hoje, dataProgramarAte) < 0) return { acao: 'nenhuma' };\n  if (diferencaDias(hoje, fimDoCiclo) >= 0) {\n    return { acao: 'encerrar_sem_resposta', novoEstado: { threadId: estadoAtual ? estadoAtual.threadId : null, data_ultima_cobranca: estadoAtual ? estadoAtual.data_ultima_cobranca : null, contagem_cobrancas: estadoAtual ? estadoAtual.contagem_cobrancas : 0, status_ciclo: 'encerrado_sem_resposta' } };\n  }\n  if (estadoAtual.contagem_cobrancas === 0) {\n    const diaPrimeira = somarDias(dataProgramarAte, 1);\n    if (diferencaDias(hoje, diaPrimeira) >= 0) {\n      return { acao: 'cobrar', novoEstado: { threadId: estadoAtual.threadId, data_ultima_cobranca: ymdBrasilia(hoje), contagem_cobrancas: 1, status_ciclo: 'em_andamento' } };\n    }\n    return { acao: 'nenhuma' };\n  }\n  const dataUltima = dataDeYMD(estadoAtual.data_ultima_cobranca);\n  if (diferencaDias(hoje, dataUltima) >= 5) {\n    return { acao: 'cobrar', novoEstado: { threadId: estadoAtual.threadId, data_ultima_cobranca: ymdBrasilia(hoje), contagem_cobrancas: estadoAtual.contagem_cobrancas + 1, status_ciclo: 'em_andamento' } };\n  }\n  return { acao: 'nenhuma' };\n}\n\n// D59: o dia de Brasília (o container é UTC), ao meio-dia local.\nconst hoje = dataBrasilia();\nreturn $input.all().map((item) => {\n  const d = item.json;\n  const vencimento = new Date(d.nota.colunaG);\n  const chaveCobranca = d.perfil.retranca + '_L' + d.nota.linha;\n  const estadoAtual = d.cobrancas ? d.cobrancas[chaveCobranca] : undefined;\n  const dataProgramarAte = estadoAtual && estadoAtual.dataProgramarAteOriginal ? new Date(estadoAtual.dataProgramarAteOriginal) : hoje;\n  const resultado = avaliarCobranca({ hoje, dataProgramarAte, dataVencimentoNF: vencimento, estadoAtual });\n  const acao = resultado.acao === 'cobrar' ? (d.config.modo === 'automatico' ? 'cobrar_enviar' : 'cobrar_rascunho') : resultado.acao;\n  return { json: { ...d, acao, chaveCobranca, novoEstadoCobranca: resultado.novoEstado, threadId: estadoAtual ? estadoAtual.threadId : null } };\n});"
+        "jsCode": "/* @@incluir scripts/lib/data_brasilia.js */\n// Avalia cobranca para linhas ja SOLICITADA MI (fluxo='monitoramento') - secao 3.1.1.\n// Schema de cobrancas.json: threadId, draftId, data_base_cobranca, data_ultima_cobranca,\n// contagem_cobrancas, status_ciclo ('em_andamento'|'encerrado_sem_resposta'|'recebido'), e o\n// assunto, destinatários e marcadores do pedido (gravados na criação do pedido).\n//\n// D61' (33ª rodada), cadência do spec 3.1.1: data base = a data do PROGRAMAR ATÉ (PROGRAMAR) ou o\n// dia do pedido (SOLICITAR), gravada no cobrancas na criação do pedido; 1ª cobrança no dia\n// SEGUINTE à data base; depois a cada 5 dias; perto do vencimento (5 dias antes) encerra.\n// D64/D17: a cobrança é SEMPRE rascunho na mesma thread, em qualquer modo. Nunca altera a L.\n// D59: 'AAAA-MM-DD' (como o cobrancas grava) -> Date ao meio-dia local do mesmo dia.\nfunction dataDeYMD(s) { const m = /^(\\d{4})-(\\d{2})-(\\d{2})$/.exec(String(s || '')); return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12) : null; }\nfunction somarDias(data, dias) { const d = new Date(data); d.setDate(d.getDate() + dias); return d; }\nfunction diferencaDias(a, b) { const MS = 86400000; const u1 = Date.UTC(a.getFullYear(), a.getMonth(), a.getDate()); const u2 = Date.UTC(b.getFullYear(), b.getMonth(), b.getDate()); return Math.round((u1 - u2) / MS); }\n// Entradas antigas (antes da 33ª rodada) não têm data_base_cobranca: o PROGRAMAR ATÉ guardava a\n// data-alvo em dataAlvoEnvio (ISO). Sem nenhuma das duas, não se inventa data: relata.\nfunction dataBaseDaEntrada(e) {\n  if (e.data_base_cobranca) return dataDeYMD(e.data_base_cobranca);\n  if (e.dataAlvoEnvio) return dataDeYMD(String(e.dataAlvoEnvio).slice(0, 10));\n  return null;\n}\nfunction avaliarCobranca({ hoje, dataVencimentoNF, estadoAtual }) {\n  if (estadoAtual && estadoAtual.status_ciclo && estadoAtual.status_ciclo !== 'em_andamento') return { acao: 'nenhuma' };\n  // D41 (32ª rodada): sem entrada no cobrancas não há pedido registrado pela automação. Não\n  // encerra, não cobra e não grava nada: só relata, para a Michelle conferir à mão.\n  if (!estadoAtual) return { acao: 'monitoramento_sem_pedido' };\n  const fimDoCiclo = somarDias(dataVencimentoNF, -5);\n  const dataBase = dataBaseDaEntrada(estadoAtual);\n  if (dataBase && diferencaDias(hoje, dataBase) < 0) return { acao: 'nenhuma' };\n  if (diferencaDias(hoje, fimDoCiclo) >= 0) {\n    return { acao: 'encerrar_sem_resposta', novoEstado: { ...estadoAtual, status_ciclo: 'encerrado_sem_resposta' } };\n  }\n  if (!dataBase) return { acao: 'cobranca_nao_criada', motivo: 'sem data base da 1ª cobrança no cobrancas' };\n  const contagem = estadoAtual.contagem_cobrancas || 0;\n  const devida = contagem === 0\n    ? diferencaDias(hoje, somarDias(dataBase, 1)) >= 0\n    : (dataDeYMD(estadoAtual.data_ultima_cobranca) ? diferencaDias(hoje, dataDeYMD(estadoAtual.data_ultima_cobranca)) >= 5 : false);\n  if (!devida) return { acao: 'nenhuma' };\n  // Sem a conversa do pedido não há cobrança \"na mesma thread\": não cria, não soma, relata.\n  if (!estadoAtual.threadId) return { acao: 'cobranca_nao_criada', motivo: 'sem threadId do pedido' };\n  if (!estadoAtual.assunto || !estadoAtual.emailDestino) return { acao: 'cobranca_nao_criada', motivo: 'sem o assunto ou o destinatário do pedido no cobrancas (entrada antiga)' };\n  return { acao: 'cobrar_rascunho', novoEstado: { ...estadoAtual, data_ultima_cobranca: ymdBrasilia(hoje), contagem_cobrancas: contagem + 1, status_ciclo: 'em_andamento' } };\n}\n\n// Marcadores do pedido (spec 3.1.2): os gravados na entrada; numa entrada antiga, IA + o do projeto.\nconst MARCADOR_PROJETO_COBRANCA = { REUNION: 'REUNION - PEDIDO DE NOTAS', SOFT_PRE: 'SOFT PRE - PEDIDO DE NOTAS', AREP: 'AREP - PEDIDO DE NOTAS' };\n\n// D59: o dia de Brasília (o container é UTC), ao meio-dia local.\nconst hoje = dataBrasilia();\nreturn $input.all().map((item) => {\n  const d = item.json;\n  const vencimento = new Date(d.nota.colunaG);\n  const chaveCobranca = d.perfil.retranca + '_L' + d.nota.linha;\n  const estadoAtual = d.cobrancas ? d.cobrancas[chaveCobranca] : undefined;\n  const e = estadoAtual || {};\n  const resultado = avaliarCobranca({ hoje, dataVencimentoNF: vencimento, estadoAtual });\n  return { json: {\n    ...d,\n    acao: resultado.acao,\n    motivoCobranca: resultado.motivo,\n    chaveCobranca,\n    novoEstadoCobranca: resultado.novoEstado,\n    threadId: e.threadId || null,\n    assuntoCobranca: e.assunto || null,\n    emailDestinoCobranca: e.emailDestino || null,\n    emailCopiaCobranca: e.emailCopia || null,\n    marcadores: (Array.isArray(e.marcadores) && e.marcadores.length) ? e.marcadores : ['IA', MARCADOR_PROJETO_COBRANCA[d.nota.projetoId]].filter(Boolean),\n  } };\n});"
       },
       "id": "n20b-avaliar-cobranca",
       "name": "Avaliar cobrança",
@@ -457,38 +457,6 @@
                 "conditions": [
                   {
                     "leftValue": "={{ $json.acao }}",
-                    "rightValue": "enviar_direto",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
-                ]
-              },
-              "renameOutput": true,
-              "outputKey": "enviar_direto"
-            },
-            {
-              "conditions": {
-                "conditions": [
-                  {
-                    "leftValue": "={{ $json.acao }}",
-                    "rightValue": "enviar_programado",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
-                ]
-              },
-              "renameOutput": true,
-              "outputKey": "enviar_programado"
-            },
-            {
-              "conditions": {
-                "conditions": [
-                  {
-                    "leftValue": "={{ $json.acao }}",
                     "rightValue": "cobrar_rascunho",
                     "operator": {
                       "type": "string",
@@ -499,22 +467,6 @@
               },
               "renameOutput": true,
               "outputKey": "cobrar_rascunho"
-            },
-            {
-              "conditions": {
-                "conditions": [
-                  {
-                    "leftValue": "={{ $json.acao }}",
-                    "rightValue": "cobrar_enviar",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
-                ]
-              },
-              "renameOutput": true,
-              "outputKey": "cobrar_enviar"
             },
             {
               "conditions": {
@@ -619,7 +571,7 @@
     },
     {
       "parameters": {
-        "jsCode": "/* @@incluir scripts/lib/data_brasilia.js */\n// Consolida: (a) mudancas de coluna N/L a escrever no Box, (b) novo cobrancas.json,\n// (c) resumo pro relatorio (incl. lacunas de informacao, correcoes de contrato e alertas\n// de situacao nao mapeada), (d) registro no log diario pro /resumo (secao 7.3).\n// Suporta itens de 1 linha (colaborador/cobranca/pendente) e itens de GRUPO fornecedor\n// (varias linhas por item, campo linhasAfetadas — secao 3.2.1).\n\nconst itens = $input.all().map((i) => i.json);\n\nconst mudancasColunaN = [];\nconst mudancasColunaL = [];\n\nfor (const d of itens) {\n  if (Array.isArray(d.linhasAfetadas)) {\n    for (const la of d.linhasAfetadas) {\n      if (la.atualizarColunaNPara) mudancasColunaN.push({ projetoId: la.projetoId, linha: la.linha, valor: la.atualizarColunaNPara });\n      if (d.atualizarColunaL && d.novoValorColunaL) mudancasColunaL.push({ projetoId: la.projetoId, linha: la.linha, valor: d.novoValorColunaL });\n    }\n    continue;\n  }\n  if (d.atualizarColunaNPara) mudancasColunaN.push({ projetoId: d.nota.projetoId, linha: d.nota.linha, valor: d.atualizarColunaNPara });\n  if (d.atualizarColunaL && d.novoValorColunaL) mudancasColunaL.push({ projetoId: d.nota.projetoId, linha: d.nota.linha, valor: d.novoValorColunaL });\n}\n\nconst cobrancasAtualizadas = { ...(itens.find((d) => d.cobrancas) ? itens.find((d) => d.cobrancas).cobrancas : {}) };\nfor (const d of itens) {\n  if (d.chaveCobranca && d.novoEstadoCobranca) cobrancasAtualizadas[d.chaveCobranca] = d.novoEstadoCobranca;\n}\n\nconst alertasEncerramento = itens.filter((d) => d.acao === 'encerrar_sem_resposta');\nconst alertasSituacaoNaoMapeada = itens.filter((d) => d.acao === 'alerta_situacao_nao_mapeada');\nconst correcoesContrato = itens.filter((d) => d.acao === 'avisar_correcao_contrato');\nconst rascunhosCriados = itens.filter((d) => d.acao === 'criar_rascunho' || d.acao === 'cobrar_rascunho');\nconst enviosDiretos = itens.filter((d) => d.acao === 'enviar_direto' || d.acao === 'cobrar_enviar');\nconst pendentesContrato = itens.filter((d) => d.acao === 'pendente_contrato');\nconst comLacunaInformacao = itens.filter((d) => d.temLacunaInformacao);\n// D53 (c): marcador faltando ou erro ao aplicar só relata\nconst infoMarcadores = $('Mapear marcadores').first().json || {};\nconst marcadoresNaoEncontrados = [...new Set(itens.flatMap((d) => d.marcadoresNaoEncontrados || []))];\nconst errosMarcadores = itens.filter((d) => d.erroMarcadores);\n// D41: SOLICITADA MI sem pedido registrado\nconst semPedido = itens.filter((d) => d.acao === 'monitoramento_sem_pedido');\n// D63: REF. do assunto duvidoso -> sem rascunho, conferir à mão\nconst conferirRef = itens.filter((d) => d.acao === 'conferir_ref_mao');\n\nconst resumo = {\n  rascunhosCriados: rascunhosCriados.length,\n  enviosDiretos: enviosDiretos.length,\n  pendentesContrato: pendentesContrato.length,\n  comLacunaInformacao: comLacunaInformacao.length,\n  alertasSituacaoNaoMapeada: alertasSituacaoNaoMapeada.length,\n  correcoesContrato: correcoesContrato.length,\n  alertasEncerramento: alertasEncerramento.map((a) => ({ colaboradorOuFornecedor: a.nomeColaborador || (a.nota && a.nota.colunaH), projetoId: a.nota && a.nota.projetoId })),\n  marcadoresNaoEncontrados,\n  errosMarcadores: errosMarcadores.length,\n  erroListagemMarcadores: infoMarcadores.erroListagem || null,\n  linhasSemPedido: semPedido.map((d) => 'L' + (d.nota && d.nota.linha)),\n  conferirRefMao: conferirRef.flatMap((d) => d.motivosConferirRef || []),\n};\n\nreturn [{ json: {\n  mudancasColunaN, mudancasColunaL, cobrancasAtualizadas, resumo,\n  // timestamp = o instante (ISO, UTC); data = o dia de Brasília (D59)\n  logEntry: { timestamp: new Date().toISOString(), data: hojeBrasilia(), fase: 'fase1_solicitacao_nota', resumo },\n} }];"
+        "jsCode": "/* @@incluir scripts/lib/data_brasilia.js */\n// Consolida: (a) mudancas de coluna N/L a escrever no Box, (b) novo cobrancas.json,\n// (c) resumo pro relatorio (incl. lacunas de informacao, correcoes de contrato e alertas\n// de situacao nao mapeada), (d) registro no log diario pro /resumo (secao 7.3).\n// Suporta itens de 1 linha (colaborador/cobranca/pendente) e itens de GRUPO fornecedor\n// (varias linhas por item, campo linhasAfetadas — secao 3.2.1).\n\nconst itens = $input.all().map((i) => i.json);\n\nconst mudancasColunaN = [];\nconst mudancasColunaL = [];\n\nfor (const d of itens) {\n  if (Array.isArray(d.linhasAfetadas)) {\n    for (const la of d.linhasAfetadas) {\n      if (la.atualizarColunaNPara) mudancasColunaN.push({ projetoId: la.projetoId, linha: la.linha, valor: la.atualizarColunaNPara });\n      if (d.atualizarColunaL && d.novoValorColunaL) mudancasColunaL.push({ projetoId: la.projetoId, linha: la.linha, valor: d.novoValorColunaL });\n    }\n    continue;\n  }\n  if (d.atualizarColunaNPara) mudancasColunaN.push({ projetoId: d.nota.projetoId, linha: d.nota.linha, valor: d.atualizarColunaNPara });\n  if (d.atualizarColunaL && d.novoValorColunaL) mudancasColunaL.push({ projetoId: d.nota.projetoId, linha: d.nota.linha, valor: d.novoValorColunaL });\n}\n\nconst cobrancasAtualizadas = { ...(itens.find((d) => d.cobrancas) ? itens.find((d) => d.cobrancas).cobrancas : {}) };\nfor (const d of itens) {\n  if (d.chaveCobranca && d.novoEstadoCobranca) cobrancasAtualizadas[d.chaveCobranca] = d.novoEstadoCobranca;\n}\n\nconst alertasEncerramento = itens.filter((d) => d.acao === 'encerrar_sem_resposta');\nconst alertasSituacaoNaoMapeada = itens.filter((d) => d.acao === 'alerta_situacao_nao_mapeada');\nconst correcoesContrato = itens.filter((d) => d.acao === 'avisar_correcao_contrato');\nconst rascunhosCriados = itens.filter((d) => d.acao === 'criar_rascunho' || d.acao === 'cobrar_rascunho');\n// D64 (33ª rodada): a automação nunca envia; o Relatório continua mostrando \"Envios diretos: 0\".\nconst enviosDiretos = [];\nconst pendentesContrato = itens.filter((d) => d.acao === 'pendente_contrato');\nconst comLacunaInformacao = itens.filter((d) => d.temLacunaInformacao);\n// D53 (c): marcador faltando ou erro ao aplicar só relata\nconst infoMarcadores = $('Mapear marcadores').first().json || {};\nconst marcadoresNaoEncontrados = [...new Set(itens.flatMap((d) => d.marcadoresNaoEncontrados || []))];\nconst errosMarcadores = itens.filter((d) => d.erroMarcadores);\n// D41: SOLICITADA MI sem pedido registrado\nconst semPedido = itens.filter((d) => d.acao === 'monitoramento_sem_pedido');\n// D63: REF. do assunto duvidoso -> sem rascunho, conferir à mão\nconst conferirRef = itens.filter((d) => d.acao === 'conferir_ref_mao');\n// D65/D17: rascunho sem id, pedido sem threadId (sem L) e cobrança não criada: só relata\nconst linhaDe = (d) => 'L' + (d.nota && d.nota.linha);\nconst rascunhosSemId = itens.filter((d) => d.acao === 'rascunho_sem_id' || d.acao === 'cobranca_rascunho_sem_id');\nconst pedidosSemThread = itens.filter((d) => d.pedidoSemThread);\nconst cobrancasNaoCriadas = itens.filter((d) => d.acao === 'cobranca_nao_criada');\n\nconst resumo = {\n  rascunhosCriados: rascunhosCriados.length,\n  enviosDiretos: enviosDiretos.length,\n  pendentesContrato: pendentesContrato.length,\n  comLacunaInformacao: comLacunaInformacao.length,\n  alertasSituacaoNaoMapeada: alertasSituacaoNaoMapeada.length,\n  correcoesContrato: correcoesContrato.length,\n  alertasEncerramento: alertasEncerramento.map((a) => ({ colaboradorOuFornecedor: a.nomeColaborador || (a.nota && a.nota.colunaH), projetoId: a.nota && a.nota.projetoId })),\n  marcadoresNaoEncontrados,\n  errosMarcadores: errosMarcadores.length,\n  erroListagemMarcadores: infoMarcadores.erroListagem || null,\n  linhasSemPedido: semPedido.map((d) => 'L' + (d.nota && d.nota.linha)),\n  conferirRefMao: conferirRef.flatMap((d) => d.motivosConferirRef || []),\n  rascunhosSemId: rascunhosSemId.map(linhaDe),\n  pedidosSemThread: pedidosSemThread.map(linhaDe),\n  cobrancasNaoCriadas: cobrancasNaoCriadas.map((d) => linhaDe(d) + ': ' + (d.motivoCobranca || '?')),\n};\n\nreturn [{ json: {\n  mudancasColunaN, mudancasColunaL, cobrancasAtualizadas, resumo,\n  // timestamp = o instante (ISO, UTC); data = o dia de Brasília (D59)\n  logEntry: { timestamp: new Date().toISOString(), data: hojeBrasilia(), fase: 'fase1_solicitacao_nota', resumo },\n} }];"
       },
       "id": "n29-consolidar",
       "name": "Consolidar mudanças e cobrancas.json",
@@ -674,7 +626,7 @@
     {
       "parameters": {
         "chatId": "749277207",
-        "text": "={{ /* escapa-html */ String('📋 Relatório Fase 1 — Solicitação de Nota\\n\\nRascunhos criados: ' + ($json.resumo?.rascunhosCriados ?? '?') + '\\nEnvios diretos: ' + ($json.resumo?.enviosDiretos ?? '?') + '\\nPendentes de contrato: ' + ($json.resumo?.pendentesContrato ?? '?') + '\\nCom lacuna de informação (FALTA INFORMAÇÃO): ' + ($json.resumo?.comLacunaInformacao ?? '?') + '\\nCorreções de contrato aplicadas: ' + ($json.resumo?.correcoesContrato ?? '?') + '\\nSituações não mapeadas (alertadas): ' + ($json.resumo?.alertasSituacaoNaoMapeada ?? '?') + '\\nCiclos encerrados sem resposta: ' + ($json.resumo?.alertasEncerramento?.length ?? '?') + (($json.resumo?.conferirRefMao || []).length ? '\\nSem rascunho, conferir à mão o REF. do assunto: ' + $json.resumo.conferirRefMao.join(' | ') : '') + (($json.resumo?.linhasSemPedido || []).length ? '\\nLinhas SOLICITADA MI sem pedido registrado (conferir à mão): ' + $json.resumo.linhasSemPedido.join(', ') : '') + (($json.resumo?.marcadoresNaoEncontrados || []).length ? '\\nMarcadores não encontrados no Gmail: ' + $json.resumo.marcadoresNaoEncontrados.join(', ') : '') + ($json.resumo?.errosMarcadores ? '\\nE-mails criados sem marcador (erro ao aplicar): ' + $json.resumo.errosMarcadores : '') + ($json.resumo?.erroListagemMarcadores ? '\\nNão consegui listar os marcadores do Gmail: ' + $json.resumo.erroListagemMarcadores : '') + ($json.resumo?.semCandidatas ? '\\n\\n0 candidatas nesta passada (' + ($json.resumo.fonteId || '?') + ')' : '') ?? \"\").replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') }}",
+        "text": "={{ /* escapa-html */ String('📋 Relatório Fase 1 — Solicitação de Nota\\n\\nRascunhos criados: ' + ($json.resumo?.rascunhosCriados ?? '?') + '\\nEnvios diretos: ' + ($json.resumo?.enviosDiretos ?? '?') + '\\nPendentes de contrato: ' + ($json.resumo?.pendentesContrato ?? '?') + '\\nCom lacuna de informação (FALTA INFORMAÇÃO): ' + ($json.resumo?.comLacunaInformacao ?? '?') + '\\nCorreções de contrato aplicadas: ' + ($json.resumo?.correcoesContrato ?? '?') + '\\nSituações não mapeadas (alertadas): ' + ($json.resumo?.alertasSituacaoNaoMapeada ?? '?') + '\\nCiclos encerrados sem resposta: ' + ($json.resumo?.alertasEncerramento?.length ?? '?') + (($json.resumo?.rascunhosSemId || []).length ? '\\nGmail não devolveu o id do rascunho (conferir à mão; coluna L não gravada): ' + $json.resumo.rascunhosSemId.join(', ') : '') + (($json.resumo?.pedidosSemThread || []).length ? '\\nRascunho de pedido sem threadId (coluna L não gravada; conferir à mão): ' + $json.resumo.pedidosSemThread.join(', ') : '') + (($json.resumo?.cobrancasNaoCriadas || []).length ? '\\nCobrança não criada (conferir à mão): ' + $json.resumo.cobrancasNaoCriadas.join(' | ') : '') + (($json.resumo?.conferirRefMao || []).length ? '\\nSem rascunho, conferir à mão o REF. do assunto: ' + $json.resumo.conferirRefMao.join(' | ') : '') + (($json.resumo?.linhasSemPedido || []).length ? '\\nLinhas SOLICITADA MI sem pedido registrado (conferir à mão): ' + $json.resumo.linhasSemPedido.join(', ') : '') + (($json.resumo?.marcadoresNaoEncontrados || []).length ? '\\nMarcadores não encontrados no Gmail: ' + $json.resumo.marcadoresNaoEncontrados.join(', ') : '') + ($json.resumo?.errosMarcadores ? '\\nE-mails criados sem marcador (erro ao aplicar): ' + $json.resumo.errosMarcadores : '') + ($json.resumo?.erroListagemMarcadores ? '\\nNão consegui listar os marcadores do Gmail: ' + $json.resumo.erroListagemMarcadores : '') + ($json.resumo?.semCandidatas ? '\\n\\n0 candidatas nesta passada (' + ($json.resumo.fonteId || '?') + ')' : '') ?? \"\").replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') }}",
         "additionalFields": {
           "appendAttribution": false,
           "parse_mode": "HTML"
@@ -725,7 +677,7 @@
     },
     {
       "parameters": {
-        "jsCode": "/* @@incluir scripts/lib/data_brasilia.js */\n// Monta a 1a entrada de cobrancas.json (secao 3.1.1: \"o threadId e gravado assim que o\n// e-mail de pedido e criado\"). D53 (c): o payload ja vem no proprio item (do 'Restaurar payload\n// (rascunho pedido)' ou da saida 1 do IF de marcadores, juntos no Merge), sem parear por indice.\nreturn $input.all().map((item) => {\n  const d = item.json || {};\n  return { json: {\n    ...d,\n    novoEstadoCobranca: {\n      threadId: d.threadIdGmail || null,\n      // PROGRAMAR ATE (3.1.8): o rascunho foi criado antes da data-alvo; guardamos o id e a\n      // data pra saber, nas proximas execucoes, que ja existe rascunho e quando envia-lo.\n      draftId: d.draftId || null,\n      dataAlvoEnvio: d.dataAlvoEnvio || null,\n      data_ultima_cobranca: hojeBrasilia(), // D59: dia de Brasília\n      contagem_cobrancas: 0,\n      status_ciclo: 'em_andamento',\n    },\n  } };\n});"
+        "jsCode": "/* @@incluir scripts/lib/data_brasilia.js */\n// Monta a 1a entrada de cobrancas.json (secao 3.1.1: \"o threadId e gravado assim que o e-mail de\n// pedido e criado\"). D53 (c): o payload ja vem no proprio item, sem parear por indice.\n//\n// D65 (33ª rodada): rascunho criado = pedido feito. A coluna L vira \"SOLICITADA MI\" em TODAS as\n// linhas do e-mail (linhasAfetadas), em qualquer modo e ambiente, SÓ se o Gmail devolveu o id do\n// rascunho E o threadId. Sem id: não registra pedido, não grava a L e relata. Sem threadId:\n// registra o pedido (para não duplicar), não grava a L e relata. Enviar o rascunho é da Michelle.\n// D61': a data base da 1ª cobrança vai para o cobrancas aqui; e também o assunto, os\n// destinatários e os marcadores do pedido, que a cobrança (rascunho na mesma thread) reusa.\nreturn $input.all().map((item) => {\n  const d = item.json || {};\n  const draftId = d.draftId || null;\n  const threadId = d.threadIdGmail || null;\n  if (!draftId) {\n    return { json: { ...d, acao: 'rascunho_sem_id', atualizarColunaL: false, novoValorColunaL: undefined, novoEstadoCobranca: undefined } };\n  }\n  return { json: {\n    ...d,\n    atualizarColunaL: !!threadId,\n    novoValorColunaL: threadId ? 'SOLICITADA MI' : undefined,\n    pedidoSemThread: !threadId,\n    novoEstadoCobranca: {\n      threadId,\n      draftId,\n      // PROGRAMAR ATE (3.1.8): a data-alvo, só para registro (não há mais envio na data: D64)\n      dataAlvoEnvio: d.dataAlvoEnvio || null,\n      data_base_cobranca: d.dataBaseCobranca || null,\n      gatilho: d.gatilho || null,\n      linhas: (d.linhasAfetadas || []).map((la) => la.linha),\n      assunto: d.assunto || null,\n      emailDestino: d.emailDestino || null,\n      emailCopia: d.emailCopia || null,\n      marcadores: d.marcadores || [],\n      data_ultima_cobranca: hojeBrasilia(), // D59: dia de Brasília\n      contagem_cobrancas: 0,\n      status_ciclo: 'em_andamento',\n    },\n  } };\n});"
       },
       "id": "n_capturar_thread_rascunho",
       "name": "Capturar threadId (rascunho)",
@@ -736,20 +688,6 @@
         20
       ],
       "notes": "Lê a resposta do Gmail via $('Gmail — Criar rascunho (pedido)') porque a entrada direta passou a ser a resposta do node de marcadores. Formato de resposta confirmar em homolog."
-    },
-    {
-      "parameters": {
-        "jsCode": "/* @@incluir scripts/lib/data_brasilia.js */\n// Monta a 1a entrada de cobrancas.json (secao 3.1.1: \"o threadId e gravado assim que o\n// e-mail de pedido e criado\"). D53 (c): o payload ja vem no proprio item (do 'Restaurar payload\n// (envio pedido)' ou da saida 1 do IF de marcadores, juntos no Merge), sem parear por indice.\nreturn $input.all().map((item) => {\n  const d = item.json || {};\n  return { json: {\n    ...d,\n    novoEstadoCobranca: {\n      threadId: d.threadIdGmail || null,\n      data_ultima_cobranca: hojeBrasilia(), // D59: dia de Brasília\n      contagem_cobrancas: 0,\n      status_ciclo: 'em_andamento',\n    },\n  } };\n});"
-      },
-      "id": "n_capturar_thread_envio",
-      "name": "Capturar threadId (envio direto)",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        5700,
-        140
-      ],
-      "notes": "Lê a resposta do Gmail via $('Gmail — Enviar direto (automático)') porque a entrada direta passou a ser a resposta do node de marcadores. Formato de resposta confirmar em homolog."
     },
     {
       "parameters": {
@@ -1318,48 +1256,19 @@
     },
     {
       "parameters": {
-        "resource": "message",
-        "operation": "send",
-        "sendTo": "={{ $json.emailDestino }}",
-        "subject": "={{ $json.assunto }}",
-        "message": "={{ $json.corpoHtml }}",
+        "resource": "draft",
+        "operation": "create",
+        "subject": "={{ $json.assuntoCobranca }}",
+        "message": "={{ 'Bom dia! Reforçando o pedido de emissão da nota fiscal — ' + $json.assuntoCobranca }}",
         "options": {
-          "appendAttribution": false,
-          "ccList": "={{ $json.emailCopia }}"
-        },
-        "emailType": "html"
-      },
-      "id": "n23-gmail-enviar-direto",
-      "name": "Gmail — Enviar direto (automático)",
-      "type": "n8n-nodes-base.gmail",
-      "typeVersion": 2.1,
-      "position": [
-        5440,
-        80
-      ],
-      "credentials": {
-        "gmailOAuth2": {
-          "__porAmbiente": {
-            "homolog": "Gmail - Homolog (Claudio Pessoal)",
-            "producao": "Gmail account"
-          }
-        }
-      },
-      "notes": "Só roda quando MODO_EXECUCAO=automatico E gatilho=SOLICITAR (envio imediato)."
-    },
-    {
-      "parameters": {
-        "resource": "message",
-        "operation": "reply",
-        "messageId": "={{ $json.nota.threadId }}",
-        "message": "={{ 'Bom dia! Reforçando o pedido de emissão da nota fiscal — ' + $json.assunto }}",
-        "options": {
-          "appendAttribution": false
+          "threadId": "={{ $json.threadId }}",
+          "sendTo": "={{ $json.emailDestinoCobranca }}",
+          "ccList": "={{ $json.emailCopiaCobranca }}"
         },
         "emailType": "html"
       },
       "id": "n25-gmail-cobranca-rascunho",
-      "name": "Gmail — Cobrança (rascunho, responde Todos)",
+      "name": "Gmail — Cobrança (rascunho na thread)",
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.1,
       "position": [
@@ -1374,36 +1283,7 @@
           }
         }
       },
-      "notes": "ASSUNÇÃO: nota.threadId precisa vir preenchido a partir da thread original de pedido (não temos, nesta entrega, o mecanismo que grava o threadId no momento da criação do rascunho — próxima iteração deve gravar o threadId retornado por n22 em cobrancas.json pra permitir a resposta na MESMA thread, seção 3.1.1). Por ora este node está estruturalmente correto mas depende desse dado existir."
-    },
-    {
-      "parameters": {
-        "resource": "message",
-        "operation": "reply",
-        "messageId": "={{ $json.nota.threadId }}",
-        "message": "={{ 'Bom dia! Reforçando o pedido de emissão da nota fiscal — ' + $json.assunto }}",
-        "options": {
-          "replyToSenderOnly": false,
-          "appendAttribution": false
-        },
-        "emailType": "html"
-      },
-      "id": "n26-gmail-cobranca-enviar",
-      "name": "Gmail — Cobrança (enviar, automático)",
-      "type": "n8n-nodes-base.gmail",
-      "typeVersion": 2.1,
-      "position": [
-        5440,
-        400
-      ],
-      "credentials": {
-        "gmailOAuth2": {
-          "__porAmbiente": {
-            "homolog": "Gmail - Homolog (Claudio Pessoal)",
-            "producao": "Gmail account"
-          }
-        }
-      }
+      "notes": "D17 + D64 (33ª rodada): cobrança como RASCUNHO na mesma conversa do pedido (threadId), com o assunto e os destinatários do pedido. Nunca envia."
     },
     {
       "parameters": {
@@ -1477,32 +1357,6 @@
         "messageId": "={{ $json.messageId }}",
         "labelIds": "={{ $json.labelIdsAplicar }}"
       },
-      "id": "gmail-marcar-envio-pedido",
-      "name": "Gmail — Aplicar marcadores (envio pedido)",
-      "type": "n8n-nodes-base.gmail",
-      "typeVersion": 2.1,
-      "position": [
-        5560,
-        140
-      ],
-      "credentials": {
-        "gmailOAuth2": {
-          "__porAmbiente": {
-            "homolog": "Gmail - Homolog (Claudio Pessoal)",
-            "producao": "Gmail account"
-          }
-        }
-      },
-      "notes": "Aplica os marcadores (spec 3.1.2: \"IA\" + marcador do projeto). D53 (c): só roda com pelo menos 1 id (IF antes) e continua em erro; o erro vai ao Relatório e não para o cobrancas nem o log.",
-      "onError": "continueRegularOutput"
-    },
-    {
-      "parameters": {
-        "resource": "message",
-        "operation": "addLabels",
-        "messageId": "={{ $json.messageId }}",
-        "labelIds": "={{ $json.labelIdsAplicar }}"
-      },
       "id": "gmail-marcar-cobranca-rascunho",
       "name": "Gmail — Aplicar marcadores (cobrança rascunho)",
       "type": "n8n-nodes-base.gmail",
@@ -1510,32 +1364,6 @@
       "position": [
         5560,
         380
-      ],
-      "credentials": {
-        "gmailOAuth2": {
-          "__porAmbiente": {
-            "homolog": "Gmail - Homolog (Claudio Pessoal)",
-            "producao": "Gmail account"
-          }
-        }
-      },
-      "notes": "Aplica os marcadores (spec 3.1.2: \"IA\" + marcador do projeto). D53 (c): só roda com pelo menos 1 id (IF antes) e continua em erro; o erro vai ao Relatório e não para o cobrancas nem o log.",
-      "onError": "continueRegularOutput"
-    },
-    {
-      "parameters": {
-        "resource": "message",
-        "operation": "addLabels",
-        "messageId": "={{ $json.messageId }}",
-        "labelIds": "={{ $json.labelIdsAplicar }}"
-      },
-      "id": "gmail-marcar-cobranca-envio",
-      "name": "Gmail — Aplicar marcadores (cobrança envio)",
-      "type": "n8n-nodes-base.gmail",
-      "typeVersion": 2.1,
-      "position": [
-        5560,
-        460
       ],
       "credentials": {
         "gmailOAuth2": {
@@ -1559,19 +1387,6 @@
       "position": [
         5680,
         380
-      ]
-    },
-    {
-      "parameters": {
-        "jsCode": "// A resposta do addLabels (ou o erro, com \"continuar em erro\") não carrega o payload (acao,\n// chaveCobranca, novoEstadoCobranca...). Restaura pelo índice contra a SAÍDA 0 do IF anterior,\n// que são exatamente os itens que foram ao Aplicar, na mesma ordem (D53 c).\nconst enviados = $('IF — Há marcador a aplicar? (cobrança envio)').all(0).map((i) => i.json);\nreturn $input.all().map((item, i) => {\n  const r = item.json || {};\n  const erro = r.error ? String(r.error.message || r.error).slice(0, 300) : null;\n  const d = enviados[i] || {};\n  return { json: { ...d, marcadoresAplicados: erro ? [] : (d.labelIdsAplicar || []), erroMarcadores: erro } };\n});"
-      },
-      "id": "restaurar-payload-cobranca-envio",
-      "name": "Restaurar payload (cobrança envio)",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        5680,
-        460
       ]
     },
     {
@@ -1716,19 +1531,6 @@
       }
     },
     {
-      "id": "casar-envio-pedido",
-      "name": "Casar resposta do Gmail (envio pedido)",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        5450,
-        250
-      ],
-      "parameters": {
-        "jsCode": "// A resposta do Gmail substitui o json do item pelos ids do rascunho/mensagem, levando\n// embora o payload do pedido (marcadores, acao, chaveCobranca...). Aqui os dois sao casados.\n//\n// O pareamento e por indice contra a SAIDA 1 do Switch — e nao contra\n// $('Merge — rotas...').all()[i]. O Switch DIVIDE os itens entre as saidas, entao o indice\n// desta ramificacao nao corresponde ao indice no Merge: com um mix de acoes na mesma\n// execucao, a correlacao antiga devolvia o payload de OUTRA linha.\nconst pedidos = $('Switch — ação').all(1).map((i) => i.json);\n\n// D53 (c): os ids a aplicar saem daqui (só os que o Gmail tem); os nomes que faltam vão ao Relatório.\nconst mapaMarcadores = ($('Mapear marcadores').first().json || {}).mapa || {};\n\nreturn $input.all().map((item, i) => {\n  const j = item.json || {};\n  const msg = j.message || {};\n  const nomesMarcadores = ((pedidos[i] || {}).marcadores) || [];\n  return { json: {\n    ...(pedidos[i] || {}),\n    labelIdsAplicar: nomesMarcadores.map((nome) => mapaMarcadores[nome]).filter(Boolean),\n    marcadoresNaoEncontrados: nomesMarcadores.filter((nome) => !mapaMarcadores[nome]),\n    draftId: j.id || null,\n    messageId: msg.id || j.id || null,\n    threadIdGmail: msg.threadId || j.threadId || null,\n  } };\n});"
-      }
-    },
-    {
       "id": "casar-cobranca-rascunho",
       "name": "Casar resposta do Gmail (cobrança rascunho)",
       "type": "n8n-nodes-base.code",
@@ -1738,20 +1540,7 @@
         490
       ],
       "parameters": {
-        "jsCode": "// A resposta do Gmail substitui o json do item pelos ids do rascunho/mensagem, levando\n// embora o payload do pedido (marcadores, acao, chaveCobranca...). Aqui os dois sao casados.\n//\n// O pareamento e por indice contra a SAIDA 3 do Switch — e nao contra\n// $('Merge — rotas...').all()[i]. O Switch DIVIDE os itens entre as saidas, entao o indice\n// desta ramificacao nao corresponde ao indice no Merge: com um mix de acoes na mesma\n// execucao, a correlacao antiga devolvia o payload de OUTRA linha.\nconst pedidos = $('Switch — ação').all(3).map((i) => i.json);\n\n// D53 (c): os ids a aplicar saem daqui (só os que o Gmail tem); os nomes que faltam vão ao Relatório.\nconst mapaMarcadores = ($('Mapear marcadores').first().json || {}).mapa || {};\n\nreturn $input.all().map((item, i) => {\n  const j = item.json || {};\n  const msg = j.message || {};\n  const nomesMarcadores = ((pedidos[i] || {}).marcadores) || [];\n  return { json: {\n    ...(pedidos[i] || {}),\n    labelIdsAplicar: nomesMarcadores.map((nome) => mapaMarcadores[nome]).filter(Boolean),\n    marcadoresNaoEncontrados: nomesMarcadores.filter((nome) => !mapaMarcadores[nome]),\n    draftId: j.id || null,\n    messageId: msg.id || j.id || null,\n    threadIdGmail: msg.threadId || j.threadId || null,\n  } };\n});"
-      }
-    },
-    {
-      "id": "casar-cobranca-envio",
-      "name": "Casar resposta do Gmail (cobrança envio)",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        5450,
-        570
-      ],
-      "parameters": {
-        "jsCode": "// A resposta do Gmail substitui o json do item pelos ids do rascunho/mensagem, levando\n// embora o payload do pedido (marcadores, acao, chaveCobranca...). Aqui os dois sao casados.\n//\n// O pareamento e por indice contra a SAIDA 4 do Switch — e nao contra\n// $('Merge — rotas...').all()[i]. O Switch DIVIDE os itens entre as saidas, entao o indice\n// desta ramificacao nao corresponde ao indice no Merge: com um mix de acoes na mesma\n// execucao, a correlacao antiga devolvia o payload de OUTRA linha.\nconst pedidos = $('Switch — ação').all(4).map((i) => i.json);\n\n// D53 (c): os ids a aplicar saem daqui (só os que o Gmail tem); os nomes que faltam vão ao Relatório.\nconst mapaMarcadores = ($('Mapear marcadores').first().json || {}).mapa || {};\n\nreturn $input.all().map((item, i) => {\n  const j = item.json || {};\n  const msg = j.message || {};\n  const nomesMarcadores = ((pedidos[i] || {}).marcadores) || [];\n  return { json: {\n    ...(pedidos[i] || {}),\n    labelIdsAplicar: nomesMarcadores.map((nome) => mapaMarcadores[nome]).filter(Boolean),\n    marcadoresNaoEncontrados: nomesMarcadores.filter((nome) => !mapaMarcadores[nome]),\n    draftId: j.id || null,\n    messageId: msg.id || j.id || null,\n    threadIdGmail: msg.threadId || j.threadId || null,\n  } };\n});"
+        "jsCode": "// A resposta do Gmail substitui o json do item pelos ids do rascunho/mensagem, levando\n// embora o payload do pedido (marcadores, acao, chaveCobranca...). Aqui os dois sao casados.\n//\n// O pareamento e por indice contra a SAIDA 1 do Switch (cobrar_rascunho) — e nao contra\n// $('Merge — rotas...').all()[i]. O Switch DIVIDE os itens entre as saidas, entao o indice\n// desta ramificacao nao corresponde ao indice no Merge: com um mix de acoes na mesma\n// execucao, a correlacao antiga devolvia o payload de OUTRA linha.\nconst pedidos = $('Switch — ação').all(1).map((i) => i.json);\n\n// D53 (c): os ids a aplicar saem daqui (só os que o Gmail tem); os nomes que faltam vão ao Relatório.\nconst mapaMarcadores = ($('Mapear marcadores').first().json || {}).mapa || {};\n\nreturn $input.all().map((item, i) => {\n  const j = item.json || {};\n  const msg = j.message || {};\n  const nomesMarcadores = ((pedidos[i] || {}).marcadores) || [];\n  const p = pedidos[i] || {};\n  // D17: o cobrancas guarda o id do RASCUNHO da cobrança e o threadId (nunca o id da mensagem).\n  // Sem id do rascunho, a cobrança não conta (não soma) e vai para o Relatório.\n  const novoEstadoCobranca = j.id && p.novoEstadoCobranca ? { ...p.novoEstadoCobranca, draftIdCobranca: j.id, threadId: msg.threadId || p.novoEstadoCobranca.threadId } : undefined;\n  return { json: {\n    ...p,\n    acao: j.id ? p.acao : 'cobranca_rascunho_sem_id',\n    novoEstadoCobranca,\n    labelIdsAplicar: nomesMarcadores.map((nome) => mapaMarcadores[nome]).filter(Boolean),\n    marcadoresNaoEncontrados: nomesMarcadores.filter((nome) => !mapaMarcadores[nome]),\n    draftId: j.id || null,\n    messageId: msg.id || j.id || null,\n    threadIdGmail: msg.threadId || j.threadId || null,\n  } };\n});"
       }
     },
     {
@@ -1764,7 +1553,7 @@
         1400
       ],
       "parameters": {
-        "jsCode": "// Segunda escrita da planilha: SÓ a coluna L (Status Box), e SÓ aqui — depois do envio.\n//\n// Este node fica pendurado em \"Consolidar mudanças e cobrancas.json\", que só roda depois\n// dos nodes de envio do Gmail. Chegar aqui já significa que o e-mail saiu: se o envio\n// falhasse, a execução teria parado antes e a coluna L não seria tocada (spec 3.1.5).\n//\n// Em MODO_EXECUCAO=rascunho a lista vem vazia (atualizarColunaL é false), então o IF\n// seguinte corta o caminho e nada é gravado.\nconst d = $input.first().json;\nreturn [{ json: { mudancasColunaN: [], mudancasColunaL: d.mudancasColunaL || [] } }];"
+        "jsCode": "// Segunda escrita da planilha: SÓ a coluna L (Status Box), e SÓ aqui — depois da criação do\n// rascunho do pedido (D65, 33ª rodada; antes era depois do envio, que não existe mais: D64).\n//\n// Este node fica pendurado em \"Consolidar mudanças e cobrancas.json\", que só roda depois dos\n// nodes do Gmail. Só vem pedido de L para rascunho criado com id e threadId (\"Capturar threadId\n// (rascunho)\"); se o Gmail falhar, a execução para antes e a coluna L não é tocada. O cobrancas\n// é gravado ANTES desta cadeia (1ª saída do Consolidar), então uma L que pare aqui não gera\n// pedido duplicado na passada seguinte (deduplicação nos nodes de montar e-mail).\n//\n// Sem pedido de L, a lista vem vazia e o IF seguinte corta o caminho.\nconst d = $input.first().json;\nreturn [{ json: { mudancasColunaN: [], mudancasColunaL: d.mudancasColunaL || [] } }];"
       }
     },
     {
@@ -1856,142 +1645,6 @@
           "id": "cred-telegram-account",
           "name": "Telegram account"
         }
-      }
-    },
-    {
-      "id": "gm-checar-rasc",
-      "name": "Gmail — Checar rascunho programado",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        5480,
-        260
-      ],
-      "parameters": {
-        "url": "=https://gmail.googleapis.com/gmail/v1/users/me/drafts/{{ $json.draftIdProgramado }}",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "gmailOAuth2",
-        "options": {
-          "response": {
-            "response": {
-              "neverError": true,
-              "fullResponse": true
-            }
-          }
-        }
-      },
-      "credentials": {
-        "gmailOAuth2": {
-          "__porAmbiente": {
-            "homolog": "Gmail - Homolog (Claudio Pessoal)",
-            "producao": "Gmail account"
-          }
-        }
-      }
-    },
-    {
-      "id": "dec-envio-rasc",
-      "name": "Decidir envio do rascunho programado",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        5650,
-        260
-      ],
-      "parameters": {
-        "jsCode": "// Checagem do rascunho na data-alvo (spec 3.1.8). O GET devolve 200 se o rascunho ainda\n// existe e 404 se sumiu — a Michelle enviou manualmente antes da automacao agir, que e\n// caminho normal, nao erro.\nconst pedidos = $('Switch — ação').all(2).map((i) => i.json);\nreturn $input.all().map((item, i) => {\n  const resp = item.json || {};\n  const existe = resp.statusCode >= 200 && resp.statusCode < 300;\n  return { json: { ...(pedidos[i] || {}), rascunhoExiste: existe, httpChecagem: resp.statusCode } };\n});"
-      }
-    },
-    {
-      "id": "if-rasc-existe",
-      "name": "IF — Rascunho programado ainda existe?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
-      "position": [
-        5820,
-        260
-      ],
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "loose"
-          },
-          "conditions": [
-            {
-              "leftValue": "={{ $json.rascunhoExiste }}",
-              "rightValue": true,
-              "operator": {
-                "type": "boolean",
-                "operation": "equals"
-              }
-            }
-          ],
-          "combinator": "and"
-        }
-      }
-    },
-    {
-      "id": "gm-enviar-rasc",
-      "name": "Gmail — Enviar rascunho programado",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        5990,
-        170
-      ],
-      "parameters": {
-        "method": "POST",
-        "url": "https://gmail.googleapis.com/gmail/v1/users/me/drafts/send",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "gmailOAuth2",
-        "sendBody": true,
-        "contentType": "json",
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ id: $json.draftIdProgramado }) }}",
-        "options": {
-          "response": {
-            "response": {
-              "neverError": true,
-              "fullResponse": true
-            }
-          }
-        }
-      },
-      "credentials": {
-        "gmailOAuth2": {
-          "__porAmbiente": {
-            "homolog": "Gmail - Homolog (Claudio Pessoal)",
-            "producao": "Gmail account"
-          }
-        }
-      }
-    },
-    {
-      "id": "casar-envio-prog",
-      "name": "Casar envio programado",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        6160,
-        170
-      ],
-      "parameters": {
-        "jsCode": "// Envio do rascunho programado confirmado. So AQUI a coluna L pode virar \"SOLICITADA MI\"\n// (spec 3.1.5 + 3.1.8): antes disso nao havia envio nenhum.\nconst pedidos = $('Decidir envio do rascunho programado').all().map((i) => i.json).filter((d) => d.rascunhoExiste);\nreturn $input.all().map((item, i) => {\n  const d = pedidos[i] || {};\n  const j = item.json || {};\n  const corpo = j.body || j;\n  const enviou = j.statusCode === undefined || (j.statusCode >= 200 && j.statusCode < 300);\n  if (!enviou) {\n    // falhou o envio: NAO grava coluna L. O Error Handler ja alerta pelo status.\n    throw new Error('falha ao enviar o rascunho programado (HTTP ' + j.statusCode + '): ' + JSON.stringify(corpo).slice(0, 200));\n  }\n  return { json: {\n    ...d,\n    acao: 'programado_enviado',\n    threadIdGmail: (corpo && corpo.threadId) || d.threadIdGmail || null,\n    atualizarColunaL: true,\n    novoValorColunaL: 'SOLICITADA MI',\n    linhasAfetadas: (d.linhasAfetadas || []).map((la) => ({ ...la })),\n  } };\n});"
-      }
-    },
-    {
-      "id": "rasc-ausente",
-      "name": "Registrar rascunho já enviado manualmente",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        5990,
-        350
-      ],
-      "parameters": {
-        "jsCode": "function statusBoxAindaAntesDoEnvio(statusBox) {\n  const s = String(statusBox || '').normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toUpperCase().trim();\n  return /^PROGRAMAR ATE/.test(s) || /^SOLICITAR/.test(s);\n}\n\n// Rascunho nao existe mais: a Michelle enviou manualmente. NAO reenviar (spec 3.1.8) —\n// reenviar duplicaria o pedido pro colaborador.\n//\n// So grava coluna L se o Status Box AINDA estiver num estagio anterior ao envio. Se ja\n// avancou (ENTREGUE MI, ENTREGUE MI R1...), a automacao nao pode regredir o que foi feito\n// a mao. O valor usado e o colunaL lido nesta execucao, direto do Cost Report.\nreturn $input.all().map((item) => {\n  const d = item.json;\n  const statusAtual = (d.nota && d.nota.colunaL) || '';\n  const podeGravar = statusBoxAindaAntesDoEnvio(statusAtual);\n  return { json: {\n    ...d,\n    acao: 'programado_ja_enviado_manualmente',\n    atualizarColunaL: podeGravar,\n    novoValorColunaL: podeGravar ? 'SOLICITADA MI' : undefined,\n    // registro auditavel — entra no resumo/log, sem alerta urgente (3.1.8)\n    auditoria: podeGravar\n      ? 'rascunho programado ausente (enviado manualmente); Status Box ainda era \"' + statusAtual + '\", atualizado para SOLICITADA MI'\n      : 'rascunho programado ausente (enviado manualmente); Status Box ja estava em \"' + statusAtual + '\" — nao regredido',\n  } };\n});"
       }
     },
     {
@@ -5242,58 +4895,6 @@
           ]
         }
       },
-      "id": "d53c-if-envio-pedido",
-      "name": "IF — Há marcador a aplicar? (envio pedido)",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
-      "position": [
-        5450,
-        300
-      ],
-      "notes": "D53 (c): sem nenhum marcador encontrado no Gmail, pula o Aplicar (a lista vazia dava \"Bad request\", execução 677) e segue pela saída 1."
-    },
-    {
-      "parameters": {
-        "jsCode": "// A resposta do addLabels (ou o erro, com \"continuar em erro\") não carrega o payload (acao,\n// chaveCobranca, novoEstadoCobranca...). Restaura pelo índice contra a SAÍDA 0 do IF anterior,\n// que são exatamente os itens que foram ao Aplicar, na mesma ordem (D53 c).\nconst enviados = $('IF — Há marcador a aplicar? (envio pedido)').all(0).map((i) => i.json);\nreturn $input.all().map((item, i) => {\n  const r = item.json || {};\n  const erro = r.error ? String(r.error.message || r.error).slice(0, 300) : null;\n  const d = enviados[i] || {};\n  return { json: { ...d, marcadoresAplicados: erro ? [] : (d.labelIdsAplicar || []), erroMarcadores: erro } };\n});"
-      },
-      "id": "d53c-rest-envio-pedido",
-      "name": "Restaurar payload (envio pedido)",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        5670,
-        140
-      ]
-    },
-    {
-      "parameters": {
-        "numberInputs": 2
-      },
-      "id": "d53c-merge-envio-pedido",
-      "name": "Merge — marcadores (envio pedido)",
-      "type": "n8n-nodes-base.merge",
-      "typeVersion": 3,
-      "position": [
-        5780,
-        300
-      ],
-      "notes": "D53 (c): junta os itens que tiveram marcador aplicado (entrada 0) com os que não tinham marcador a aplicar (entrada 1)."
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "conditions": [
-            {
-              "leftValue": "={{ ($json.labelIdsAplicar || []).length }}",
-              "rightValue": 0,
-              "operator": {
-                "type": "number",
-                "operation": "gt"
-              }
-            }
-          ]
-        }
-      },
       "id": "d53c-if-cobran-a-rascunho",
       "name": "IF — Há marcador a aplicar? (cobrança rascunho)",
       "type": "n8n-nodes-base.if",
@@ -5315,45 +4916,6 @@
       "position": [
         5780,
         540
-      ],
-      "notes": "D53 (c): junta os itens que tiveram marcador aplicado (entrada 0) com os que não tinham marcador a aplicar (entrada 1)."
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "conditions": [
-            {
-              "leftValue": "={{ ($json.labelIdsAplicar || []).length }}",
-              "rightValue": 0,
-              "operator": {
-                "type": "number",
-                "operation": "gt"
-              }
-            }
-          ]
-        }
-      },
-      "id": "d53c-if-cobran-a-envio",
-      "name": "IF — Há marcador a aplicar? (cobrança envio)",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
-      "position": [
-        5450,
-        620
-      ],
-      "notes": "D53 (c): sem nenhum marcador encontrado no Gmail, pula o Aplicar (a lista vazia dava \"Bad request\", execução 677) e segue pela saída 1."
-    },
-    {
-      "parameters": {
-        "numberInputs": 2
-      },
-      "id": "d53c-merge-cobran-a-envio",
-      "name": "Merge — marcadores (cobrança envio)",
-      "type": "n8n-nodes-base.merge",
-      "typeVersion": 3,
-      "position": [
-        5780,
-        620
       ],
       "notes": "D53 (c): junta os itens que tiveram marcador aplicado (entrada 0) com os que não tinham marcador a aplicar (entrada 1)."
     },
@@ -5665,28 +5227,7 @@
         ],
         [
           {
-            "node": "Gmail — Enviar direto (automático)",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Gmail — Checar rascunho programado",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Gmail — Cobrança (rascunho, responde Todos)",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Gmail — Cobrança (enviar, automático)",
+            "node": "Gmail — Cobrança (rascunho na thread)",
             "type": "main",
             "index": 0
           }
@@ -5832,17 +5373,6 @@
             "node": "Merge — resultados consolidados",
             "type": "main",
             "index": 0
-          }
-        ]
-      ]
-    },
-    "Capturar threadId (envio direto)": {
-      "main": [
-        [
-          {
-            "node": "Merge — resultados consolidados",
-            "type": "main",
-            "index": 1
           }
         ]
       ]
@@ -6050,39 +5580,6 @@
         ]
       ]
     },
-    "Gmail — Enviar direto (automático)": {
-      "main": [
-        [
-          {
-            "node": "Casar resposta do Gmail (envio pedido)",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Gmail — Cobrança (rascunho, responde Todos)": {
-      "main": [
-        [
-          {
-            "node": "Casar resposta do Gmail (cobrança rascunho)",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Gmail — Cobrança (enviar, automático)": {
-      "main": [
-        [
-          {
-            "node": "Casar resposta do Gmail (cobrança envio)",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Gmail — Listar marcadores": {
       "main": [
         [
@@ -6131,17 +5628,6 @@
         ]
       ]
     },
-    "Gmail — Aplicar marcadores (envio pedido)": {
-      "main": [
-        [
-          {
-            "node": "Restaurar payload (envio pedido)",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Gmail — Aplicar marcadores (cobrança rascunho)": {
       "main": [
         [
@@ -6153,33 +5639,11 @@
         ]
       ]
     },
-    "Gmail — Aplicar marcadores (cobrança envio)": {
-      "main": [
-        [
-          {
-            "node": "Restaurar payload (cobrança envio)",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Restaurar payload (cobrança rascunho)": {
       "main": [
         [
           {
             "node": "Merge — marcadores (cobrança rascunho)",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Restaurar payload (cobrança envio)": {
-      "main": [
-        [
-          {
-            "node": "Merge — marcadores (cobrança envio)",
             "type": "main",
             "index": 0
           }
@@ -6319,33 +5783,11 @@
         ]
       ]
     },
-    "Casar resposta do Gmail (envio pedido)": {
-      "main": [
-        [
-          {
-            "node": "IF — Há marcador a aplicar? (envio pedido)",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Casar resposta do Gmail (cobrança rascunho)": {
       "main": [
         [
           {
             "node": "IF — Há marcador a aplicar? (cobrança rascunho)",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Casar resposta do Gmail (cobrança envio)": {
-      "main": [
-        [
-          {
-            "node": "IF — Há marcador a aplicar? (cobrança envio)",
             "type": "main",
             "index": 0
           }
@@ -6407,79 +5849,6 @@
           }
         ],
         []
-      ]
-    },
-    "Gmail — Checar rascunho programado": {
-      "main": [
-        [
-          {
-            "node": "Decidir envio do rascunho programado",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Decidir envio do rascunho programado": {
-      "main": [
-        [
-          {
-            "node": "IF — Rascunho programado ainda existe?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "IF — Rascunho programado ainda existe?": {
-      "main": [
-        [
-          {
-            "node": "Gmail — Enviar rascunho programado",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Registrar rascunho já enviado manualmente",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Gmail — Enviar rascunho programado": {
-      "main": [
-        [
-          {
-            "node": "Casar envio programado",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Casar envio programado": {
-      "main": [
-        [
-          {
-            "node": "Merge — resultados consolidados",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Registrar rascunho já enviado manualmente": {
-      "main": [
-        [
-          {
-            "node": "Merge — resultados consolidados",
-            "type": "main",
-            "index": 0
-          }
-        ]
       ]
     },
     "Trigger — fonte a processar": {
@@ -8085,46 +7454,6 @@
         ]
       ]
     },
-    "IF — Há marcador a aplicar? (envio pedido)": {
-      "main": [
-        [
-          {
-            "node": "Gmail — Aplicar marcadores (envio pedido)",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Merge — marcadores (envio pedido)",
-            "type": "main",
-            "index": 1
-          }
-        ]
-      ]
-    },
-    "Restaurar payload (envio pedido)": {
-      "main": [
-        [
-          {
-            "node": "Merge — marcadores (envio pedido)",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Merge — marcadores (envio pedido)": {
-      "main": [
-        [
-          {
-            "node": "Capturar threadId (envio direto)",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "IF — Há marcador a aplicar? (cobrança rascunho)": {
       "main": [
         [
@@ -8154,35 +7483,6 @@
         ]
       ]
     },
-    "IF — Há marcador a aplicar? (cobrança envio)": {
-      "main": [
-        [
-          {
-            "node": "Gmail — Aplicar marcadores (cobrança envio)",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Merge — marcadores (cobrança envio)",
-            "type": "main",
-            "index": 1
-          }
-        ]
-      ]
-    },
-    "Merge — marcadores (cobrança envio)": {
-      "main": [
-        [
-          {
-            "node": "Merge — resultados consolidados",
-            "type": "main",
-            "index": 4
-          }
-        ]
-      ]
-    },
     "IF — Há candidatas nesta passada?": {
       "main": [
         [
@@ -8206,6 +7506,17 @@
         [
           {
             "node": "Telegram — Relatório final",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail — Cobrança (rascunho na thread)": {
+      "main": [
+        [
+          {
+            "node": "Casar resposta do Gmail (cobrança rascunho)",
             "type": "main",
             "index": 0
           }

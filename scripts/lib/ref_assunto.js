@@ -6,17 +6,20 @@
  * se houver, a palavra REF, JOB ou DIÁRIA. Nunca o mês do envio (o "REF. NOV" do rascunho do 9b,
  * para um período de agosto, saiu do mês do envio).
  *
- * Regra (Claudio e Michelle, 32ª rodada), conferida contra o spec (fase-1.md, 3.2 e 3.2.1):
- *   (i)   palavra explícita manda: JOB -> "REF. JOB"; DIÁRIA -> "REF. DIÁRIA"; REF -> "REF. [MÊS]".
- *         Um JOB de um mês só continua JOB.
+ * Regra (Claudio e Michelle; 32ª rodada e D63'' da 33ª), na ordem:
+ *   (i)   palavra explícita manda: JOB -> "REF. JOB"; DIÁRIA/DIÁRIAS -> "REF. DIÁRIA" (qualquer
+ *         número de dias); PACOTE -> "REF. PACOTE"; REF -> "REF. [MÊS]". Um JOB de um mês só
+ *         continua JOB.
  *   (ii)  sem palavra e período dentro de UM mês -> "REF. [MÊS do período]".
- *   (iii) sem palavra e período que ATRAVESSA meses -> o spec (3.2.1) diz "REF. [MÊS1] E [MÊS2]";
- *         o Claudio diz "nunca REF, só JOB ou diária". DIVERGÊNCIA (D63'): até ela ser resolvida,
- *         "conferir à mão".
+ *   (iii) sem palavra e período que ATRAVESSA meses -> "REF. JOB", sempre (D63'', Michelle; corrige
+ *         o spec 3.2.1, que dizia "REF. [MÊS1] E [MÊS2]" para uma linha só). DIÁRIA só com a
+ *         palavra escrita.
  *   (iv)  contradição (REF com período que atravessa meses, mês escrito que não bate com as datas,
  *         JOB e DIÁRIA juntos, IA e descrição discordando) -> "conferir à mão".
- *   Período ilegível -> "conferir à mão".
- *   PACOTE (spec 3.2, só AREP) continua "REF. PACOTE", como antes, se a palavra estiver escrita.
+ *   Período ilegível -> "conferir à mão", inclusive para JOB e DIÁRIA.
+ *   Parcela ("P.X/Y", spec 3.2): vai no JOB COMO ESTÁ ESCRITA na descrição ("P. 1/5" -> "REF. JOB
+ *   (P. 1/5)"); a Michelle ajusta no rascunho, se precisar. Um "X/Y" solto fora do período, sem o
+ *   "P", é ambíguo (parcela ou data?) -> "conferir à mão".
  *
  * "Conferir à mão" = não cria rascunho e a linha vai para o Relatório (spec 3.2, item 6: nunca
  * inventar um valor).
@@ -65,6 +68,19 @@ function lerPeriodoDescricao(descricao) {
     : [MESES_REF[ini.mes - 1], MESES_REF[fim.mes - 1]];
   const dd = (x) => String(x.dia).padStart(2, '0') + '/' + String(x.mes).padStart(2, '0');
   return { inicio: ini, fim, texto: dd(ini) + ' A ' + dd(fim), meses, atravessaMeses: meses.length > 1 };
+}
+
+/**
+ * Parcela "P.X/Y" escrita na descrição, COMO ESTÁ (D63''). Tira antes o período, para a data não
+ * passar por parcela. Devolve { parcela: string|null, ambigua: boolean }.
+ */
+function lerParcelaDescricao(descricao) {
+  const semPeriodo = String(descricao || '').replace(/\d{1,2}\s*\/\s*\d{1,2}(?:\s*\/\s*\d{2,4})?\s+(?:A|AT[ÉE])\s+\d{1,2}\s*\/\s*\d{1,2}(?:\s*\/\s*\d{2,4})?/gi, ' ');
+  const comP = semPeriodo.match(/\bP\.?\s*\d{1,2}\s*\/\s*\d{1,2}\b/gi) || [];
+  const resto = semPeriodo.replace(/\bP\.?\s*\d{1,2}\s*\/\s*\d{1,2}\b/gi, ' ');
+  const soltos = resto.match(/\b\d{1,2}\s*\/\s*\d{1,2}\b/g) || [];
+  if (comP.length > 1 || soltos.length) return { parcela: null, ambigua: true };
+  return { parcela: comP.length ? comP[0].trim() : null, ambigua: false };
 }
 
 /** Palavras de tipo e meses escritos na descrição. */
@@ -124,35 +140,47 @@ function decidirRefLinha(p) {
     if (!daIA || daIA.texto !== periodo.texto) return nao('período lido pela IA (' + (p.periodoIA || '') + ') difere do da descrição (' + periodo.texto + ')');
   }
 
-  const tipoDescricao = pal.job ? 'JOB' : pal.diaria ? 'DIARIA' : pal.pacote ? 'PACOTE' : 'NF_NORMAL';
   const tipoIA = p.tipoEmissaoIA || 'NF_NORMAL';
   if (['NF_NORMAL', 'JOB', 'DIARIA', 'PACOTE'].indexOf(tipoIA) === -1) return nao('tipo de emissão da IA inesperado para colaborador: ' + tipoIA);
-  if (tipoIA !== tipoDescricao) return nao('IA diz ' + tipoIA + ' e a descrição diz ' + tipoDescricao);
+  const par = lerParcelaDescricao(p.descricao);
+  if (par.ambigua) return nao('número "X/Y" fora do período sem o "P." (parcela ou data?) ou mais de uma parcela');
 
-  if (tipoDescricao !== 'NF_NORMAL') return { ok: true, tipo: tipoDescricao, meses: periodo.meses, periodo, palavra };
-
-  if (periodo.atravessaMeses) {
-    return nao(pal.ref
-      ? 'REF com período que atravessa meses (' + periodo.texto + ')'
-      : 'sem palavra e período que atravessa meses (' + periodo.texto + '): spec diz "REF. ' + periodo.meses.join(' E ') + '", regra do Claudio diz nunca REF (D63\')');
+  // (i) palavra escrita manda; a IA tem de concordar.
+  const tipoPalavra = pal.job ? 'JOB' : pal.diaria ? 'DIARIA' : pal.pacote ? 'PACOTE' : null;
+  if (tipoPalavra) {
+    if (tipoIA !== tipoPalavra) return nao('IA diz ' + tipoIA + ' e a descrição diz ' + tipoPalavra);
+    return { ok: true, tipo: tipoPalavra, meses: periodo.meses, periodo, palavra, parcela: par.parcela };
   }
-  return { ok: true, tipo: 'NF_NORMAL', meses: periodo.meses, periodo, palavra };
+  if (periodo.atravessaMeses) {
+    // (iv) REF escrito com período que atravessa meses: contradição.
+    if (pal.ref) return nao('REF com período que atravessa meses (' + periodo.texto + ')');
+    // (iii) D63'': sem palavra e atravessando meses = JOB, sempre. A IA pode ter lido NF normal
+    // (não há palavra) ou JOB; DIÁRIA ou PACOTE sem a palavra é contradição.
+    if (tipoIA !== 'NF_NORMAL' && tipoIA !== 'JOB') return nao('IA diz ' + tipoIA + ' sem a palavra escrita na descrição');
+    return { ok: true, tipo: 'JOB', meses: periodo.meses, periodo, palavra, parcela: par.parcela, jobPorPeriodo: true };
+  }
+  // (ii) sem palavra e um mês só: REF. do mês.
+  if (tipoIA !== 'NF_NORMAL') return nao('IA diz ' + tipoIA + ' e a descrição diz NF_NORMAL');
+  return { ok: true, tipo: 'NF_NORMAL', meses: periodo.meses, periodo, palavra, parcela: null };
 }
 
 /**
  * "REF." do assunto de um e-mail (1 ou mais blocos do mesmo colaborador e vencimento).
  * @param {Array<{descricao, tipoEmissaoIA, periodoIA, linha}>} blocos  na ordem da planilha
- * @param {string|null} parcela  "P.X/Y" (JOB parcelado)
  * @returns {{ok: true, ref: string} | {ok: false, motivos: string[]}}
+ * A parcela é a escrita na descrição (D63''); a que a IA leu não é usada.
  */
-function decidirRefAssunto(blocos, parcela) {
+function decidirRefAssunto(blocos) {
   const decisoes = blocos.map((b) => ({ linha: b.linha, d: decidirRefLinha(b) }));
   const ruins = decisoes.filter((x) => !x.d.ok);
   if (ruins.length) return { ok: false, motivos: ruins.map((x) => (x.linha != null ? 'L' + x.linha + ': ' : '') + x.d.motivo), decisoes };
   const tipos = [...new Set(decisoes.map((x) => x.d.tipo))];
   if (tipos.length > 1) return { ok: false, motivos: ['blocos de tipos diferentes no mesmo e-mail (' + tipos.join(', ') + ')'], decisoes };
   const tipo = tipos[0];
-  if (tipo === 'JOB') return { ok: true, ref: parcela ? 'REF. JOB (' + parcela + ')' : 'REF. JOB', decisoes };
+  if (tipo === 'JOB') {
+    const parcela = decisoes[0].d.parcela;
+    return { ok: true, ref: parcela ? 'REF. JOB (' + parcela + ')' : 'REF. JOB', decisoes };
+  }
   if (tipo === 'DIARIA') return { ok: true, ref: 'REF. DIÁRIA', decisoes };
   if (tipo === 'PACOTE') return { ok: true, ref: 'REF. PACOTE', decisoes };
   // Mais de um bloco com meses diferentes: cita todos, na ordem de aparição (spec 3.2 e 3.2.1).
@@ -161,4 +189,4 @@ function decidirRefAssunto(blocos, parcela) {
   return { ok: true, ref: 'REF. ' + meses.join(' E '), decisoes };
 }
 
-module.exports = { MESES_REF, lerPeriodoDescricao, lerPalavrasDescricao, decidirRefLinha, decidirRefAssunto };
+module.exports = { MESES_REF, lerPeriodoDescricao, lerPalavrasDescricao, lerParcelaDescricao, decidirRefLinha, decidirRefAssunto };

@@ -161,6 +161,10 @@ module.exports = function criarMotor({ box, semJszip, fs: disco, gmail, agora })
             if (v && typeof v === 'object' && !Array.isArray(v)) r[k] = Object.fromEntries(Object.entries(v).map(([k2, v2]) => [k2, ev(v2, json, ix)]));
             else r[k] = ev(v, json, ix);
           }
+          // Os padrões do node do Gmail v2.1: sem resource é 'message'; sem operation, a do recurso
+          // (em 'message' é 'send' — um node sem operação ENVIA, e o Gmail falso tem de ver isso).
+          r.resource = r.resource || 'message';
+          r.operation = r.operation || ({ message: 'send', draft: 'create', label: 'create', thread: 'get' }[r.resource]);
           return r;
         };
         // getAll de marcadores é uma chamada só (não por item)

@@ -502,14 +502,11 @@ function ehModoAutomatico(config) {
   return config && config.modo === 'automatico';
 }
 
-function decidirAcaoEnvio(gatilho, modoAutomatico) {
-  if (!modoAutomatico) {
-    return { acaoGmail: 'criar_rascunho', atualizarColunaL: false };
-  }
-  if (gatilho === 'SOLICITAR') {
-    return { acaoGmail: 'enviar_direto', atualizarColunaL: true, novoValorColunaL: 'SOLICITADA MI' };
-  }
-  return { acaoGmail: 'agendar_envio', atualizarColunaL: true, novoValorColunaL: 'SOLICITADA MI' };
+// D64 (33ª rodada): a automação NUNCA envia e-mail, em nenhum modo. Todo pedido é rascunho; a
+// coluna L ("SOLICITADA MI") é gravada quando o rascunho é criado (D65, no node "Capturar threadId
+// (rascunho)"). O segundo parâmetro (modo) ficou sem efeito; mantido só para não quebrar chamadas.
+function decidirAcaoEnvio(gatilho) {
+  return { acaoGmail: 'criar_rascunho', programado: gatilho === 'PROGRAMAR_ATE' };
 }
 
 // ─────────────────────────────────────────────────────────────────────────

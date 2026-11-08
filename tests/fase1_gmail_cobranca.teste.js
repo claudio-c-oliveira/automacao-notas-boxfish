@@ -4,8 +4,8 @@
  *
  * Roda os nodes do workflows/fase1_solicitacao_nota.homolog.json GERADO (e, onde dito, o de
  * produção) no tests/simulador/motor_q.js, com o Gmail FALSO (tests/simulador/gmail_falso.js) e
- * relógio falso. Nada de rede: o Gmail falso só registra, e em modo 'rascunho' QUALQUER envio é
- * violação (o node falha e o teste também).
+ * relógio falso. Nada de rede: o Gmail falso só registra, e QUALQUER envio é violação em QUALQUER
+ * modo (D64, 33ª rodada): o node falha, o cenário falha e o caso final soma as violações de todos.
  *
  * Itens desta rodada:
  *   D57 + D53 (c)  marcador do Soft Pré com o nome novo; marcador faltando só relata
@@ -14,8 +14,9 @@
  *                  caso duvidoso = "conferir à mão" (sem rascunho, linha no Relatório)
  *   D41            SOLICITADA MI sem entrada no cobrancas: só relata
  *   D40            Relatório também com 0 candidatas
- *   D17            (PENDENTE, não implementado nesta rodada) só se confere que, em modo
- *                  rascunho, a cobrança NÃO envia nada
+ *   D64  (33ª)     nenhum node da Fase 1 envia; modo automático também só cria rascunho
+ *   D65  (33ª)     coluna L "SOLICITADA MI" quando o rascunho do pedido é criado; sem duplicar
+ *   D17 + D61' (33ª) cobrança = rascunho na mesma thread; data base e cadência do 3.1.1
  *
  * Os itens são SINTÉTICOS (nomes e e-mails inventados). O container do n8n é UTC: este teste
  * roda com TZ=UTC para reproduzir o fuso de lá.
@@ -71,9 +72,10 @@ function itemFiltro(linha, colunaL, modo, cobrancas, extraNota = {}) {
 // Execução: 1º o começo da passada (Trigger -> Listar -> Mapear marcadores), depois o trecho
 // ---------------------------------------------------------------------------------------
 const LEITURAS_CFG = new Set(['Ler config_execucao.json', 'Ler cobrancas.json', 'Ler apelidos.json', 'Ler cost_reports.json']);
+const VIOLACOES_TODAS = [];
 async function rodar({ wf = WF_HML, sufixo = '_hml', fonteId = 'S02', modo = 'rascunho', marcadores = MARC_5, falharListagem, falharAplicar, agora = '2026-11-08T01:13:55Z',
-  cobrancas = {}, inicio, entrada, limite = 1, parar = [] }) {
-  const gmail = criarGmail({ modo, marcadores, falharListagem, falharAplicar });
+  cobrancas = {}, inicio, entrada, limite = 1, parar = [], threads, falharRascunho, rascunhoSemId, rascunhoSemThread }) {
+  const gmail = criarGmail({ modo, marcadores, falharListagem, falharAplicar, threads, falharRascunho, rascunhoSemId, rascunhoSemThread });
   const disco = { [DIR + 'cobrancas' + sufixo + '.json']: Buffer.from(JSON.stringify(cobrancas)), [DIR + 'log_diario' + sufixo + '.json']: Buffer.from('[]') };
   const antes = { cobrancas: disco[DIR + 'cobrancas' + sufixo + '.json'].toString(), log: disco[DIR + 'log_diario' + sufixo + '.json'].toString() };
   const box = { http: (m, u) => { throw new Error('simulador: este teste não fala com o Box (' + m + ' ' + u + ')'); }, download: (id) => { throw new Error('simulador: download do Box ' + id); } };
@@ -82,35 +84,50 @@ async function rodar({ wf = WF_HML, sufixo = '_hml', fonteId = 'S02', modo = 'ra
   const a = await motor(wf, { inicio: 'Trigger — fonte a processar', entrada: [{ json: { fonteId } }], parar: LEITURAS_CFG, runs, saidas });
   runs['Carregar config + perfis'] = [[{ json: { config: cfgExec(modo, limite), cobrancas, apelidos: APELIDOS, perfis: PERFIS, dominioEmpresa: 'novorealitybox.com', costs: {} } }]];
   const b = await motor(wf, { inicio, entrada, runs, saidas, parar: new Set(['Escrita N — 01 config e alvos', 'Escrita L — 01 config e alvos', ...parar]) });
+  VIOLACOES_TODAS.push(...gmail.violacoes.map((v) => ({ inicio, modo, ...v })));
   const lerJson = (k) => { const v = disco[DIR + k + sufixo + '.json']; return v ? JSON.parse(v.toString()) : null; };
+  const pedidoL = (b.chegou['Escrita L — 01 config e alvos'] || []).flat().map((i) => i.json).flatMap((j) => j.mudancasColunaL || []);
+  const pedidoN = (b.chegou['Escrita N — 01 config e alvos'] || []).flat().map((i) => i.json);
   return {
     erro: a.erro || b.erro, gmail, runs, chegou: b.chegou, ordem: a.ordem.concat(b.ordem), mensagens: a.mensagens.concat(b.mensagens),
     cobrancas: lerJson('cobrancas'), log: lerJson('log_diario'),
     cobrancasGravado: disco[DIR + 'cobrancas' + sufixo + '.json'].toString() !== antes.cobrancas, logGravado: disco[DIR + 'log_diario' + sufixo + '.json'].toString() !== antes.log,
+    pedidoL, pedidoN,
     relatorio: (b.mensagens.find((m) => m.node === 'Telegram — Relatório final') || {}).texto || null,
     relatorios: b.mensagens.filter((m) => m.node === 'Telegram — Relatório final').length,
     saida: (n) => (runs[n] ? runs[n][runs[n].length - 1].map((i) => i.json) : null),
   };
 }
 const aplicarChamadas = (r) => r.gmail.chamadas.filter((c) => c.op === 'message/addLabels');
-const semViolacao = (cen, r) => caso(cen, 'Gmail: nenhum envio em modo rascunho (0 violações)', 0, r.gmail.violacoes.length, r.gmail.violacoes);
+const semViolacao = (cen, r) => caso(cen, 'Gmail: nenhum envio (D64: 0 violações, em qualquer modo)', [0, 0], [r.gmail.envios.length, r.gmail.violacoes.length], r.gmail.violacoes);
 
 (async () => {
   // ======================================================================================
   console.log('\n== 1. Simulador: Gmail falso ==');
   {
     const cen = '1 gmail falso';
-    const g = criarGmail({ modo: 'rascunho', marcadores: MARC_5 });
-    let msg = null; try { g.chamar('X', { resource: 'message', operation: 'send', sendTo: 'a@b', subject: 's' }); } catch (e) { msg = e.message; }
-    caso(cen, 'envio em modo rascunho FALHA e fica registrado como violação', [true, 1], [/ENVIO EM MODO RASCUNHO/.test(msg || ''), g.violacoes.length]);
+    for (const modo of ['rascunho', 'automatico']) {
+      const gv = criarGmail({ modo, marcadores: MARC_5, threads: { 't-9': [{ id: 'm-9', labelIds: ['SENT'] }] } });
+      const tentativas = [
+        () => gv.chamar('X', { resource: 'message', operation: 'send', sendTo: 'a@b', subject: 's' }),
+        () => gv.chamar('X', { resource: 'message', operation: 'reply', messageId: 'm-9' }),
+        () => gv.chamar('X', { resource: 'message', operation: 'forward', messageId: 'm-9' }),
+        () => gv.chamar('X', { resource: 'message', operation: 'sendAndWait', sendTo: 'a@b' }),
+        () => gv.chamar('X', { resource: 'draft', operation: 'send', draftId: 'r-1' }),
+        () => gv.http('X', 'POST', 'https://gmail.googleapis.com/gmail/v1/users/me/drafts/send', {}, { id: 'r-1' }),
+        () => gv.http('X', 'POST', 'https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {}, {}),
+      ];
+      const msgs = tentativas.map((f) => { try { f(); return null; } catch (e) { return e.message; } });
+      caso(cen, 'modo ' + modo + ': send, reply, forward, sendAndWait, draft/send e POST .../send FALHAM e viram violação (D64)', [7, 7], [msgs.filter((m) => /ENVIO PROIBIDO \(D64\)/.test(m || '')).length, gv.violacoes.length], msgs);
+    }
+    const g = criarGmail({ modo: 'rascunho', marcadores: MARC_5, threads: { 't-1': [{ id: 'm-1', labelIds: ['SENT'] }] } });
     const d = g.chamar('X', { resource: 'draft', operation: 'create', subject: 's', options: { threadId: 't-1', sendTo: 'a@b' } });
     caso(cen, 'rascunho com threadId fica na mesma conversa', ['t-1', 'DRAFT'], [d.message.threadId, d.message.labelIds[0]]);
     let erroVazio = null; try { g.chamar('X', { resource: 'message', operation: 'addLabels', messageId: 'm1', labelIds: [] }); } catch (e) { erroVazio = e.message; }
     caso(cen, 'aplicar lista VAZIA de marcadores dá "Bad request" (como na execução 677)', true, /Bad request/.test(erroVazio || ''));
-    const ga = criarGmail({ modo: 'automatico', threads: { 't-9': [{ id: 'm-9', labelIds: ['SENT'] }] } });
-    const rr = ga.chamar('X', { resource: 'message', operation: 'reply', messageId: 'm-9' });
-    caso(cen, 'modo automático: responder na thread registra 1 envio na mesma conversa', [1, 't-9'], [ga.envios.length, rr.threadId]);
-    caso(cen, 'ler thread devolve as mensagens', 2, ga.chamar('X', { resource: 'thread', operation: 'get', threadId: 't-9' }).messages.length);
+    let semThread = null; try { g.chamar('X', { resource: 'draft', operation: 'create', subject: 's', options: { threadId: 't-nao-existe' } }); } catch (e) { semThread = e.message; }
+    caso(cen, 'rascunho com threadId inexistente dá erro (como no Gmail)', true, /not found/.test(semThread || ''));
+    caso(cen, 'ler thread devolve as mensagens (o pedido e o rascunho)', 2, g.chamar('X', { resource: 'thread', operation: 'get', threadId: 't-1' }).messages.length);
   }
 
   // ======================================================================================
@@ -161,10 +178,10 @@ const semViolacao = (cen, r) => caso(cen, 'Gmail: nenhum envio em modo rascunho 
     semViolacao(cen, r);
   }
   {
-    const cen = '3 D53c envio pedido (automático)';
+    const cen = '3 D53c pedido em modo automático (D64: só rascunho)';
     const r = await rodar({ modo: 'automatico', inicio: 'Montar e-mail colaborador', entrada: [itemPedido(194, 'automatico')] });
-    caso(cen, 'sem erro; 1 envio direto; Aplicar 1x com IA + SOFT PRE', [null, 1, 1, [idDe('IA'), idDe('SOFT PRE - PEDIDO DE NOTAS')]], [r.erro, r.gmail.envios.length, aplicarChamadas(r).length, aplicarChamadas(r)[0] && aplicarChamadas(r)[0].p.labelIds]);
-    caso(cen, 'cobrancas com o threadId do envio; a coluna L foi para a cadeia de escrita (parada aqui)', [true, true], [!!(r.cobrancas['SOFT PRE_S02_L194'] && r.cobrancas['SOFT PRE_S02_L194'].threadId), !!r.chegou['Escrita L — 01 config e alvos']]);
+    caso(cen, 'sem erro; 1 RASCUNHO e 0 envios; Aplicar 1x com IA + SOFT PRE', [null, 1, 0, 1, [idDe('IA'), idDe('SOFT PRE - PEDIDO DE NOTAS')]], [r.erro, r.gmail.rascunhos.length, r.gmail.envios.length, aplicarChamadas(r).length, aplicarChamadas(r)[0] && aplicarChamadas(r)[0].p.labelIds]);
+    caso(cen, 'cobrancas com o id do rascunho e o threadId; a coluna L foi para a cadeia de escrita (D65)', [true, true, true], [!!(r.cobrancas['SOFT PRE_S02_L194'] && r.cobrancas['SOFT PRE_S02_L194'].threadId), !!(r.cobrancas['SOFT PRE_S02_L194'] && r.cobrancas['SOFT PRE_S02_L194'].draftId), !!r.chegou['Escrita L — 01 config e alvos']]);
   }
 
   // ======================================================================================
@@ -191,7 +208,7 @@ const semViolacao = (cen, r) => caso(cen, 'Gmail: nenhum envio em modo rascunho 
     const d = B.dataBrasilia('2026-11-08T01:13:55Z');
     caso(cen, 'dataBrasilia: getDate/getMonth do dia de Brasília; +5 dias', ['2026-11-07', '2026-11-12'], [B.ymdBrasilia(d), (() => { const x = new Date(d); x.setDate(x.getDate() + 5); return B.ymdBrasilia(x); })()]);
     const nos = WF_HML.nodes.filter((n) => /data_brasilia|function hojeBrasilia/.test((n.parameters && n.parameters.jsCode) || '')).map((n) => n.name).sort();
-    caso(cen, 'a biblioteca está embutida nos 6 nodes que usam data', ['Agrupar e montar e-mail fornecedor', 'Avaliar cobrança', 'Capturar threadId (envio direto)', 'Capturar threadId (rascunho)', 'Consolidar mudanças e cobrancas.json', 'Montar e-mail colaborador'], nos);
+    caso(cen, 'a biblioteca está embutida nos 5 nodes que usam data (o "Capturar threadId (envio direto)" saiu com a D64)', ['Agrupar e montar e-mail fornecedor', 'Avaliar cobrança', 'Capturar threadId (rascunho)', 'Consolidar mudanças e cobrancas.json', 'Montar e-mail colaborador'], nos);
     // o dia UTC de "agora" (new Date() / hoje .toISOString().slice(0,10)), fora de comentários
     const semComentario = (js) => js.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
     const sobrou = WF_HML.nodes.filter((n) => /(new Date\(\)|\bhoje)\.toISOString\(\)\.slice\(0, ?10\)/.test(semComentario((n.parameters && n.parameters.jsCode) || ''))).map((n) => n.name);
@@ -223,7 +240,12 @@ const semViolacao = (cen, r) => caso(cen, 'Gmail: nenhum envio em modo rascunho 
     const vira = R.decidirRefAssunto([{ descricao: 'X - 01/12 A 31/12', linha: 1 }, { descricao: 'X - 01/01 A 31/01', linha: 2 }], null);
     caso(cen, '2 blocos DEZ + JAN: ordem de aparição, não "JAN E DEZ" (spec 3.2.1)', 'REF. DEZ E JAN', vira.ref);
     const mist = R.decidirRefAssunto([{ descricao: 'X - 01/08 A 31/08', linha: 1 }, { descricao: 'X - 20/08 A 10/09', linha: 2 }], null);
-    caso(cen, '2 blocos, um deles atravessando meses sem palavra: o e-mail inteiro vai para conferir', [false, ['L2']], [mist.ok, mist.motivos.map((m) => m.slice(0, 2))]);
+    caso(cen, 'D63\'\': 2 blocos, um num mês só (NF) e outro atravessando meses sem palavra (JOB): tipos diferentes -> conferir', [false, true], [mist.ok, /tipos diferentes/.test(mist.motivos.join(' '))]);
+    caso(cen, 'D63\'\': sem palavra e 20/08 A 10/09 -> REF. JOB; 30/07 A 12/08 -> REF. JOB; a IA pode ter lido NF ou JOB', ['REF. JOB', 'REF. JOB', 'REF. JOB'], [ref('X - 20/08 A 10/09'), ref('X - 30/07 A 12/08'), ref('X - 30/07 A 12/08', 'JOB')]);
+    caso(cen, 'D63\'\': DIÁRIA só com a palavra: "DIÁRIA" de 3 dias -> REF. DIÁRIA; a IA dizer DIÁRIA sem a palavra -> conferir', ['REF. DIÁRIA', 'CONFERIR'], [ref('X - DIÁRIA - 25/08 A 27/08', 'DIARIA'), ref('X - 20/08 A 10/09', 'DIARIA')]);
+    caso(cen, 'D63\'\': parcela como está na descrição ("P. 1/5", "P.2/2"); "X/Y" solto fora do período -> conferir', ['REF. JOB (P. 1/5)', 'REF. JOB (P.2/2)', 'CONFERIR'],
+      [ref('X S02 - 01/10 A 05/12 - P. 1/5 (Y)'), ref('X - 03/08 A 10/09 (JOB) - P.2/2', 'JOB'), ref('X - 01/10 A 05/12 - 1/5')]);
+    caso(cen, 'D63\'\': a parcela lida pela IA não é usada (só a escrita)', 'REF. JOB', R.decidirRefAssunto([{ descricao: 'X - 20/08 A 10/09', linha: 1 }], 'P.9/9').ref);
     const antigo = (d) => ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'][d.getMonth()];
     caso(cen, '9b (L194, período 01/08 A 31/08, sem palavra): a regra antiga (mês do envio, 08/11) dava NOV; a nova dá AGO', ['NOV', 'REF. AGO'],
       [antigo(new Date('2026-11-08T12:00:00Z')), ref('CARGO - [nome] - 01/08 A 31/08 (VALOR 8K/MÊS)')]);
@@ -243,7 +265,10 @@ const semViolacao = (cen, r) => caso(cen, 'Gmail: nenhum envio em modo rascunho 
       { nome: '"JOB" explícito com período de um mês', agora: '2026-11-07T13:00:00Z', j: 'CARGO - PESSOA 194 - 01/08 A 30/08 (JOB)', p: '01/08 A 30/08', t: 'JOB', ref: 'REF. JOB', ate: '07.11' },
       { nome: '"REF" explícito com período de um mês', agora: '2026-11-07T13:00:00Z', j: 'CARGO - PESSOA 194 - REF. 01/08 A 31/08', p: '01/08 A 31/08', ref: 'REF. AGO', ate: '07.11' },
       { nome: '"REFORÇO" não conta como REF (sai o mês do período)', agora: '2026-11-07T13:00:00Z', j: 'REFORÇO DE PRODUÇÃO - PESSOA 194 - 01/08 A 31/08', p: '01/08 A 31/08', ref: 'REF. AGO', ate: '07.11' },
-      { nome: 'sem palavra e período 20/08 A 10/09 (spec diz "REF. AGO E SET"; Claudio diz nunca REF)', agora: '2026-11-07T13:00:00Z', j: 'CARGO - PESSOA 194 - 20/08 A 10/09', p: '20/08 A 10/09', conferir: /atravessa meses/ },
+      { nome: 'D63\'\': sem palavra e período 20/08 A 10/09', agora: '2026-11-07T13:00:00Z', j: 'CARGO - PESSOA 194 - 20/08 A 10/09', p: '20/08 A 10/09', ref: 'REF. JOB', ate: '07.11' },
+      { nome: 'D63\'\': sem palavra e período 30/07 A 12/08', agora: '2026-11-07T13:00:00Z', j: 'CARGO - PESSOA 194 - 30/07 A 12/08', p: '30/07 A 12/08', ref: 'REF. JOB', ate: '07.11' },
+      { nome: 'D63\'\': com parcela "P. 1/5"', agora: '2026-11-07T13:00:00Z', j: 'CARGO S02 - PESSOA 194 - 01/10 A 05/12 - P. 1/5', p: '01/10 A 05/12', ref: 'REF. JOB (P. 1/5)', ate: '07.11' },
+      { nome: 'D63\'\': "DIÁRIA" explícita, período de 3 dias', agora: '2026-11-07T13:00:00Z', j: 'CARGO - PESSOA 194 - DIÁRIA 25/08 A 27/08', p: '25/08 A 27/08', t: 'DIARIA', ref: 'REF. DIÁRIA', ate: '07.11' },
       { nome: '"REF" com período que atravessa meses', agora: '2026-11-07T13:00:00Z', j: 'CARGO - PESSOA 194 - REF 20/08 A 10/09', p: '20/08 A 10/09', conferir: /REF com período que atravessa meses/ },
       { nome: 'mês escrito que não bate com as datas', agora: '2026-11-07T13:00:00Z', j: 'CARGO - PESSOA 194 - REF. SETEMBRO - 01/08 A 31/08', p: '01/08 A 31/08', conferir: /não bate/ },
       { nome: 'período ilegível', agora: '2026-11-07T13:00:00Z', j: 'CARGO - PESSOA 194 - 080/08 A 31/08', p: null, conferir: /ilegível/ },
@@ -273,7 +298,7 @@ const semViolacao = (cen, r) => caso(cen, 'Gmail: nenhum envio em modo rascunho 
     }
     {
       const cen = '4b D63 conferir à mão no gerado de produção';
-      const it = itemRef(194, 'CARGO - PESSOA 194 - 20/08 A 10/09', '20/08 A 10/09');
+      const it = itemRef(194, 'CARGO - PESSOA 194 - REF 20/08 A 10/09', '20/08 A 10/09');
       it.json.config = { ...it.json.config, ambiente: 'producao' };
       const r = await rodar({ wf: WF_PROD, sufixo: '', fonteId: 'S02', agora: '2026-11-07T13:00:00Z', inicio: 'Montar e-mail colaborador', entrada: [it] });
       caso(cen, 'produção faz o mesmo: 0 rascunhos e a linha no Relatório', [null, 0, true], [r.erro, r.gmail.rascunhos.length, /conferir à mão o REF\. do assunto: L194/.test(r.relatorio || '')]);
@@ -299,14 +324,180 @@ const semViolacao = (cen, r) => caso(cen, 'Gmail: nenhum envio em modo rascunho 
   }
 
   // ======================================================================================
-  console.log('\n== 6. D17 (PENDENTE nesta rodada): em modo rascunho a cobrança não envia ==');
+  console.log('\n== 6. D64: nenhum node da Fase 1 envia e-mail ==');
   {
-    const cen = '6 D17 pendente';
-    // cobrança devida: contagem 1, última há 6 dias, vencimento longe
-    const est = { 'SOFT PRE_S02_L114': { threadId: 't-114', draftId: 'r-114', data_ultima_cobranca: '2026-11-01', contagem_cobrancas: 1, status_ciclo: 'em_andamento' } };
-    const r = await rodar({ limite: 0, cobrancas: est, agora: '2026-11-07T15:00:00Z', inicio: 'Filtrar por Status Box (novo pedido / monitoramento)', entrada: [itemFiltro(114, 'SOLICITADA MI', 'rascunho', est)] });
-    caso(cen, 'Avaliar cobrança decide "cobrar_rascunho"', 'cobrar_rascunho', ((r.saida('Avaliar cobrança') || [])[0] || {}).acao);
-    caso(cen, 'nenhum envio (o node atual "responde" e falha antes: D17 continua pendente)', [0, true], [r.gmail.envios.length, /Cobrança \(rascunho, responde Todos\)/.test(r.erro || '')], r.erro);
+    const cen = '6 D64 texto';
+    const OPS_ENVIO = /^(send|reply|forward|sendAndWait)$/;
+    for (const [nome, wf] of [['homolog', WF_HML], ['produção', WF_PROD]]) {
+      const enviam = wf.nodes.filter((n) => {
+        const p = n.parameters || {};
+        if (/\.gmail$/.test(n.type)) return OPS_ENVIO.test(p.operation || 'send') || (p.resource === 'draft' && p.operation === 'send');
+        if (/emailSend|smtp/i.test(n.type)) return true;
+        if (/httpRequest/.test(n.type)) return /gmail\.googleapis/.test(JSON.stringify(p)) && /(messages|drafts)\/send/.test(JSON.stringify(p));
+        return false;
+      }).map((n) => n.name);
+      caso(cen, nome + ': nenhum node com send, reply, forward, sendAndWait, draft/send, SMTP ou POST .../send', [], enviam);
+      const gmail = wf.nodes.filter((n) => /\.gmail$/.test(n.type)).map((n) => (n.parameters.resource || 'message') + '/' + n.parameters.operation).sort();
+      caso(cen, nome + ': os nodes do Gmail que sobraram só leem, criam rascunho ou aplicam marcador',
+        ['draft/create', 'draft/create', 'label/getAll', 'message/addLabels', 'message/addLabels', 'message/get', 'message/getAll'], gmail);
+      const nomes = wf.nodes.map((n) => n.name);
+      caso(cen, nome + ': saíram os nodes de envio e as cadeias deles', [], ['Gmail — Enviar direto (automático)', 'Gmail — Cobrança (enviar, automático)', 'Gmail — Enviar rascunho programado', 'Gmail — Checar rascunho programado', 'Capturar threadId (envio direto)'].filter((x) => nomes.includes(x)));
+      const js = wf.nodes.map((n) => (n.parameters && n.parameters.jsCode) || '').join('\n');
+      caso(cen, nome + ': nenhum Code node decide envio ("enviar_direto", "enviar_programado", "cobrar_enviar")', [], ['enviar_direto', 'enviar_programado', 'cobrar_enviar'].filter((x) => js.includes("'" + x + "'")));
+    }
+  }
+
+  // ======================================================================================
+  console.log('\n== 7c. D65: coluna L na criação do rascunho do pedido ==');
+  const L194 = { projetoId: 'SOFT_PRE', linha: 194, valor: 'SOLICITADA MI' };
+  const programar = (linha, modo, dataISO) => { const it = itemPedido(linha, modo); it.json.gatilho = 'PROGRAMAR_ATE'; it.json.dataProgramarAte = dataISO; it.json.nota.colunaL = 'PROGRAMAR ATÉ 20/11'; delete it.json.escalaUrgencia; return it; };
+  for (const modo of ['rascunho', 'automatico']) {
+    {
+      const cen = '7c D65 (a) SOLICITAR, modo ' + modo;
+      const r = await rodar({ modo, agora: '2026-11-07T13:00:00Z', inicio: 'Montar e-mail colaborador', entrada: [itemPedido(194, modo)] });
+      caso(cen, 'sem erro; 1 rascunho; o pedido de gravar a L chega à cadeia: L194 = "SOLICITADA MI"', [null, 1, [L194]], [r.erro, r.gmail.rascunhos.length, r.pedidoL]);
+      const e = (r.cobrancas || {})['SOFT PRE_S02_L194'] || {};
+      caso(cen, 'cobrancas: id do rascunho, threadId, data base = dia do pedido (D61\'), linhas e dados do pedido', [r.gmail.rascunhos[0].id, r.gmail.rascunhos[0].threadId, '2026-11-07', 'SOLICITAR', [194], true, true, ['IA', 'SOFT PRE - PEDIDO DE NOTAS']],
+        [e.draftId, e.threadId, e.data_base_cobranca, e.gatilho, e.linhas, !!e.assunto, !!e.emailDestino, e.marcadores]);
+      semViolacao(cen, r);
+    }
+    {
+      const cen = '7c D65 (a) PROGRAMAR ATÉ 20/11, modo ' + modo;
+      const r = await rodar({ modo, agora: '2026-11-07T13:00:00Z', inicio: 'Montar e-mail colaborador', entrada: [programar(194, modo, new Date(2026, 10, 20).toISOString())] });
+      const e = (r.cobrancas || {})['SOFT PRE_S02_L194'] || {};
+      caso(cen, 'sem erro; 1 rascunho (criado já, sem esperar a data); L194 = "SOLICITADA MI"; data base = 2026-11-20', [null, 1, [L194], '2026-11-20', 'PROGRAMAR_ATE'], [r.erro, r.gmail.rascunhos.length, r.pedidoL, e.data_base_cobranca, e.gatilho]);
+      semViolacao(cen, r);
+    }
+  }
+  {
+    const cen = '7c D65 (b) Gmail falha ao criar o rascunho';
+    const r = await rodar({ falharRascunho: true, inicio: 'Montar e-mail colaborador', entrada: [itemPedido(194, 'rascunho')] });
+    caso(cen, 'a execução para no node do Gmail; nenhum pedido de L; cobrancas intacto', [true, [], false], [/Criar rascunho \(pedido\)/.test(r.erro || ''), r.pedidoL, r.cobrancasGravado], r.erro);
+    semViolacao(cen, r);
+  }
+  {
+    const cen = '7c D65 (b) Gmail devolve o rascunho sem id';
+    const r = await rodar({ rascunhoSemId: true, inicio: 'Montar e-mail colaborador', entrada: [itemPedido(194, 'rascunho')] });
+    caso(cen, 'sem erro; nenhum pedido de L; cobrancas sem a entrada; Relatório avisa', [null, [], undefined, true], [r.erro, r.pedidoL, (r.cobrancas || {})['SOFT PRE_S02_L194'], /não devolveu o id do rascunho .*L194/.test(r.relatorio || '')], r.relatorio);
+  }
+  {
+    const cen = '7c D65 (b) rascunho sem threadId';
+    const r = await rodar({ rascunhoSemThread: true, inicio: 'Montar e-mail colaborador', entrada: [itemPedido(194, 'rascunho')] });
+    const e = (r.cobrancas || {})['SOFT PRE_S02_L194'] || {};
+    caso(cen, 'sem erro; nenhum pedido de L; o pedido fica registrado (para não duplicar) e o Relatório avisa', [null, [], true, null, true], [r.erro, r.pedidoL, !!e.draftId, e.threadId, /sem threadId \(coluna L não gravada.*L194/.test(r.relatorio || '')], r.relatorio);
+  }
+  {
+    const cen = '7c D65 (b) conferir à mão (REF.)';
+    const it = itemPedido(194, 'rascunho'); it.json.nota.colunaJ = 'CARGO - PESSOA 194 - REF 20/08 A 10/09'; it.json.periodo = '20/08 A 10/09';
+    const r = await rodar({ inicio: 'Montar e-mail colaborador', entrada: [it] });
+    caso(cen, 'sem rascunho e sem pedido de L', [null, 0, []], [r.erro, r.gmail.rascunhos.length, r.pedidoL]);
+  }
+  {
+    const cen = '7c D65 (b) SOLICITADA MI sem pedido (D41) e cobrança';
+    const est = { 'SOFT PRE_S02_L114': { threadId: 't-114', draftId: 'r-114', data_base_cobranca: '2026-11-01', data_ultima_cobranca: '2026-11-01', contagem_cobrancas: 0, status_ciclo: 'em_andamento', assunto: 'ASSUNTO DO PEDIDO 114', emailDestino: 'teste@exemplo.invalid', emailCopia: 'copia@exemplo.invalid', marcadores: ['IA', 'SOFT PRE - PEDIDO DE NOTAS'] } };
+    const r = await rodar({ limite: 0, cobrancas: est, agora: '2026-11-07T15:00:00Z', threads: { 't-114': [{ id: 'm-114', labelIds: ['SENT'] }] }, inicio: 'Filtrar por Status Box (novo pedido / monitoramento)',
+      entrada: [itemFiltro(132, 'SOLICITADA MI', 'rascunho', est), itemFiltro(114, 'SOLICITADA MI', 'rascunho', est)] });
+    caso(cen, 'sem erro; a L132 só relata; a cobrança da L114 vira rascunho; NENHUM pedido de L (a cobrança não grava a L)', [null, 1, false], [r.erro, r.gmail.rascunhos.length, !!r.chegou['Escrita L — 01 config e alvos']]);
+    semViolacao(cen, r);
+  }
+  {
+    const cen = '7c D65 (c) 2 blocos no mesmo e-mail';
+    const extra = { nomeColaborador: 'PESSOA DUPLA' };
+    const a = itemPedido(194, 'rascunho'); a.json.nota.colunaJ = 'CARGO - PESSOA DUPLA - 27/07 A 31/07'; a.json.periodo = '27/07 A 31/07'; Object.assign(a.json, extra);
+    const b = itemPedido(195, 'rascunho'); Object.assign(b.json, extra);
+    const r = await rodar({ limite: 0, agora: '2026-11-07T13:00:00Z', inicio: 'Montar e-mail colaborador', entrada: [a, b] });
+    caso(cen, '1 rascunho; L nas DUAS linhas; o cobrancas guarda as 2 linhas do e-mail', [null, 1, [L194, { ...L194, linha: 195 }], [194, 195]],
+      [r.erro, r.gmail.rascunhos.length, r.pedidoL, ((r.cobrancas || {})['SOFT PRE_S02_L194'] || {}).linhas]);
+  }
+  for (const [amb, wf, sufixo] of [['homolog', WF_HML, '_hml'], ['produção', WF_PROD, '']]) {
+    const cen = '7c D65 (d) a L parou depois do rascunho, ' + amb;
+    const ambiente = amb === 'homolog' ? 'homolog' : 'producao';
+    const com = (it) => { it.json.config = { ...it.json.config, ambiente }; return it; };
+    // 1ª passada: rascunho criado, cobrancas gravado; a cadeia da L "para" (o teste não segue além da Escrita L — 01)
+    const r1 = await rodar({ wf, sufixo, inicio: 'Montar e-mail colaborador', entrada: [com(itemPedido(194, 'rascunho'))] });
+    caso(cen, '1ª passada: 1 rascunho, cobrancas gravado ANTES da cadeia da L, L pedida', [null, 1, true, [L194]], [r1.erro, r1.gmail.rascunhos.length, r1.ordem.indexOf('Gravar cobrancas.json') !== -1 && r1.ordem.indexOf('Gravar cobrancas.json') < r1.ordem.indexOf('[parou em] Escrita L — 01 config e alvos'), r1.pedidoL]);
+    // 2ª passada: a linha ainda está "SOLICITAR" (a L não foi gravada), com o cobrancas da 1ª
+    const r2 = await rodar({ wf, sufixo, cobrancas: r1.cobrancas, inicio: 'Montar e-mail colaborador', entrada: [com(itemPedido(194, 'rascunho', r1.cobrancas))] });
+    caso(cen, '2ª passada: NENHUM rascunho novo; a linha sai como "pedido_ja_criado"; nenhum pedido de L', [null, 0, 'pedido_ja_criado', []],
+      [r2.erro, r2.gmail.rascunhos.length, ((r2.saida('Montar e-mail colaborador') || [])[0] || {}).acao, r2.pedidoL]);
+  }
+  {
+    const cen = '7c D65 (d) 2 blocos: a 2ª linha também não vira pedido novo';
+    const extra = { nomeColaborador: 'PESSOA DUPLA' };
+    const mk = (cob) => { const a = itemPedido(194, 'rascunho', cob); a.json.nota.colunaJ = 'CARGO - PESSOA DUPLA - 27/07 A 31/07'; a.json.periodo = '27/07 A 31/07'; Object.assign(a.json, extra);
+      const b = itemPedido(195, 'rascunho', cob); Object.assign(b.json, extra); return [a, b]; };
+    const r1 = await rodar({ limite: 0, inicio: 'Montar e-mail colaborador', entrada: mk({}) });
+    const r2 = await rodar({ limite: 0, cobrancas: r1.cobrancas, inicio: 'Montar e-mail colaborador', entrada: mk(r1.cobrancas) });
+    caso(cen, '2ª passada: 0 rascunhos; L194 e L195 saem "pedido_ja_criado"', [1, 0, ['pedido_ja_criado', 'pedido_ja_criado']], [r1.gmail.rascunhos.length, r2.gmail.rascunhos.length, (r2.saida('Montar e-mail colaborador') || []).map((d) => d.acao)]);
+  }
+  {
+    const cen = '7c D65 (e) a coluna N continua igual';
+    const it = itemPedido(194, 'rascunho'); it.json.atualizarColunaNPara = 'OK - ASSINADO';
+    const r = await rodar({ inicio: 'Montar e-mail colaborador', entrada: [it] });
+    caso(cen, 'a N vai à cadeia da N ANTES do e-mail, sozinha (sem L junto), como antes', [[{ mudancasColunaN: [{ projetoId: 'SOFT_PRE', linha: 194, valor: 'OK - ASSINADO' }], mudancasColunaL: [] }], 0],
+      [r.pedidoN, r.gmail.rascunhos.length]);
+  }
+
+  // ======================================================================================
+  console.log('\n== 7d. D17 + D61\': cobrança em rascunho na mesma thread ==');
+  const entrada114 = (extra = {}) => ({ 'SOFT PRE_S02_L114': { threadId: 't-114', draftId: 'r-114', gatilho: 'SOLICITAR', data_base_cobranca: '2026-11-07', data_ultima_cobranca: '2026-11-07', contagem_cobrancas: 0, status_ciclo: 'em_andamento',
+    assunto: 'SMTC - S02 | SOFT PRE | EMISSÃO DE NF | REF. AGO (ENVIAR ATÉ 07.11) | PESSOA 114', emailDestino: 'teste@exemplo.invalid', emailCopia: 'copia@exemplo.invalid', marcadores: ['IA', 'SOFT PRE - PEDIDO DE NOTAS'], linhas: [114], ...extra } });
+  const TH = () => ({ 't-114': [{ id: 'm-114', labelIds: ['SENT'] }] });
+  const cobrar = (op) => rodar({ limite: 0, threads: TH(), inicio: 'Filtrar por Status Box (novo pedido / monitoramento)', ...op, entrada: [itemFiltro(114, 'SOLICITADA MI', op.modo || 'rascunho', op.cobrancas)] });
+  for (const modo of ['rascunho', 'automatico']) {
+    const cen = '7d (a) cobrança devida, modo ' + modo;
+    const est = entrada114();
+    const r = await cobrar({ modo, cobrancas: est, agora: '2026-11-08T15:00:00Z' });
+    const rc = r.gmail.rascunhos[0] || {};
+    caso(cen, 'sem erro; 1 RASCUNHO na mesma thread (t-114), com o assunto e o destinatário do pedido; 0 envios', [null, 1, 't-114', est['SOFT PRE_S02_L114'].assunto, 'teste@exemplo.invalid', 'copia@exemplo.invalid'],
+      [r.erro, r.gmail.rascunhos.length, rc.threadIdPedido, rc.assunto, rc.para, rc.cc]);
+    const e = (r.cobrancas || {})['SOFT PRE_S02_L114'] || {};
+    caso(cen, 'cobrancas: soma 1, data da cobrança, id do RASCUNHO da cobrança, threadId; o id do rascunho do pedido fica', [1, '2026-11-08', rc.id, 't-114', 'r-114'], [e.contagem_cobrancas, e.data_ultima_cobranca, e.draftIdCobranca, e.threadId, e.draftId]);
+    caso(cen, 'a cobrança não grava a L', false, !!r.chegou['Escrita L — 01 config e alvos']);
+    semViolacao(cen, r);
+  }
+  {
+    const cen = '7d (b) cadência';
+    const acao = async (est, agora) => (((await cobrar({ cobrancas: est, agora })).saida('Avaliar cobrança') || [])[0] || {}).acao;
+    const sol = entrada114();
+    caso(cen, 'SOLICITAR (base = dia do pedido 07/11): 07/11 nada; 08/11 1ª cobrança', ['nenhuma', 'cobrar_rascunho'], [await acao(sol, '2026-11-07T20:00:00Z'), await acao(sol, '2026-11-08T13:00:00Z')]);
+    const prog = entrada114({ gatilho: 'PROGRAMAR_ATE', data_base_cobranca: '2026-11-20' });
+    caso(cen, 'PROGRAMAR ATÉ 20/11 (pedido criado em 07/11): 08/11 e 20/11 nada; 21/11 1ª cobrança', ['nenhuma', 'nenhuma', 'cobrar_rascunho'], [await acao(prog, '2026-11-08T13:00:00Z'), await acao(prog, '2026-11-20T13:00:00Z'), await acao(prog, '2026-11-21T13:00:00Z')]);
+    const seg = entrada114({ contagem_cobrancas: 1, data_ultima_cobranca: '2026-11-08' });
+    caso(cen, '2ª cobrança 5 dias depois da 1ª (08/11): 12/11 nada; 13/11 cobra', ['nenhuma', 'cobrar_rascunho'], [await acao(seg, '2026-11-12T13:00:00Z'), await acao(seg, '2026-11-13T13:00:00Z')]);
+    caso(cen, 'perto do vencimento (10/12 - 5 = 05/12): 04/12 ainda cobra; 05/12 encerra (como antes)', ['cobrar_rascunho', 'encerrar_sem_resposta'], [await acao(seg, '2026-12-04T13:00:00Z'), await acao(seg, '2026-12-05T13:00:00Z')]);
+    const antiga = entrada114({ data_base_cobranca: undefined, dataAlvoEnvio: '2026-11-20T00:00:00.000Z' });
+    caso(cen, 'entrada antiga do PROGRAMAR ATÉ (sem data_base, com dataAlvoEnvio 20/11): 21/11 cobra', 'cobrar_rascunho', await acao(antiga, '2026-11-21T13:00:00Z'));
+  }
+  {
+    const cen = '7d (c) sem threadId';
+    const est = entrada114({ threadId: null });
+    const r = await cobrar({ cobrancas: est, agora: '2026-11-08T15:00:00Z' });
+    caso(cen, 'não cria rascunho, não soma, e o Relatório avisa', [null, 0, 0, true], [r.erro, r.gmail.rascunhos.length, ((r.cobrancas || {})['SOFT PRE_S02_L114'] || {}).contagem_cobrancas,
+      (r.relatorio || '').includes('Cobrança não criada (conferir à mão): L114: sem threadId do pedido')], r.relatorio);
+    semViolacao(cen, r);
+  }
+  {
+    const cen = '7d (c) entrada antiga sem data base';
+    const est = entrada114({ data_base_cobranca: undefined });
+    const r = await cobrar({ cobrancas: est, agora: '2026-11-08T15:00:00Z' });
+    caso(cen, 'não inventa data: não cria, não soma e relata', [null, 0, true], [r.erro, r.gmail.rascunhos.length, (r.relatorio || '').includes('L114: sem data base da 1ª cobrança')], r.relatorio);
+  }
+  const D53C = [
+    { nome: 'os marcadores existem', op: {}, ids: [idDe('IA'), idDe('SOFT PRE - PEDIDO DE NOTAS')], rel: null },
+    { nome: 'falta o do projeto', op: { marcadores: MARC_5.filter((l) => l.name !== 'SOFT PRE - PEDIDO DE NOTAS') }, ids: [idDe('IA')], rel: 'Marcadores não encontrados no Gmail: SOFT PRE - PEDIDO DE NOTAS' },
+    { nome: 'lista vazia', op: { marcadores: [] }, ids: null, rel: 'Marcadores não encontrados no Gmail: IA, SOFT PRE - PEDIDO DE NOTAS' },
+    { nome: 'erro na listagem', op: { falharListagem: true }, ids: null, rel: 'Não consegui listar os marcadores do Gmail:' },
+    { nome: 'erro ao aplicar', op: { falharAplicar: true }, ids: [idDe('IA'), idDe('SOFT PRE - PEDIDO DE NOTAS')], rel: 'E-mails criados sem marcador (erro ao aplicar): 1' },
+  ];
+  for (const c of D53C) {
+    const cen = '7d (d) marcadores da cobrança: ' + c.nome;
+    const r = await cobrar({ ...c.op, cobrancas: entrada114(), agora: '2026-11-08T15:00:00Z' });
+    const ap = aplicarChamadas(r);
+    caso(cen, 'sem erro; o rascunho da cobrança é criado e conta (soma 1)', [null, 1, 1], [r.erro, r.gmail.rascunhos.length, ((r.cobrancas || {})['SOFT PRE_S02_L114'] || {}).contagem_cobrancas]);
+    caso(cen, c.ids ? 'Aplicar 1x, no rascunho da cobrança, com os ids encontrados' : 'Aplicar NÃO chamado', c.ids ? [1, c.ids, r.gmail.rascunhos[0] && r.gmail.rascunhos[0].messageId] : [0], c.ids ? [ap.length, ap[0] && ap[0].p.labelIds, ap[0] && ap[0].p.messageId] : [ap.length]);
+    if (c.rel) caso(cen, 'Relatório avisa: "' + c.rel + '"', true, (r.relatorio || '').includes(c.rel), r.relatorio);
+    semViolacao(cen, r);
   }
 
   // ======================================================================================
@@ -331,12 +522,14 @@ const semViolacao = (cen, r) => caso(cen, 'Gmail: nenhum envio em modo rascunho 
   }
 
   // ======================================================================================
-  console.log('\n== 8. Em modo rascunho NUNCA há envio, em nenhum caminho testado ==');
+  console.log('\n== 8. NUNCA há envio, em nenhum caminho nem modo (D64) ==');
   {
     const cen = '8 nunca envia';
-    const est = { 'SOFT PRE_S02_L114': { threadId: 't-114', data_ultima_cobranca: '2026-11-01', contagem_cobrancas: 1, status_ciclo: 'em_andamento' } };
-    const r = await rodar({ limite: 0, cobrancas: est, inicio: 'Montar e-mail colaborador', entrada: [itemPedido(194, 'rascunho', est), itemPedido(195, 'rascunho', est)] });
-    caso(cen, 'pedidos em modo rascunho: 0 envios e 0 violações', [0, 0], [r.gmail.envios.length, r.gmail.violacoes.length]);
+    for (const modo of ['rascunho', 'automatico']) {
+      const r = await rodar({ modo, limite: 0, inicio: 'Montar e-mail colaborador', entrada: [itemPedido(194, modo), itemPedido(195, modo)] });
+      caso(cen, 'pedidos em modo ' + modo + ': 2 rascunhos, 0 envios e 0 violações', [2, 0, 0], [r.gmail.rascunhos.length, r.gmail.envios.length, r.gmail.violacoes.length]);
+    }
+    caso(cen, 'em TODOS os cenários deste arquivo, somados: 0 violações (envio, resposta, encaminhamento ou envio de rascunho)', [], VIOLACOES_TODAS);
   }
 
   const falhas = casos.filter((c) => !c.ok);
