@@ -131,6 +131,8 @@ module.exports = function criarMotor({ box, semJszip, fs: disco, gmail, agora })
         outs = [[]];
         const P = n.parameters;
         const neverError = !!(P.options && P.options.response && P.options.response.response && P.options.response.response.neverError);
+        // 34ª rodada: "resposta completa" (fullResponse) devolve { statusCode, statusMessage, headers, body }, como o n8n.
+        const fullResponse = !!(P.options && P.options.response && P.options.response.response && P.options.response.response.fullResponse);
         for (const [ix, it] of input.entries()) {
           const url = ev(P.url, it.json, ix);
           const qs = P.sendQuery ? JSON.parse(ev(P.jsonQuery, it.json, ix)) : {};
@@ -147,7 +149,8 @@ module.exports = function criarMotor({ box, semJszip, fs: disco, gmail, agora })
           try {
             const r = /^https:\/\/gmail\.googleapis\.com\//.test(url) ? exigirGmail(nome).http(nome, P.method || 'GET', url, qs, body) : box.http(P.method || 'GET', url, qs, body, headers, arquivo, form);
             if (r.status >= 300 && !neverError) throw new Error('HTTP ' + r.status + ' ' + (r.code || ''));
-            json = r.status < 300 ? (r.body || {}) : { type: 'error', status: r.status, code: r.code || 'x', message: r.message || '' };
+            if (fullResponse) json = { statusCode: r.status, statusMessage: r.statusMessage || '', headers: r.headers || {}, body: r.body === undefined ? '' : r.body };
+            else json = r.status < 300 ? (r.body || {}) : { type: 'error', status: r.status, code: r.code || 'x', message: r.message || '' };
           } catch (e) { if (n.onError === 'continueRegularOutput') json = { error: { message: e.message } }; else throw new Error('[' + nome + '] ' + e.message); }
           outs[0].push({ json });
         }

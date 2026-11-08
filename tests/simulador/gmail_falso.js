@@ -13,6 +13,10 @@
 //   falharRascunho       true -> draft/create dá erro (como um 500 do Gmail)
 //   rascunhoSemId        true -> draft/create responde sem o id do rascunho
 //   rascunhoSemThread    true -> draft/create responde sem o threadId da mensagem
+//   leituraRascunho      { draftId: 'existe'|'404'|'500'|'rede'|'semCorpo'|'401' } para o GET drafts/{id}
+//                        (D66, só leitura: PERMITIDO). Sem entrada: existe se o rascunho foi criado
+//                        neste Gmail falso ou está em `rascunhosExistentes`; senão, 404.
+//   rascunhosExistentes  [draftId] que já existiam antes da passada
 //   marcadores           [{ id, name }] devolvidos por label/getAll
 //   falharListagem       true -> label/getAll dá erro (como um 403/500 do Gmail)
 //   falharAplicar        true -> message/addLabels dá erro
@@ -64,6 +68,12 @@ module.exports = function criarGmail(cfg = {}) {
         if (invalido) throw new Error('Invalid label: ' + invalido);
         return { id: p.messageId, threadId: null, labelIds: ['DRAFT'].concat(ids) };
       }
+      case 'draft/get': {
+        const r = ler(p.messageId || p.draftId);
+        if (r.status === 'rede') throw new Error('getaddrinfo ENOTFOUND gmail.googleapis.com (simulado)');
+        if (r.status >= 300) throw new Error(r.status === 404 ? 'Requested entity was not found. (simulado)' : 'HTTP ' + r.status + ' (simulado)');
+        return r.body;
+      }
       case 'thread/get': {
         const msgs = threads[p.threadId];
         if (!msgs) throw new Error('Requested entity was not found (thread ' + p.threadId + ')');
@@ -75,6 +85,20 @@ module.exports = function criarGmail(cfg = {}) {
         throw new Error('Gmail falso: operação não simulada ' + op);
     }
   }
+  // D66: leitura de rascunho (permitida). Devolve { status, body } ou { status: 'rede' }.
+  const leituras = [];
+  function ler(id) {
+    leituras.push(id);
+    const modo = (cfg.leituraRascunho || {})[id];
+    if (modo === 'rede') return { status: 'rede' };
+    if (modo === '500') return { status: 500, body: { error: { code: 500, message: 'Backend Error' } } };
+    if (modo === '401') return { status: 401, body: { error: { code: 401, message: 'Invalid Credentials' } } };
+    if (modo === 'semCorpo') return { status: 200, body: '' };
+    if (modo === '404') return { status: 404, body: { error: { code: 404, message: 'Requested entity was not found.' } } };
+    const r = rascunhos.find((x) => x.id === id);
+    if (modo === 'existe' || r || (cfg.rascunhosExistentes || []).includes(id)) return { status: 200, body: { id, message: { id: (r && r.messageId) || 'm-' + id, threadId: (r && r.threadId) || null } } };
+    return { status: 404, body: { error: { code: 404, message: 'Requested entity was not found.' } } };
+  }
   function http(no, method, url, qs, body) {
     const caminho = url.replace(/^https:\/\/gmail\.googleapis\.com\/gmail\/v1\/users\/me/, '');
     chamadas.push({ no, op: 'HTTP ' + method + ' ' + caminho, p: { qs, body } });
@@ -84,12 +108,12 @@ module.exports = function criarGmail(cfg = {}) {
       return threads[t] ? { status: 200, body: { id: t, messages: threads[t] } } : { status: 404, body: { error: { code: 404 } } };
     }
     if (method === 'GET' && caminho.startsWith('/drafts/')) {
-      const id = caminho.slice('/drafts/'.length);
-      const r = rascunhos.find((x) => x.id === id);
-      return r ? { status: 200, body: { id, message: { id: r.messageId, threadId: r.threadId } } } : { status: 404, body: { error: { code: 404 } } };
+      const r = ler(caminho.slice('/drafts/'.length).split('?')[0]);
+      if (r.status === 'rede') throw new Error('getaddrinfo ENOTFOUND gmail.googleapis.com (simulado)');
+      return r;
     }
     if (method !== 'GET') { violacoes.push({ no, tipo: 'HTTP ' + method + ' ' + caminho }); throw new Error('Gmail falso: chamada que escreve não simulada: ' + method + ' ' + caminho); }
     return { status: 404, body: {} };
   }
-  return { chamar, http, chamadas, envios, violacoes, rascunhos, threads };
+  return { chamar, http, chamadas, envios, violacoes, rascunhos, threads, leituras };
 };

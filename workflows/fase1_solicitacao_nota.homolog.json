@@ -570,7 +570,7 @@
     },
     {
       "parameters": {
-        "jsCode": "/**\n * Data do calendário de Brasília (D59, 32ª rodada, 07/11/2026).\n *\n * O container do n8n roda em UTC: `new Date().toISOString().slice(0, 10)` e `getDate()` dão o dia\n * UTC, que depois das 21:00 de Brasília já é o dia seguinte (o rascunho da execução 682, às 22:13\n * de 07/11, saiu \"ENVIAR ATÉ 08.11\" e o cobrancas com \"2026-11-08\"). Aqui o fuso é explícito\n * (America/Sao_Paulo), qualquer que seja o fuso da máquina.\n *\n * Embutido nos Code nodes da Fase 1 pelo marcador de inclusão do scripts/gerar_workflows.js.\n *   hojeBrasilia(agora)      -> 'AAAA-MM-DD' (o dia em Brasília no instante `agora`; padrão: agora)\n *   dataBrasilia(agora)      -> Date ao MEIO-DIA LOCAL do dia de Brasília: getDate()/getMonth()/\n *                               getFullYear() e setDate(+n) dão o calendário de Brasília em\n *                               qualquer fuso de máquina (o meio-dia evita virar o dia por fuso).\n *   ymdBrasilia(d)           -> 'AAAA-MM-DD' de um Date criado pelo dataBrasilia (campos locais).\n */\nconst FUSO_BRASILIA = 'America/Sao_Paulo';\n\nfunction partesBrasilia(agora) {\n  const d = agora === undefined ? new Date() : new Date(agora);\n  if (isNaN(d.getTime())) throw new Error('data inválida para o calendário de Brasília: ' + agora);\n  try {\n    const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: FUSO_BRASILIA, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(d).map((x) => [x.type, x.value]));\n    const ano = Number(p.year), mes = Number(p.month), dia = Number(p.day);\n    if (ano > 2000 && mes >= 1 && mes <= 12 && dia >= 1 && dia <= 31) return { ano, mes, dia };\n  } catch (e) { /* sem Intl com fuso: cai no deslocamento fixo abaixo */ }\n  // Brasília não tem horário de verão desde 2019: UTC-3 fixo.\n  const b = new Date(d.getTime() - 3 * 3600000);\n  return { ano: b.getUTCFullYear(), mes: b.getUTCMonth() + 1, dia: b.getUTCDate() };\n}\n\nfunction hojeBrasilia(agora) {\n  const { ano, mes, dia } = partesBrasilia(agora);\n  return ano + '-' + String(mes).padStart(2, '0') + '-' + String(dia).padStart(2, '0');\n}\n\nfunction dataBrasilia(agora) {\n  const { ano, mes, dia } = partesBrasilia(agora);\n  return new Date(ano, mes - 1, dia, 12, 0, 0, 0);\n}\n\nfunction ymdBrasilia(d) {\n  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');\n}\n\n\n// Consolida: (a) mudancas de coluna N/L a escrever no Box, (b) novo cobrancas.json,\n// (c) resumo pro relatorio (incl. lacunas de informacao, correcoes de contrato e alertas\n// de situacao nao mapeada), (d) registro no log diario pro /resumo (secao 7.3).\n// Suporta itens de 1 linha (colaborador/cobranca/pendente) e itens de GRUPO fornecedor\n// (varias linhas por item, campo linhasAfetadas — secao 3.2.1).\n\nconst itens = $input.all().map((i) => i.json);\n\nconst mudancasColunaN = [];\nconst mudancasColunaL = [];\n\nfor (const d of itens) {\n  if (Array.isArray(d.linhasAfetadas)) {\n    for (const la of d.linhasAfetadas) {\n      if (la.atualizarColunaNPara) mudancasColunaN.push({ projetoId: la.projetoId, linha: la.linha, valor: la.atualizarColunaNPara });\n      if (d.atualizarColunaL && d.novoValorColunaL) mudancasColunaL.push({ projetoId: la.projetoId, linha: la.linha, valor: d.novoValorColunaL });\n    }\n    continue;\n  }\n  if (d.atualizarColunaNPara) mudancasColunaN.push({ projetoId: d.nota.projetoId, linha: d.nota.linha, valor: d.atualizarColunaNPara });\n  if (d.atualizarColunaL && d.novoValorColunaL) mudancasColunaL.push({ projetoId: d.nota.projetoId, linha: d.nota.linha, valor: d.novoValorColunaL });\n}\n\nconst cobrancasAtualizadas = { ...(itens.find((d) => d.cobrancas) ? itens.find((d) => d.cobrancas).cobrancas : {}) };\nfor (const d of itens) {\n  if (d.chaveCobranca && d.novoEstadoCobranca) cobrancasAtualizadas[d.chaveCobranca] = d.novoEstadoCobranca;\n}\n\nconst alertasEncerramento = itens.filter((d) => d.acao === 'encerrar_sem_resposta');\nconst alertasSituacaoNaoMapeada = itens.filter((d) => d.acao === 'alerta_situacao_nao_mapeada');\nconst correcoesContrato = itens.filter((d) => d.acao === 'avisar_correcao_contrato');\nconst rascunhosCriados = itens.filter((d) => d.acao === 'criar_rascunho' || d.acao === 'cobrar_rascunho');\n// D64 (33ª rodada): a automação nunca envia; o Relatório continua mostrando \"Envios diretos: 0\".\nconst enviosDiretos = [];\nconst pendentesContrato = itens.filter((d) => d.acao === 'pendente_contrato');\nconst comLacunaInformacao = itens.filter((d) => d.temLacunaInformacao);\n// D53 (c): marcador faltando ou erro ao aplicar só relata\nconst infoMarcadores = $('Mapear marcadores').first().json || {};\nconst marcadoresNaoEncontrados = [...new Set(itens.flatMap((d) => d.marcadoresNaoEncontrados || []))];\nconst errosMarcadores = itens.filter((d) => d.erroMarcadores);\n// D41: SOLICITADA MI sem pedido registrado\nconst semPedido = itens.filter((d) => d.acao === 'monitoramento_sem_pedido');\n// D63: REF. do assunto duvidoso -> sem rascunho, conferir à mão\nconst conferirRef = itens.filter((d) => d.acao === 'conferir_ref_mao');\n// D65/D17: rascunho sem id, pedido sem threadId (sem L) e cobrança não criada: só relata\nconst linhaDe = (d) => 'L' + (d.nota && d.nota.linha);\nconst rascunhosSemId = itens.filter((d) => d.acao === 'rascunho_sem_id' || d.acao === 'cobranca_rascunho_sem_id');\nconst pedidosSemThread = itens.filter((d) => d.pedidoSemThread);\nconst cobrancasNaoCriadas = itens.filter((d) => d.acao === 'cobranca_nao_criada');\n\nconst resumo = {\n  rascunhosCriados: rascunhosCriados.length,\n  enviosDiretos: enviosDiretos.length,\n  pendentesContrato: pendentesContrato.length,\n  comLacunaInformacao: comLacunaInformacao.length,\n  alertasSituacaoNaoMapeada: alertasSituacaoNaoMapeada.length,\n  correcoesContrato: correcoesContrato.length,\n  alertasEncerramento: alertasEncerramento.map((a) => ({ colaboradorOuFornecedor: a.nomeColaborador || (a.nota && a.nota.colunaH), projetoId: a.nota && a.nota.projetoId })),\n  marcadoresNaoEncontrados,\n  errosMarcadores: errosMarcadores.length,\n  erroListagemMarcadores: infoMarcadores.erroListagem || null,\n  linhasSemPedido: semPedido.map((d) => 'L' + (d.nota && d.nota.linha)),\n  conferirRefMao: conferirRef.flatMap((d) => d.motivosConferirRef || []),\n  rascunhosSemId: rascunhosSemId.map(linhaDe),\n  pedidosSemThread: pedidosSemThread.map(linhaDe),\n  cobrancasNaoCriadas: cobrancasNaoCriadas.map((d) => linhaDe(d) + ': ' + (d.motivoCobranca || '?')),\n};\n\nreturn [{ json: {\n  mudancasColunaN, mudancasColunaL, cobrancasAtualizadas, resumo,\n  // timestamp = o instante (ISO, UTC); data = o dia de Brasília (D59)\n  logEntry: { timestamp: new Date().toISOString(), data: hojeBrasilia(), fase: 'fase1_solicitacao_nota', resumo },\n} }];"
+        "jsCode": "/**\n * Data do calendário de Brasília (D59, 32ª rodada, 07/11/2026).\n *\n * O container do n8n roda em UTC: `new Date().toISOString().slice(0, 10)` e `getDate()` dão o dia\n * UTC, que depois das 21:00 de Brasília já é o dia seguinte (o rascunho da execução 682, às 22:13\n * de 07/11, saiu \"ENVIAR ATÉ 08.11\" e o cobrancas com \"2026-11-08\"). Aqui o fuso é explícito\n * (America/Sao_Paulo), qualquer que seja o fuso da máquina.\n *\n * Embutido nos Code nodes da Fase 1 pelo marcador de inclusão do scripts/gerar_workflows.js.\n *   hojeBrasilia(agora)      -> 'AAAA-MM-DD' (o dia em Brasília no instante `agora`; padrão: agora)\n *   dataBrasilia(agora)      -> Date ao MEIO-DIA LOCAL do dia de Brasília: getDate()/getMonth()/\n *                               getFullYear() e setDate(+n) dão o calendário de Brasília em\n *                               qualquer fuso de máquina (o meio-dia evita virar o dia por fuso).\n *   ymdBrasilia(d)           -> 'AAAA-MM-DD' de um Date criado pelo dataBrasilia (campos locais).\n */\nconst FUSO_BRASILIA = 'America/Sao_Paulo';\n\nfunction partesBrasilia(agora) {\n  const d = agora === undefined ? new Date() : new Date(agora);\n  if (isNaN(d.getTime())) throw new Error('data inválida para o calendário de Brasília: ' + agora);\n  try {\n    const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: FUSO_BRASILIA, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(d).map((x) => [x.type, x.value]));\n    const ano = Number(p.year), mes = Number(p.month), dia = Number(p.day);\n    if (ano > 2000 && mes >= 1 && mes <= 12 && dia >= 1 && dia <= 31) return { ano, mes, dia };\n  } catch (e) { /* sem Intl com fuso: cai no deslocamento fixo abaixo */ }\n  // Brasília não tem horário de verão desde 2019: UTC-3 fixo.\n  const b = new Date(d.getTime() - 3 * 3600000);\n  return { ano: b.getUTCFullYear(), mes: b.getUTCMonth() + 1, dia: b.getUTCDate() };\n}\n\nfunction hojeBrasilia(agora) {\n  const { ano, mes, dia } = partesBrasilia(agora);\n  return ano + '-' + String(mes).padStart(2, '0') + '-' + String(dia).padStart(2, '0');\n}\n\nfunction dataBrasilia(agora) {\n  const { ano, mes, dia } = partesBrasilia(agora);\n  return new Date(ano, mes - 1, dia, 12, 0, 0, 0);\n}\n\nfunction ymdBrasilia(d) {\n  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');\n}\n\n\n// Consolida: (a) mudancas de coluna N/L a escrever no Box, (b) novo cobrancas.json,\n// (c) resumo pro relatorio (incl. lacunas de informacao, correcoes de contrato e alertas\n// de situacao nao mapeada), (d) registro no log diario pro /resumo (secao 7.3).\n// Suporta itens de 1 linha (colaborador/cobranca/pendente) e itens de GRUPO fornecedor\n// (varias linhas por item, campo linhasAfetadas — secao 3.2.1).\n\nconst itens = $input.all().map((i) => i.json);\n\nconst mudancasColunaN = [];\nconst mudancasColunaL = [];\n\nfor (const d of itens) {\n  if (Array.isArray(d.linhasAfetadas)) {\n    for (const la of d.linhasAfetadas) {\n      if (la.atualizarColunaNPara) mudancasColunaN.push({ projetoId: la.projetoId, linha: la.linha, valor: la.atualizarColunaNPara });\n      if (d.atualizarColunaL && d.novoValorColunaL) mudancasColunaL.push({ projetoId: la.projetoId, linha: la.linha, valor: d.novoValorColunaL });\n    }\n    continue;\n  }\n  if (d.atualizarColunaNPara) mudancasColunaN.push({ projetoId: d.nota.projetoId, linha: d.nota.linha, valor: d.atualizarColunaNPara });\n  if (d.atualizarColunaL && d.novoValorColunaL) mudancasColunaL.push({ projetoId: d.nota.projetoId, linha: d.nota.linha, valor: d.novoValorColunaL });\n}\n\nconst cobrancasAtualizadas = { ...(itens.find((d) => d.cobrancas) ? itens.find((d) => d.cobrancas).cobrancas : {}) };\nfor (const d of itens) {\n  if (d.chaveCobranca && d.novoEstadoCobranca) cobrancasAtualizadas[d.chaveCobranca] = d.novoEstadoCobranca;\n}\n\nconst alertasEncerramento = itens.filter((d) => d.acao === 'encerrar_sem_resposta');\nconst alertasSituacaoNaoMapeada = itens.filter((d) => d.acao === 'alerta_situacao_nao_mapeada');\nconst correcoesContrato = itens.filter((d) => d.acao === 'avisar_correcao_contrato');\nconst rascunhosCriados = itens.filter((d) => d.acao === 'criar_rascunho' || d.acao === 'cobrar_rascunho');\n// D64 (33ª rodada): a automação nunca envia; o Relatório continua mostrando \"Envios diretos: 0\".\nconst enviosDiretos = [];\nconst pendentesContrato = itens.filter((d) => d.acao === 'pendente_contrato');\nconst comLacunaInformacao = itens.filter((d) => d.temLacunaInformacao);\n// D53 (c): marcador faltando ou erro ao aplicar só relata\nconst infoMarcadores = $('Mapear marcadores').first().json || {};\nconst marcadoresNaoEncontrados = [...new Set(itens.flatMap((d) => d.marcadoresNaoEncontrados || []))];\nconst errosMarcadores = itens.filter((d) => d.erroMarcadores);\n// D41: SOLICITADA MI sem pedido registrado\nconst semPedido = itens.filter((d) => d.acao === 'monitoramento_sem_pedido');\n// D63: REF. do assunto duvidoso -> sem rascunho, conferir à mão\nconst conferirRef = itens.filter((d) => d.acao === 'conferir_ref_mao');\n// D65/D17: rascunho sem id, pedido sem threadId (sem L) e cobrança não criada: só relata\nconst linhaDe = (d) => 'L' + (d.nota && d.nota.linha);\nconst rascunhosSemId = itens.filter((d) => d.acao === 'rascunho_sem_id' || d.acao === 'cobranca_rascunho_sem_id');\nconst pedidosSemThread = itens.filter((d) => d.pedidoSemThread);\nconst cobrancasNaoCriadas = itens.filter((d) => d.acao === 'cobranca_nao_criada');\n// D66: cobrança devida que não foi criada por causa de um rascunho (ou da dúvida sobre ele)\nconst pedidoEmRascunho = itens.filter((d) => d.acao === 'cobranca_pedido_em_rascunho');\nconst cobrancaAnteriorEmRascunho = itens.filter((d) => d.acao === 'cobranca_anterior_em_rascunho');\nconst rascunhoNaoVerificado = itens.filter((d) => d.acao === 'cobranca_nao_verificada');\n\nconst resumo = {\n  rascunhosCriados: rascunhosCriados.length,\n  enviosDiretos: enviosDiretos.length,\n  pendentesContrato: pendentesContrato.length,\n  comLacunaInformacao: comLacunaInformacao.length,\n  alertasSituacaoNaoMapeada: alertasSituacaoNaoMapeada.length,\n  correcoesContrato: correcoesContrato.length,\n  alertasEncerramento: alertasEncerramento.map((a) => ({ colaboradorOuFornecedor: a.nomeColaborador || (a.nota && a.nota.colunaH), projetoId: a.nota && a.nota.projetoId })),\n  marcadoresNaoEncontrados,\n  errosMarcadores: errosMarcadores.length,\n  erroListagemMarcadores: infoMarcadores.erroListagem || null,\n  linhasSemPedido: semPedido.map((d) => 'L' + (d.nota && d.nota.linha)),\n  conferirRefMao: conferirRef.flatMap((d) => d.motivosConferirRef || []),\n  rascunhosSemId: rascunhosSemId.map(linhaDe),\n  pedidosSemThread: pedidosSemThread.map(linhaDe),\n  cobrancasNaoCriadas: cobrancasNaoCriadas.map((d) => linhaDe(d) + ': ' + (d.motivoCobranca || '?')),\n  pedidoEmRascunho: pedidoEmRascunho.map(linhaDe),\n  cobrancaAnteriorEmRascunho: cobrancaAnteriorEmRascunho.map(linhaDe),\n  rascunhoNaoVerificado: rascunhoNaoVerificado.map((d) => linhaDe(d) + ' (' + (d.motivoVerificacao || '?') + ')'),\n};\n\nreturn [{ json: {\n  mudancasColunaN, mudancasColunaL, cobrancasAtualizadas, resumo,\n  // timestamp = o instante (ISO, UTC); data = o dia de Brasília (D59)\n  logEntry: { timestamp: new Date().toISOString(), data: hojeBrasilia(), fase: 'fase1_solicitacao_nota', resumo },\n} }];"
       },
       "id": "n29-consolidar",
       "name": "Consolidar mudanças e cobrancas.json",
@@ -625,7 +625,7 @@
     {
       "parameters": {
         "chatId": "749277207",
-        "text": "={{ /* escapa-html */ String('📋 Relatório Fase 1 — Solicitação de Nota\\n\\nRascunhos criados: ' + ($json.resumo?.rascunhosCriados ?? '?') + '\\nEnvios diretos: ' + ($json.resumo?.enviosDiretos ?? '?') + '\\nPendentes de contrato: ' + ($json.resumo?.pendentesContrato ?? '?') + '\\nCom lacuna de informação (FALTA INFORMAÇÃO): ' + ($json.resumo?.comLacunaInformacao ?? '?') + '\\nCorreções de contrato aplicadas: ' + ($json.resumo?.correcoesContrato ?? '?') + '\\nSituações não mapeadas (alertadas): ' + ($json.resumo?.alertasSituacaoNaoMapeada ?? '?') + '\\nCiclos encerrados sem resposta: ' + ($json.resumo?.alertasEncerramento?.length ?? '?') + (($json.resumo?.rascunhosSemId || []).length ? '\\nGmail não devolveu o id do rascunho (conferir à mão; coluna L não gravada): ' + $json.resumo.rascunhosSemId.join(', ') : '') + (($json.resumo?.pedidosSemThread || []).length ? '\\nRascunho de pedido sem threadId (coluna L não gravada; conferir à mão): ' + $json.resumo.pedidosSemThread.join(', ') : '') + (($json.resumo?.cobrancasNaoCriadas || []).length ? '\\nCobrança não criada (conferir à mão): ' + $json.resumo.cobrancasNaoCriadas.join(' | ') : '') + (($json.resumo?.conferirRefMao || []).length ? '\\nSem rascunho, conferir à mão o REF. do assunto: ' + $json.resumo.conferirRefMao.join(' | ') : '') + (($json.resumo?.linhasSemPedido || []).length ? '\\nLinhas SOLICITADA MI sem pedido registrado (conferir à mão): ' + $json.resumo.linhasSemPedido.join(', ') : '') + (($json.resumo?.marcadoresNaoEncontrados || []).length ? '\\nMarcadores não encontrados no Gmail: ' + $json.resumo.marcadoresNaoEncontrados.join(', ') : '') + ($json.resumo?.errosMarcadores ? '\\nE-mails criados sem marcador (erro ao aplicar): ' + $json.resumo.errosMarcadores : '') + ($json.resumo?.erroListagemMarcadores ? '\\nNão consegui listar os marcadores do Gmail: ' + $json.resumo.erroListagemMarcadores : '') + ($json.resumo?.semCandidatas ? '\\n\\n0 candidatas nesta passada (' + ($json.resumo.fonteId || '?') + ')' : '') ?? \"\").replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') }}",
+        "text": "={{ /* escapa-html */ String('📋 Relatório Fase 1 — Solicitação de Nota\\n\\nRascunhos criados: ' + ($json.resumo?.rascunhosCriados ?? '?') + '\\nEnvios diretos: ' + ($json.resumo?.enviosDiretos ?? '?') + '\\nPendentes de contrato: ' + ($json.resumo?.pendentesContrato ?? '?') + '\\nCom lacuna de informação (FALTA INFORMAÇÃO): ' + ($json.resumo?.comLacunaInformacao ?? '?') + '\\nCorreções de contrato aplicadas: ' + ($json.resumo?.correcoesContrato ?? '?') + '\\nSituações não mapeadas (alertadas): ' + ($json.resumo?.alertasSituacaoNaoMapeada ?? '?') + '\\nCiclos encerrados sem resposta: ' + ($json.resumo?.alertasEncerramento?.length ?? '?') + (($json.resumo?.rascunhosSemId || []).length ? '\\nGmail não devolveu o id do rascunho (conferir à mão; coluna L não gravada): ' + $json.resumo.rascunhosSemId.join(', ') : '') + (($json.resumo?.pedidosSemThread || []).length ? '\\nRascunho de pedido sem threadId (coluna L não gravada; conferir à mão): ' + $json.resumo.pedidosSemThread.join(', ') : '') + (($json.resumo?.cobrancasNaoCriadas || []).length ? '\\nCobrança não criada (conferir à mão): ' + $json.resumo.cobrancasNaoCriadas.join(' | ') : '') + (($json.resumo?.pedidoEmRascunho || []).length ? '\\nPedido ainda em rascunho (cobrança não criada): ' + $json.resumo.pedidoEmRascunho.join(', ') : '') + (($json.resumo?.cobrancaAnteriorEmRascunho || []).length ? '\\nCobrança anterior ainda em rascunho (outra não criada): ' + $json.resumo.cobrancaAnteriorEmRascunho.join(', ') : '') + (($json.resumo?.rascunhoNaoVerificado || []).length ? '\\nNão consegui verificar o rascunho (cobrança não criada): ' + $json.resumo.rascunhoNaoVerificado.join(' | ') : '') + (($json.resumo?.conferirRefMao || []).length ? '\\nSem rascunho, conferir à mão o REF. do assunto: ' + $json.resumo.conferirRefMao.join(' | ') : '') + (($json.resumo?.linhasSemPedido || []).length ? '\\nLinhas SOLICITADA MI sem pedido registrado (conferir à mão): ' + $json.resumo.linhasSemPedido.join(', ') : '') + (($json.resumo?.marcadoresNaoEncontrados || []).length ? '\\nMarcadores não encontrados no Gmail: ' + $json.resumo.marcadoresNaoEncontrados.join(', ') : '') + ($json.resumo?.errosMarcadores ? '\\nE-mails criados sem marcador (erro ao aplicar): ' + $json.resumo.errosMarcadores : '') + ($json.resumo?.erroListagemMarcadores ? '\\nNão consegui listar os marcadores do Gmail: ' + $json.resumo.erroListagemMarcadores : '') + ($json.resumo?.semCandidatas ? '\\n\\n0 candidatas nesta passada (' + ($json.resumo.fonteId || '?') + ')' : '') ?? \"\").replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') }}",
         "additionalFields": {
           "appendAttribution": false,
           "parse_mode": "HTML"
@@ -1265,8 +1265,8 @@
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.1,
       "position": [
-        5440,
-        320
+        6760,
+        20
       ],
       "credentials": {
         "gmailOAuth2": {
@@ -1525,7 +1525,7 @@
         490
       ],
       "parameters": {
-        "jsCode": "// A resposta do Gmail substitui o json do item pelos ids do rascunho/mensagem, levando\n// embora o payload do pedido (marcadores, acao, chaveCobranca...). Aqui os dois sao casados.\n//\n// O pareamento e por indice contra a SAIDA 1 do Switch (cobrar_rascunho) — e nao contra\n// $('Merge — rotas...').all()[i]. O Switch DIVIDE os itens entre as saidas, entao o indice\n// desta ramificacao nao corresponde ao indice no Merge: com um mix de acoes na mesma\n// execucao, a correlacao antiga devolvia o payload de OUTRA linha.\nconst pedidos = $('Switch — ação').all(1).map((i) => i.json);\n\n// D53 (c): os ids a aplicar saem daqui (só os que o Gmail tem); os nomes que faltam vão ao Relatório.\nconst mapaMarcadores = ($('Mapear marcadores').first().json || {}).mapa || {};\n\nreturn $input.all().map((item, i) => {\n  const j = item.json || {};\n  const msg = j.message || {};\n  const nomesMarcadores = ((pedidos[i] || {}).marcadores) || [];\n  const p = pedidos[i] || {};\n  // D17: o cobrancas guarda o id do RASCUNHO da cobrança e o threadId (nunca o id da mensagem).\n  // Sem id do rascunho, a cobrança não conta (não soma) e vai para o Relatório.\n  const novoEstadoCobranca = j.id && p.novoEstadoCobranca ? { ...p.novoEstadoCobranca, draftIdCobranca: j.id, threadId: msg.threadId || p.novoEstadoCobranca.threadId } : undefined;\n  return { json: {\n    ...p,\n    acao: j.id ? p.acao : 'cobranca_rascunho_sem_id',\n    novoEstadoCobranca,\n    labelIdsAplicar: nomesMarcadores.map((nome) => mapaMarcadores[nome]).filter(Boolean),\n    marcadoresNaoEncontrados: nomesMarcadores.filter((nome) => !mapaMarcadores[nome]),\n    draftId: j.id || null,\n    messageId: msg.id || j.id || null,\n    threadIdGmail: msg.threadId || j.threadId || null,\n  } };\n});"
+        "jsCode": "// A resposta do Gmail substitui o json do item pelos ids do rascunho/mensagem, levando\n// embora o payload do pedido (marcadores, acao, chaveCobranca...). Aqui os dois sao casados.\n//\n// O pareamento e por indice contra a SAIDA 0 do \"IF — Criar a cobrança?\" (D66): sao exatamente\n// os itens que foram ao Gmail, na mesma ordem — e nao contra\n// $('Merge — rotas...').all()[i]. O Switch DIVIDE os itens entre as saidas, entao o indice\n// desta ramificacao nao corresponde ao indice no Merge: com um mix de acoes na mesma\n// execucao, a correlacao antiga devolvia o payload de OUTRA linha.\nconst pedidos = $('IF — Criar a cobrança?').all(0).map((i) => i.json);\n\n// D53 (c): os ids a aplicar saem daqui (só os que o Gmail tem); os nomes que faltam vão ao Relatório.\nconst mapaMarcadores = ($('Mapear marcadores').first().json || {}).mapa || {};\n\nreturn $input.all().map((item, i) => {\n  const j = item.json || {};\n  const msg = j.message || {};\n  const nomesMarcadores = ((pedidos[i] || {}).marcadores) || [];\n  const p = pedidos[i] || {};\n  // D17: o cobrancas guarda o id do RASCUNHO da cobrança e o threadId (nunca o id da mensagem).\n  // Sem id do rascunho, a cobrança não conta (não soma) e vai para o Relatório.\n  const novoEstadoCobranca = j.id && p.novoEstadoCobranca ? { ...p.novoEstadoCobranca, draftIdCobranca: j.id, threadId: msg.threadId || p.novoEstadoCobranca.threadId } : undefined;\n  return { json: {\n    ...p,\n    acao: j.id ? p.acao : 'cobranca_rascunho_sem_id',\n    novoEstadoCobranca,\n    labelIdsAplicar: nomesMarcadores.map((nome) => mapaMarcadores[nome]).filter(Boolean),\n    marcadoresNaoEncontrados: nomesMarcadores.filter((nome) => !mapaMarcadores[nome]),\n    draftId: j.id || null,\n    messageId: msg.id || j.id || null,\n    threadIdGmail: msg.threadId || j.threadId || null,\n  } };\n});"
       }
     },
     {
@@ -4940,6 +4940,130 @@
         2370,
         500
       ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// D66 (34ª rodada): para cada cobrança DEVIDA (só chegam aqui as que a cadência já considera\n// devidas), uma consulta por rascunho a conferir: o do PEDIDO (draftId) e o da cobrança ANTERIOR\n// (draftIdCobranca). Entrada sem o id: nada a consultar. No máximo 1 consulta por rascunho.\n// Sem nenhuma consulta, devolve vazio (o \"sempre devolver saída\" manda 1 item vazio pela saída 1\n// do IF seguinte, para a decisão rodar mesmo assim).\nconst consultas = [];\n$input.all().forEach((item, i) => {\n  const d = item.json || {};\n  const e = (d.cobrancas || {})[d.chaveCobranca] || {};\n  if (e.draftId) consultas.push({ json: { indiceCobranca: i, tipo: 'pedido', draftIdConsulta: e.draftId } });\n  if (e.draftIdCobranca) consultas.push({ json: { indiceCobranca: i, tipo: 'cobranca', draftIdConsulta: e.draftIdCobranca } });\n});\nreturn consultas;"
+      },
+      "id": "d66-preparar-consultas",
+      "name": "Preparar consultas de rascunho (cobrança)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5440,
+        100
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $json.draftIdConsulta || '' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ]
+        }
+      },
+      "id": "d66-if-consultar",
+      "name": "IF — Há rascunho a consultar? (cobrança)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        5660,
+        100
+      ],
+      "notes": "D66: saída 0 = consultas a fazer; saída 1 = nada a consultar (o item vazio do \"sempre devolver saída\")."
+    },
+    {
+      "parameters": {
+        "url": "=https://gmail.googleapis.com/gmail/v1/users/me/drafts/{{ $json.draftIdConsulta }}?format=minimal",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "gmailOAuth2",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "d66-ler-rascunho",
+      "name": "Gmail — Ler rascunho (cobrança)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        5880,
+        20
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "cred-gmail-homolog",
+          "name": "Gmail - Homolog (Claudio Pessoal)"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true,
+      "notes": "D66: SÓ LEITURA (GET drafts/{id}). 404 = o rascunho sumiu; qualquer outra coisa que não seja 2xx com o rascunho = \"não consegui verificar\"."
+    },
+    {
+      "parameters": {
+        "numberInputs": 2
+      },
+      "id": "d66-merge-consultas",
+      "name": "Merge — consultas de rascunho (cobrança)",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        6100,
+        100
+      ],
+      "notes": "D66: junta as respostas das consultas (entrada 0) com o item vazio de quando não havia nada a consultar (entrada 1)."
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * D66 (34ª rodada, 08/11/2026): antes de criar uma cobrança, conferir (SÓ LEITURA) se o rascunho do\n * PEDIDO e o da cobrança ANTERIOR ainda existem no Gmail.\n *\n *   - rascunho do pedido ainda existe       -> não cria a cobrança (\"pedido ainda em rascunho\")\n *   - rascunho da cobrança anterior existe  -> não cria outra (\"cobrança anterior ainda em rascunho\")\n *   - não existe mais (a Michelle enviou ou apagou) -> segue a cadência e cria\n *\n * Regra de segurança: \"sumiu\" só vale com resposta clara do Gmail de que o rascunho não existe\n * (HTTP 404). QUALQUER outra coisa (5xx, falha de rede, autenticação, 2xx sem o rascunho no corpo,\n * resposta estranha) = \"não consegui verificar\": não cria, não soma e relata. Na dúvida, não cria.\n * Entrada sem o id a consultar (entrada antiga): nada a consultar, segue como antes.\n *\n * Embutido no Code node \"Decidir cobrança (rascunhos)\" pelo marcador de inclusão do gerador.\n */\n\n/**\n * Lê a resposta do HTTP Request (GET drafts/{id}, com \"nunca dar erro\" e \"resposta completa\"; ou o\n * item de erro do \"continuar em erro\").\n * @returns {{estado: 'existe'|'sumiu'|'nao_verificado', motivo: string|null}}\n */\nfunction classificarLeituraRascunho(resp, draftIdEsperado) {\n  if (!resp || typeof resp !== 'object') return { estado: 'nao_verificado', motivo: 'sem resposta' };\n  if (resp.error) return { estado: 'nao_verificado', motivo: 'erro na consulta: ' + String(resp.error.message || resp.error).slice(0, 150) };\n  const st = Number(resp.statusCode);\n  if (st === 404) return { estado: 'sumiu', motivo: null };\n  if (st >= 200 && st < 300) {\n    const corpo = resp.body;\n    if (corpo && typeof corpo === 'object' && corpo.id && (!draftIdEsperado || corpo.id === draftIdEsperado)) return { estado: 'existe', motivo: null };\n    return { estado: 'nao_verificado', motivo: 'HTTP ' + st + ' sem o rascunho no corpo' };\n  }\n  if (!st) return { estado: 'nao_verificado', motivo: 'resposta sem código HTTP' };\n  return { estado: 'nao_verificado', motivo: 'HTTP ' + st };\n}\n\n/**\n * Decide UMA linha de cobrança devida, com o resultado das consultas (null = não consultado, porque\n * não havia id a consultar). O pedido vem antes da cobrança anterior.\n * @returns {{acao: string, motivo: string|null}}\n */\nfunction decidirCobrancaPorRascunhos(leituraPedido, leituraCobranca) {\n  for (const [leitura, acaoExiste] of [[leituraPedido, 'cobranca_pedido_em_rascunho'], [leituraCobranca, 'cobranca_anterior_em_rascunho']]) {\n    if (!leitura) continue;\n    if (leitura.estado === 'existe') return { acao: acaoExiste, motivo: null };\n    if (leitura.estado !== 'sumiu') return { acao: 'cobranca_nao_verificada', motivo: leitura.motivo || 'resultado desconhecido' };\n  }\n  return { acao: 'cobrar_rascunho', motivo: null };\n}\n\n\n// D66 (34ª rodada): decide cada cobrança devida: criar, \"pedido ainda em rascunho\", \"cobrança\n// anterior ainda em rascunho\" ou \"não consegui verificar\". Só \"criar\" (acao cobrar_rascunho)\n// segue para o Gmail; as outras vão ao Relatório sem gravar no cobrancas (novoEstadoCobranca\n// some) e sem marcador.\n//\n// Pareamento por índice (armadilha do CLAUDE.md, nada de .item depois de IF/Merge):\n//   cobranças   = $('Switch — ação').all(1), na ordem em que entraram nas consultas;\n//   consultas   = $('IF — Há rascunho a consultar? (cobrança)').all(0), as que foram ao Gmail;\n//   respostas   = $('Gmail — Ler rascunho (cobrança)').all(), uma por consulta, na mesma ordem.\nconst cobrancas = $('Switch — ação').all(1).map((i) => i.json);\nconst consultas = $('IF — Há rascunho a consultar? (cobrança)').all(0).map((i) => i.json);\nconst lido = $('Gmail — Ler rascunho (cobrança)');\nconst respostas = consultas.length && lido.isExecuted ? lido.all().map((i) => i.json) : [];\nconst leituras = cobrancas.map(() => ({ pedido: null, cobranca: null }));\nconsultas.forEach((c, k) => {\n  // número de respostas diferente do de consultas: não dá para parear com segurança\n  const l = respostas.length === consultas.length ? classificarLeituraRascunho(respostas[k], c.draftIdConsulta) : { estado: 'nao_verificado', motivo: 'respostas e consultas não batem (' + respostas.length + '/' + consultas.length + ')' };\n  if (leituras[c.indiceCobranca]) leituras[c.indiceCobranca][c.tipo] = l;\n});\nreturn cobrancas.map((d, i) => {\n  const r = decidirCobrancaPorRascunhos(leituras[i].pedido, leituras[i].cobranca);\n  if (r.acao === 'cobrar_rascunho') return { json: d };\n  return { json: { ...d, acao: r.acao, motivoVerificacao: r.motivo, novoEstadoCobranca: undefined } };\n});"
+      },
+      "id": "d66-decidir",
+      "name": "Decidir cobrança (rascunhos)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6320,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $json.acao }}",
+              "rightValue": "cobrar_rascunho",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      },
+      "id": "d66-if-criar",
+      "name": "IF — Criar a cobrança?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        6540,
+        100
+      ],
+      "notes": "D66: saída 0 = criar o rascunho da cobrança; saída 1 = só relatar (sem cobrancas, sem marcador)."
     }
   ],
   "connections": {
@@ -5210,7 +5334,7 @@
         ],
         [
           {
-            "node": "Gmail — Cobrança (rascunho na thread)",
+            "node": "Preparar consultas de rascunho (cobrança)",
             "type": "main",
             "index": 0
           }
@@ -7502,6 +7626,86 @@
             "node": "Casar resposta do Gmail (cobrança rascunho)",
             "type": "main",
             "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar consultas de rascunho (cobrança)": {
+      "main": [
+        [
+          {
+            "node": "IF — Há rascunho a consultar? (cobrança)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — Há rascunho a consultar? (cobrança)": {
+      "main": [
+        [
+          {
+            "node": "Gmail — Ler rascunho (cobrança)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Merge — consultas de rascunho (cobrança)",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Gmail — Ler rascunho (cobrança)": {
+      "main": [
+        [
+          {
+            "node": "Merge — consultas de rascunho (cobrança)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge — consultas de rascunho (cobrança)": {
+      "main": [
+        [
+          {
+            "node": "Decidir cobrança (rascunhos)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Decidir cobrança (rascunhos)": {
+      "main": [
+        [
+          {
+            "node": "IF — Criar a cobrança?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — Criar a cobrança?": {
+      "main": [
+        [
+          {
+            "node": "Gmail — Cobrança (rascunho na thread)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Merge — resultados consolidados",
+            "type": "main",
+            "index": 4
           }
         ]
       ]

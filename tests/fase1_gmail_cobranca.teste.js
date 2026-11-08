@@ -74,8 +74,8 @@ function itemFiltro(linha, colunaL, modo, cobrancas, extraNota = {}) {
 const LEITURAS_CFG = new Set(['Ler config_execucao.json', 'Ler cobrancas.json', 'Ler apelidos.json', 'Ler cost_reports.json']);
 const VIOLACOES_TODAS = [];
 async function rodar({ wf = WF_HML, sufixo = '_hml', fonteId = 'S02', modo = 'rascunho', marcadores = MARC_5, falharListagem, falharAplicar, agora = '2026-11-08T01:13:55Z',
-  cobrancas = {}, inicio, entrada, limite = 1, parar = [], threads, falharRascunho, rascunhoSemId, rascunhoSemThread }) {
-  const gmail = criarGmail({ modo, marcadores, falharListagem, falharAplicar, threads, falharRascunho, rascunhoSemId, rascunhoSemThread });
+  cobrancas = {}, inicio, entrada, limite = 1, parar = [], threads, falharRascunho, rascunhoSemId, rascunhoSemThread, leituraRascunho }) {
+  const gmail = criarGmail({ modo, marcadores, falharListagem, falharAplicar, threads, falharRascunho, rascunhoSemId, rascunhoSemThread, leituraRascunho });
   const disco = { [DIR + 'cobrancas' + sufixo + '.json']: Buffer.from(JSON.stringify(cobrancas)), [DIR + 'log_diario' + sufixo + '.json']: Buffer.from('[]') };
   const antes = { cobrancas: disco[DIR + 'cobrancas' + sufixo + '.json'].toString(), log: disco[DIR + 'log_diario' + sufixo + '.json'].toString() };
   const box = { http: (m, u) => { throw new Error('simulador: este teste não fala com o Box (' + m + ' ' + u + ')'); }, download: (id) => { throw new Error('simulador: download do Box ' + id); } };
@@ -338,9 +338,11 @@ const semViolacao = (cen, r) => caso(cen, 'Gmail: nenhum envio (D64: 0 violaçõ
       }).map((n) => n.name);
       caso(cen, nome + ': nenhum node com send, reply, forward, sendAndWait, draft/send, SMTP ou POST .../send', [], enviam);
       const gmail = wf.nodes.filter((n) => /\.gmail$/.test(n.type)).map((n) => (n.parameters.resource || 'message') + '/' + n.parameters.operation).sort();
-      caso(cen, nome + ': os nodes do Gmail que sobraram só leem, criam rascunho ou aplicam marcador',
+      caso(cen, nome + ': os nodes do Gmail que sobraram só leem, criam rascunho ou aplicam marcador (a leitura de rascunho da D66 é o HTTP acima)',
         ['draft/create', 'draft/create', 'label/getAll', 'message/addLabels', 'message/addLabels', 'message/get', 'message/getAll'], gmail);
       const nomes = wf.nodes.map((n) => n.name);
+      const httpGmail = wf.nodes.filter((n) => /httpRequest/.test(n.type) && /gmail\.googleapis/.test(JSON.stringify(n.parameters || {}))).map((n) => [(n.parameters.method || 'GET'), n.parameters.url]);
+      caso(cen, nome + ': o único HTTP para o Gmail é a LEITURA de rascunho (GET drafts/{id}, D66), permitida', [['GET', '=https://gmail.googleapis.com/gmail/v1/users/me/drafts/{{ $json.draftIdConsulta }}?format=minimal']], httpGmail);
       caso(cen, nome + ': saíram os nodes de envio e as cadeias deles', [], ['Gmail — Enviar direto (automático)', 'Gmail — Cobrança (enviar, automático)', 'Gmail — Enviar rascunho programado', 'Gmail — Checar rascunho programado', 'Capturar threadId (envio direto)'].filter((x) => nomes.includes(x)));
       const js = wf.nodes.map((n) => (n.parameters && n.parameters.jsCode) || '').join('\n');
       caso(cen, nome + ': nenhum Code node decide envio ("enviar_direto", "enviar_programado", "cobrar_enviar")', [], ['enviar_direto', 'enviar_programado', 'cobrar_enviar'].filter((x) => js.includes("'" + x + "'")));
@@ -443,7 +445,7 @@ const semViolacao = (cen, r) => caso(cen, 'Gmail: nenhum envio (D64: 0 violaçõ
   const entrada114 = (extra = {}) => ({ 'SOFT PRE_S02_L114': { threadId: 't-114', draftId: 'r-114', gatilho: 'SOLICITAR', data_base_cobranca: '2026-11-07', data_ultima_cobranca: '2026-11-07', contagem_cobrancas: 0, status_ciclo: 'em_andamento',
     assunto: 'SMTC - S02 | SOFT PRE | EMISSÃO DE NF | REF. AGO (ENVIAR ATÉ 07.11) | PESSOA 114', emailDestino: 'teste@exemplo.invalid', emailCopia: 'copia@exemplo.invalid', marcadores: ['IA', 'SOFT PRE - PEDIDO DE NOTAS'], linhas: [114], ...extra } });
   const TH = () => ({ 't-114': [{ id: 'm-114', labelIds: ['SENT'] }] });
-  const cobrar = (op) => rodar({ limite: 0, threads: TH(), inicio: 'Filtrar por Status Box (novo pedido / monitoramento)', ...op, entrada: [itemFiltro(114, 'SOLICITADA MI', op.modo || 'rascunho', op.cobrancas)] });
+  const cobrar = (op) => rodar({ limite: 0, threads: TH(), inicio: 'Filtrar por Status Box (novo pedido / monitoramento)', entrada: [itemFiltro(114, 'SOLICITADA MI', op.modo || 'rascunho', op.cobrancas)], ...op });
   for (const modo of ['rascunho', 'automatico']) {
     const cen = '7d (a) cobrança devida, modo ' + modo;
     const est = entrada114();
@@ -498,6 +500,102 @@ const semViolacao = (cen, r) => caso(cen, 'Gmail: nenhum envio (D64: 0 violaçõ
     caso(cen, c.ids ? 'Aplicar 1x, no rascunho da cobrança, com os ids encontrados' : 'Aplicar NÃO chamado', c.ids ? [1, c.ids, r.gmail.rascunhos[0] && r.gmail.rascunhos[0].messageId] : [0], c.ids ? [ap.length, ap[0] && ap[0].p.labelIds, ap[0] && ap[0].p.messageId] : [ap.length]);
     if (c.rel) caso(cen, 'Relatório avisa: "' + c.rel + '"', true, (r.relatorio || '').includes(c.rel), r.relatorio);
     semViolacao(cen, r);
+  }
+
+  // ======================================================================================
+  console.log('\n== 7e. D66: não criar cobrança se o rascunho do pedido ou o da cobrança anterior ainda existe ==');
+  {
+    const cen = '7e D66 biblioteca';
+    const B = require(path.join(RAIZ, 'scripts', 'lib', 'rascunho_cobranca.js'));
+    const cl = (r, id) => B.classificarLeituraRascunho(r, id).estado;
+    caso(cen, '200 com o rascunho = existe; 404 = sumiu; 500, 401, rede, 200 sem corpo, 200 de outro id, sem código = não verificado',
+      ['existe', 'sumiu', 'nao_verificado', 'nao_verificado', 'nao_verificado', 'nao_verificado', 'nao_verificado', 'nao_verificado'],
+      [cl({ statusCode: 200, body: { id: 'r-1' } }, 'r-1'), cl({ statusCode: 404, body: {} }, 'r-1'), cl({ statusCode: 500, body: {} }, 'r-1'), cl({ statusCode: 401 }, 'r-1'),
+        cl({ error: { message: 'ENOTFOUND' } }, 'r-1'), cl({ statusCode: 200, body: '' }, 'r-1'), cl({ statusCode: 200, body: { id: 'r-2' } }, 'r-1'), cl({}, 'r-1')]);
+    const ex = { estado: 'existe' }, su = { estado: 'sumiu' }, nv = { estado: 'nao_verificado', motivo: 'HTTP 500' };
+    caso(cen, 'decisão: pedido existe; pedido sumiu + anterior existe; os dois sumiram; nada consultado; dúvida no pedido; dúvida na anterior',
+      ['cobranca_pedido_em_rascunho', 'cobranca_anterior_em_rascunho', 'cobrar_rascunho', 'cobrar_rascunho', 'cobranca_nao_verificada', 'cobranca_nao_verificada'],
+      [B.decidirCobrancaPorRascunhos(ex, null), B.decidirCobrancaPorRascunhos(su, ex), B.decidirCobrancaPorRascunhos(su, su), B.decidirCobrancaPorRascunhos(null, null),
+        B.decidirCobrancaPorRascunhos(nv, su), B.decidirCobrancaPorRascunhos(su, nv)].map((x) => x.acao));
+  }
+  const cobr115 = { ...entrada114()['SOFT PRE_S02_L114'], threadId: 't-115', draftId: 'r-115', linhas: [115], assunto: 'ASSUNTO 115' };
+  const TH2 = () => ({ ...TH(), 't-115': [{ id: 'm-115', labelIds: ['SENT'] }] });
+  const leituras = (r) => r.gmail.leituras;
+  const AMBS = [['homolog', WF_HML, '_hml'], ['produção', WF_PROD, '']];
+  for (const [amb, wf, sufixo] of AMBS) for (const modo of ['rascunho', 'automatico']) {
+    const tag = ' (' + amb + ', ' + modo + ')';
+    const rodarD66 = (est, op = {}) => cobrar({ wf, sufixo, modo, cobrancas: est, agora: '2026-11-08T15:00:00Z', ...op });
+    {
+      const cen = '7e (a) pedido ainda em rascunho' + tag;
+      const est = entrada114();
+      const r = await rodarD66(est, { leituraRascunho: { 'r-114': 'existe' } });
+      caso(cen, 'sem erro; 1 leitura (o pedido); 0 rascunhos; 0 marcadores; cobrancas intacto', [null, ['r-114'], 0, 0, est['SOFT PRE_S02_L114']],
+        [r.erro, leituras(r), r.gmail.rascunhos.length, aplicarChamadas(r).length, (r.cobrancas || {})['SOFT PRE_S02_L114']]);
+      caso(cen, 'Relatório: "Pedido ainda em rascunho (cobrança não criada): L114"; nenhum pedido de L', [true, false], [(r.relatorio || '').includes('Pedido ainda em rascunho (cobrança não criada): L114'), !!r.chegou['Escrita L — 01 config e alvos']], r.relatorio);
+      semViolacao(cen, r);
+    }
+    {
+      const cen = '7e (b) pedido sumiu (404), sem cobrança anterior' + tag;
+      const r = await rodarD66(entrada114(), { leituraRascunho: { 'r-114': '404' } });
+      const e = (r.cobrancas || {})['SOFT PRE_S02_L114'] || {};
+      const rc = r.gmail.rascunhos[0] || {};
+      caso(cen, 'sem erro; 1 leitura; 1 rascunho na thread; soma 1; guarda draftIdCobranca e threadId', [null, ['r-114'], 1, 't-114', 1, rc.id, 't-114'],
+        [r.erro, leituras(r), r.gmail.rascunhos.length, rc.threadIdPedido, e.contagem_cobrancas, e.draftIdCobranca, e.threadId]);
+      semViolacao(cen, r);
+    }
+    {
+      const cen = '7e (c) cobrança anterior ainda em rascunho' + tag;
+      const est = entrada114({ contagem_cobrancas: 1, data_ultima_cobranca: '2026-11-01', draftIdCobranca: 'rc-1' });
+      const r = await rodarD66(est, { leituraRascunho: { 'r-114': '404', 'rc-1': 'existe' } });
+      caso(cen, 'sem erro; 2 leituras (pedido e anterior); 0 rascunhos; cobrancas intacto', [null, ['r-114', 'rc-1'], 0, est['SOFT PRE_S02_L114']],
+        [r.erro, leituras(r), r.gmail.rascunhos.length, (r.cobrancas || {})['SOFT PRE_S02_L114']]);
+      caso(cen, 'Relatório: "Cobrança anterior ainda em rascunho (outra não criada): L114"', true, (r.relatorio || '').includes('Cobrança anterior ainda em rascunho (outra não criada): L114'), r.relatorio);
+      semViolacao(cen, r);
+    }
+    {
+      const cen = '7e (d) cobrança anterior sumiu (404)' + tag;
+      const est = entrada114({ contagem_cobrancas: 1, data_ultima_cobranca: '2026-11-01', draftIdCobranca: 'rc-1' });
+      const r = await rodarD66(est, { leituraRascunho: { 'r-114': '404', 'rc-1': '404' } });
+      const e = (r.cobrancas || {})['SOFT PRE_S02_L114'] || {};
+      caso(cen, 'cria a próxima: 1 rascunho; soma (2); novo draftIdCobranca', [null, 1, 2, (r.gmail.rascunhos[0] || {}).id], [r.erro, r.gmail.rascunhos.length, e.contagem_cobrancas, e.draftIdCobranca]);
+      semViolacao(cen, r);
+    }
+    for (const falha of ['500', 'rede', 'semCorpo', '401']) {
+      for (const qual of ['pedido', 'anterior']) {
+        const cen = '7e (e) consulta do ' + qual + ' com ' + falha + tag;
+        const est = qual === 'pedido' ? entrada114() : entrada114({ contagem_cobrancas: 1, data_ultima_cobranca: '2026-11-01', draftIdCobranca: 'rc-1' });
+        const lr = qual === 'pedido' ? { 'r-114': falha } : { 'r-114': '404', 'rc-1': falha };
+        const r = await rodarD66(est, { leituraRascunho: lr });
+        caso(cen, 'sem erro na execução; NÃO cria; NÃO soma (cobrancas intacto)', [null, 0, est['SOFT PRE_S02_L114']], [r.erro, r.gmail.rascunhos.length, (r.cobrancas || {})['SOFT PRE_S02_L114']]);
+        caso(cen, 'Relatório: "Não consegui verificar o rascunho (cobrança não criada): L114 (motivo)"', true, /Não consegui verificar o rascunho \(cobrança não criada\): L114 \(.+\)/.test(r.relatorio || ''), r.relatorio);
+        semViolacao(cen, r);
+      }
+    }
+    {
+      const cen = '7e (f) entrada antiga, sem draftId do pedido' + tag;
+      const est = entrada114({ draftId: undefined });
+      const r = await rodarD66(est);
+      caso(cen, 'nenhuma leitura; segue como antes: cria a cobrança e soma 1', [null, [], 1, 1], [r.erro, leituras(r), r.gmail.rascunhos.length, ((r.cobrancas || {})['SOFT PRE_S02_L114'] || {}).contagem_cobrancas]);
+      caso(cen, 'Relatório sem aviso de rascunho', false, /ainda em rascunho|Não consegui verificar/.test(r.relatorio || ''));
+    }
+    {
+      const cen = '7e (g) linha NÃO devida pela cadência' + tag;
+      const r = await cobrar({ wf, sufixo, modo, cobrancas: entrada114(), agora: '2026-11-07T20:00:00Z', leituraRascunho: { 'r-114': 'existe' } });
+      caso(cen, '0 leituras de rascunho; nenhuma chamada de Gmail além da listagem de marcadores', [null, [], ['label/getAll']], [r.erro, leituras(r), r.gmail.chamadas.filter((c) => !/^HTTP GET \/drafts/.test(c.op)).map((c) => c.op)]);
+    }
+    for (const [ordem, lr] of [['L114 existe, L115 404', { 'r-114': 'existe', 'r-115': '404' }], ['L114 404, L115 existe', { 'r-114': '404', 'r-115': 'existe' }]]) {
+      const cen = '7e (h) 2 linhas devidas, ' + ordem + tag;
+      const est = { ...entrada114(), 'SOFT PRE_S02_L115': cobr115 };
+      const r = await cobrar({ wf, sufixo, modo, cobrancas: est, agora: '2026-11-08T15:00:00Z', leituraRascunho: lr, threads: TH2(),
+        entrada: [itemFiltro(114, 'SOLICITADA MI', modo, est), itemFiltro(115, 'SOLICITADA MI', modo, est)] });
+      const criada = lr['r-114'] === '404' ? 114 : 115, parada = criada === 114 ? 115 : 114;
+      const dec = Object.fromEntries((r.saida('Decidir cobrança (rascunhos)') || []).map((d) => [d.nota.linha, d.acao]));
+      caso(cen, 'cada linha recebe a SUA decisão (prova do pareamento)', { [criada]: 'cobrar_rascunho', [parada]: 'cobranca_pedido_em_rascunho' }, dec);
+      caso(cen, '1 rascunho, na thread da linha criada; só ela soma; a outra fica intacta', [null, 1, 't-' + criada, 1, est['SOFT PRE_S02_L' + parada]],
+        [r.erro, r.gmail.rascunhos.length, (r.gmail.rascunhos[0] || {}).threadIdPedido, ((r.cobrancas || {})['SOFT PRE_S02_L' + criada] || {}).contagem_cobrancas, (r.cobrancas || {})['SOFT PRE_S02_L' + parada]]);
+      caso(cen, 'Relatório: "Pedido ainda em rascunho (cobrança não criada): L' + parada + '"', true, (r.relatorio || '').includes('Pedido ainda em rascunho (cobrança não criada): L' + parada), r.relatorio);
+      semViolacao(cen, r);
+    }
   }
 
   // ======================================================================================
